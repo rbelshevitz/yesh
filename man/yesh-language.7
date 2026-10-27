@@ -1,0 +1,100 @@
+.TH YESH-LANGUAGE 7 "October 2026" "yesh" "Yesh Language Manual"
+.SH NAME
+yesh-language \- language reference for the yesh administrative shell
+.SH PRINCIPLES
+yesh has one preferred way to express a common operation. It keeps strings,
+lists, regular expressions and command arguments distinct. It does not require
+.B $,
+historical test operators, or shell word-splitting rules.
+.SH LEXICAL RULES
+.IP \(bu 2
+Indentation uses spaces; tabs are rejected.
+.IP \(bu 2
+Blank lines and lines beginning with
+.B #
+are ignored.
+.IP \(bu 2
+Double-quoted strings use Go-style escapes.
+.IP \(bu 2
+Single-quoted strings preserve their contents and are recommended for regex.
+.SH VALUES
+.SS Scalars
+.EX
+name = web-1
+message = "hello world"
+.EE
+.SS Lists
+.EX
+hosts = [web-1, web-2, web-3]
+.EE
+.PP
+Nested lists are not supported in the current runtime.
+.SS Regular expressions
+.EX
+unit = regex '^(api|worker)@[a-z0-9.-]+$'
+.EE
+.PP
+The pattern is compiled when assigned. Invalid patterns and duplicate named
+capture groups are errors.
+.SH CONTROL FLOW
+.SS if
+.EX
+if exists "/etc/myapp.conf":
+    echo "configured"
+else:
+    echo "missing"
+.EE
+.PP
+An external command can be used as a condition. Exit status zero selects the
+body; a normal non-zero exit status selects
+.B else.
+Permission failures, symlink loops, signals and timeouts are execution errors,
+not ordinary false conditions. Use only exists path; exists(path) is rejected.
+.SS exit
+.EX
+exit 2
+.EE
+.PP
+exit code terminates the entire script with an explicit decimal code from
+0 to 255, including inside nested blocks. It is not a pipeline stage.
+In plan mode exit is displayed without terminating plan traversal.
+.SS matches
+.EX
+name = api-42
+pattern = regex '^api-[0-9]+$'
+if name matches pattern:
+    echo "valid"
+.EE
+.SS for
+.EX
+for host in hosts:
+    ssh host systemctl is-active api
+.EE
+.PP
+Only finite lists are accepted. The runtime enforces iteration and total-step
+limits. The
+.B while
+statement is disabled.
+.SH COMMANDS
+Commands remain Unix commands and are executed without an implicit shell.
+Arguments are preserved as separate values.
+.EX
+grep error app.log | head 20
+echo value > output.txt
+cat < input.txt
+.EE
+.PP
+The following constructs are rejected by default:
+.B ; , & , && , || , $() ,
+backticks, nested shell invocation, background jobs, and incomplete pipelines.
+.SH ERRORS
+Errors include the script filename and line number where available. A failed
+external command stops normal execution. Missing executables and process
+startup errors are not treated as ordinary false conditions.
+.SH DESIGN BOUNDARY
+yesh is an administrative scripting language, not a Python replacement and
+not a Bash compatibility layer. SSH, rsync, systemctl, journalctl, mount and
+other Unix tools remain external commands until a documented typed yesh
+operation is added.
+.SH SEE ALSO
+.BR yesh (1)

@@ -1,0 +1,16 @@
+# Минимальный deploy-сценарий.
+
+host = web-1
+release = build/current/
+# Адрес — полное значение: подстановки внутри host:path нет.
+target = web-1:/srv/app/
+
+echo "deploying" release "to" host
+rsync -az release target
+ssh host systemctl restart api
+
+if ssh host systemctl is-active api:
+    echo "deploy complete"
+else:
+    echo "deploy failed"
+    exit 1

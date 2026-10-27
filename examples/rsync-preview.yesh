@@ -1,0 +1,4 @@
+# Показать изменения, не изменяя источник и назначение.
+source = "source/"
+target = "target/"
+rsync -a --dry-run --itemize-changes -- source target

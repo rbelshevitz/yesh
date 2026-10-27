@@ -1,0 +1,11 @@
+# Проверка сервисов на одном хосте.
+# Скрипт читается сверху вниз: список → цикл → проверка → понятная ошибка.
+
+services = [nginx, sshd]
+
+for service in services:
+    if systemctl is-active service:
+        echo service "is running"
+    else:
+        echo service "is not running"
+        exit 1

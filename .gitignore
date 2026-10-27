@@ -1,0 +1,28 @@
+# Go build and test artifacts
+/yesh
+/yesh.exe
+*.test
+*.out
+*.exe
+
+# Local Go caches
+/.gocache/
+/.gomodcache/
+
+# Coverage and profiling output
+coverage.out
+coverage.html
+*.prof
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+/.tmp/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GOCACHE: ${{ github.workspace }}/.gocache
+      GOMODCACHE: ${{ github.workspace }}/.gomodcache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+      - name: Install practical test tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rsync pv rsnapshot initramfs-tools-core cpio zstd
+      - run: go test -trimpath ./...
+      - name: POSIX lifecycle and pipeline race checks
+        if: runner.os != 'Windows'
+        run: go test -race -trimpath ./cmd/yesh -run 'Test(POSIX|Linux|Pipeline)' -count=3 -timeout=240s
+      - name: Pipeline parser fuzz smoke
+        if: runner.os == 'Linux'
+        run: go test ./cmd/yesh -run '^$' -fuzz FuzzPipelinePreflight -fuzztime=10s -parallel=2
+      - run: go vet ./...
+      - run: go build -trimpath ./cmd/yesh

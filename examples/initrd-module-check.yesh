@@ -1,0 +1,5 @@
+# Проверка точного пути в подготовленном тестовом initramfs.
+# Это проверка манифеста, не доказательство совместимости/загрузки драйвера.
+image = "test-initrd.img"
+modulefile = "usr/lib/modules/6.1.0-yesh-test/kernel/drivers/nvme/host/nvme.ko"
+lsinitramfs image | grep -F -x -- modulefile

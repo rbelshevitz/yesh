@@ -1,0 +1,11 @@
+# Ordinary Unix commands, with readable control flow.
+name = world
+things = [one, two, three]
+
+echo hello name
+
+for thing in things:
+    echo item: thing
+
+if exists README.md:
+    echo the interpreter is here

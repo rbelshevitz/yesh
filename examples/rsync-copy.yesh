@@ -1,0 +1,9 @@
+# Копирование в существующий локальный каталог. Лишние файлы не удаляются.
+# Проверка exists не заменяет проверку монтирования backup-устройства.
+source = "source/"
+target = "target/"
+if exists target:
+    rsync -a --itemize-changes -- source target
+else:
+    echo "нет целевого каталога"
+    exit 2

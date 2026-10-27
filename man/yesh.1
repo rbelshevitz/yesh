@@ -1,0 +1,169 @@
+.TH YESH 1 "2026-10-27" "yesh experimental" "User Commands"
+.SH NAME
+yesh \- readable Unix automation with bounded process pipelines
+.SH SYNOPSIS
+.B yesh
+.RB [ \-\-plan ]
+.I SCRIPT.yesh
+.SH DESCRIPTION
+.B yesh
+runs a small indentation-based automation language through its own
+process runtime. It does not translate scripts to Bash.
+A failing command stops the script by default.
+.PP
+This implementation is experimental. Read the script and its external
+commands before granting access to privileged resources.
+.SH OPTIONS
+.TP
+.B \-\-plan
+Validate commands and print expanded argument vectors and redirections
+without running commands or opening redirected files.
+Both branches of a command-based condition are shown.
+.SH LANGUAGE
+.SS Values and arguments
+.nf
+service = api
+items = [one, 'two words']
+echo service "service"
+printf '%s\en' items
+.fi
+.PP
+An unquoted existing name expands to its value.
+Quoted words are literal arguments, including empty strings.
+A scalar produces one argument; a list produces separate arguments.
+Single quotes preserve raw text. Double quotes decode Go-style escape
+sequences identically in assignments, lists and command arguments.
+Values are never reinterpreted as pipeline operators, shell substitutions,
+or glob patterns.
+.SS Blocks
+.nf
+if exists /etc/os-release:
+    cat < /etc/os-release
+else:
+    echo "no release information"
+for item in items:
+    echo item
+.fi
+.PP
+Blocks use spaces and indentation.
+Loops must iterate over finite lists.
+An ordinary nonzero command exit status makes a command condition false.
+Timeouts, cancellation, missing commands and signal termination are errors.
+The only file predicate form is "exists path", with one nonempty string.
+Missing targets are false; permission failures and symlink loops are errors.
+The old exists(path) spelling is rejected with a migration hint.
+.SS Completion
+.nf
+if exists /etc/os-release:
+    exit 0
+exit 2
+.fi
+.PP
+exit code terminates the entire script, including nested blocks, with an
+explicit decimal code from 0 to 255. It is a control statement, not an
+external command or pipeline stage. In plan mode it is displayed without
+ending plan traversal.
+.SS Pipelines
+.nf
+cat < input.txt | sort | uniq > output.txt
+printf '%s\en' next >> output.txt
+.fi
+.PP
+A pipeline may contain at most 32 stages.
+Input redirection is allowed once, on the first stage.
+Output redirection is allowed once, on the last stage.
+The first stage inherits standard input unless redirected.
+Standard error is inherited independently of the pipeline.
+.PP
+Any failing stage stops the pipeline, including a writer killed by SIGPIPE
+when a reader closes early.
+Repeated or intermediate redirections, numbered descriptor redirections,
+here-documents, background operators, shell command chaining and command
+substitution are rejected.
+.PP
+On POSIX, redirects accept regular files and /dev/null.
+Output symlinks and multiply linked regular files are rejected.
+A regular file cannot be used as both input and output of one pipeline.
+Appending is explicit with >>.
+.SS Processes and signals
+On POSIX each pipeline runs in a separate process group.
+The default timeout is five minutes per command or pipeline, rather than
+per entire script.
+Cancellation or failure sends TERM to the group, followed by KILL after
+a two-second grace period when necessary.
+Direct children are waited for and descriptors are closed.
+.PP
+The CLI handles INT, TERM and HUP by cancelling the active command.
+KILL cannot be handled. Processes that escape the group with a new session
+require stronger isolation; full POSIX job control and PTY management
+are not implemented. Windows process cleanup has different semantics.
+.SH SECURITY
+Known shell commands are rejected after argument expansion on every stage.
+Known code interpreters and execution wrappers are rejected in pipelines.
+For example, curl piped to sh or data piped to xargs is rejected.
+.PP
+These checks prevent common dangerous forms; they are not a security
+boundary for untrusted scripts.
+External binaries, scripts with shebangs and tool-specific execution features
+can execute arbitrary code and access resources allowed to the current user.
+Use operating-system isolation for untrusted code.
+.SH CRON
+Use the absolute path to yesh and the absolute script filename in crontab.
+Set an explicit PATH and use /dev/null as stdin for noninteractive jobs.
+Use an external lock and an overall script timeout when appropriate.
+Do not set crontab SHELL to yesh: cron expects a shell supporting -c.
+.PP
+The default timeout applies to each pipeline separately.
+Package transactions may need a different policy and can be left incomplete
+when interrupted. A timeout is not a transaction rollback.
+.SH FILE PERMISSIONS
+chmod and chown are external commands with their own link and privilege
+semantics; yesh does not implement a typed permissions interface yet.
+The sticky bit on a shared directory restricts removing and renaming
+other users' entries. It does not protect writable file contents.
+ACLs, immutable and append-only attributes, capabilities and SELinux or
+AppArmor policy may restrict access independently of ordinary mode bits.
+No such protection is disabled automatically.
+.SH ENVIRONMENT
+External commands inherit the caller's environment and working directory.
+PATH controls executable lookup; implicit lookup from the current directory
+is rejected by Go's default executable lookup policy.
+There is no automatic sudo, user profile loading or environment sanitization.
+Language variables are not automatically exported.
+.SH EXIT STATUS
+An explicit exit statement returns its requested code (0 through 255).
+Otherwise the CLI returns:
+.TP
+.B 0
+Successful execution or plan.
+.TP
+.B 1
+Script read, parse or execution failure, including cancellation and timeout.
+.TP
+.B 2
+Invalid command-line usage.
+.SH FILES
+.I SCRIPT.yesh
+is read before execution.
+Relative filenames are resolved against the inherited working directory,
+not the script's directory.
+.SH EXAMPLES
+.nf
+yesh /opt/ops/check.yesh
+yesh --plan /opt/ops/check.yesh
+man -l man/yesh.1
+.fi
+.SH SEE ALSO
+.BR crontab (5),
+.BR cron (8),
+.BR flock (1),
+.BR timeout (1),
+.BR signal (7),
+.BR pipe (7),
+.BR apt-get (8),
+.BR dpkg (1),
+.BR rpm (8),
+.BR snap (8)
+.PP
+Project documents: docs/pipeline-safety.ru.md, docs/cron.ru.md,
+docs/packages.ru.md and docs/linux-integration.ru.md.

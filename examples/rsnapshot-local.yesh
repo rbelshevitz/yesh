@@ -1,0 +1,5 @@
+# Конфигурация rsnapshot готовится отдельно, с no_create_root=1 и lockfile.
+# Перед реальным backup требуется проверка монтирования целевого устройства.
+config = "rsnapshot.conf"
+rsnapshot -c config configtest
+rsnapshot -c config daily

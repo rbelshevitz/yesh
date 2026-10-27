@@ -1,0 +1,14 @@
+# Запуск из рабочего каталога, содержащего source/.
+# Архив публикуется только после успеха всех стадий.
+source = "source"
+partial = "backup.tar.gz.partial"
+archive = "backup.tar.gz"
+
+if exists source:
+    tar -cf - -- source | gzip > partial
+    mv -- partial archive
+    printf '%s\n' '{"schema":1,"status":"complete","archive":"backup.tar.gz"}' > "backup-state.json.partial"
+    mv -- "backup-state.json.partial" "backup-state.json"
+else:
+    echo "нет исходного каталога"
+    exit 2
