@@ -10,19 +10,22 @@ yesh — небольшая оболочка на Go для читаемых Dev
 
 ## Простая проверка служб
 
-Задача: проверить список служб и завершиться с ошибкой, если какая-либо служба
-не активна.
+Задача: проверить список служб и завершиться с ошибкой, если активность
+какой-либо службы не подтверждена. Нужны доступ к systemd и установленные
+службы; замените `nginx` и `sshd` именами служб своей машины.
 
 ### Bash
 
 ```bash
 services=(nginx sshd)
 
+systemctl show --property=Version >/dev/null || exit 1
+
 for service in "${services[@]}"; do
-    if systemctl is-active --quiet "$service"; then
-        echo "$service is running"
+    if systemctl is-active --quiet -- "$service"; then
+        echo "$service is active"
     else
-        echo "$service is not running"
+        echo "$service active check failed"
         exit 1
     fi
 done
@@ -33,21 +36,29 @@ done
 ```yesh
 services = [nginx, sshd]
 
+systemctl show --property=Version > /dev/null
+
 for service in services:
-    if systemctl is-active --quiet service:
-        echo service "is running"
+    if systemctl is-active --quiet -- service:
+        echo service "is active"
     else:
-        echo service "is not running"
+        echo service "active check failed"
         exit 1
 ```
+
+Сначала отдельная команда проверяет доступ к менеджеру systemd. Её ошибка
+останавливает скрипт до сообщений о службах. Если доступ пропадёт позже,
+`active check failed` сообщает о неуспешной проверке, а не утверждает, что
+служба остановлена. Подробность ошибки остаётся в stderr.
 
 Версия на yesh читается сверху вниз как последовательность понятных шагов:
 
 1. определить список;
-2. пройти по каждой службе;
-3. проверить результат команды;
-4. вывести результат;
-5. явно завершиться при ошибке.
+2. проверить доступ к systemd;
+3. пройти по каждой службе;
+4. проверить результат команды;
+5. вывести результат;
+6. явно завершиться при ошибке.
 
 Здесь нет `$service`, `${services[@]}`, `[[ ... ]]`, `then`, `fi`, `do`,
 `done` и обязательного `set -euo pipefail`.
@@ -69,16 +80,23 @@ word splitting нет.
 ### Команды остаются Unix-командами
 
 ```yesh
-ps -eo pid=,ppid=,user=,rss=,stat=,comm= | head -n 25
+ps -eo pid=,ppid=,user=,rss=,stat=,comm= | sort -k 4,4nr
 ```
 
 Конвейеры, перенаправления и аргументы сохраняют привычную форму Unix. yesh
 запускает команды напрямую через Go-runtime, не разбирая всю строку ещё раз
 через другую оболочку.
 
+`sort` читает весь вход и сортирует строки по RSS по убыванию. Раннее
+завершение читателя, например `head`, может послать писателю SIGPIPE; yesh
+считает ошибку любой стадии ошибкой конвейера. Поэтому первый пример
+не использует досрочное закрытие канала.
+
 ### Ошибки видны по умолчанию
 
-Если `systemctl` не запускается или возвращает ошибку, условие `if` ложно.
+Нулевой код запущенной команды означает true, обычный ненулевой код — false.
+Отсутствие команды, невозможность запуска, сигнал, отмена и превышение
+времени остаются ошибками выполнения: они не переводят управление в `else`.
 Если обычная команда завершается с ошибкой вне условия, yesh останавливает
 скрипт и указывает исходную строку. `set -e` не нужен.
 
@@ -103,13 +121,17 @@ else:
 go build -trimpath -o yesh ./cmd/yesh
 ```
 
-Запуск скрипта:
+Запуск автономного примера, которому не нужны systemd и службы:
 
 ```text
-./yesh examples/service-check.yesh
+./yesh examples/hello.yesh
 ```
 
-Показать раскрытые команды и ветвления без выполнения:
+На машине с systemd после выбора имён служб можно выполнить
+`./yesh examples/service-check.yesh`. Это проверка состояния, не запуск служб.
+
+Показать раскрытые команды и ветвления без выполнения (доступ к systemd
+для этого не нужен):
 
 ```text
 ./yesh --plan examples/service-check.yesh

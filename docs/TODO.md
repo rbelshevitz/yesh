@@ -30,6 +30,9 @@ fixture; it does not claim a formal proof or universal production safety.
 - `exists path` and typed RE2 regular-expression conditions;
 - Linux/POSIX tests for SIGPIPE, stuck writers, cancellation, and resource
   cleanup.
+- executable quickstart examples kept in sync across English, Russian and
+  the service-check script, with checks for unavailable systemd, failed
+  commands, complete pipeline input, predicates and plans.
 
 ## Next practical slice: safe transfer and backup
 

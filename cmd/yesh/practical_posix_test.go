@@ -35,7 +35,7 @@ func practicalDependencies(t *testing.T, names ...string) {
 	t.Helper()
 	for _, name := range names {
 		if _, err := exec.LookPath(name); err != nil {
-			packageName := map[string]string{"pv": "pv", "rsnapshot": "rsnapshot", "rsync": "rsync", "tar": "tar", "gzip": "gzip", "install": "coreutils", "grep": "grep", "mv": "coreutils", "cat": "coreutils", "cp": "coreutils", "rm": "coreutils", "lsinitramfs": "initramfs-tools-core", "cpio": "cpio", "zstd": "zstd"}[name]
+			packageName := map[string]string{"pv": "pv", "rsnapshot": "rsnapshot", "rsync": "rsync", "tar": "tar", "gzip": "gzip", "install": "coreutils", "grep": "grep", "mv": "coreutils", "cat": "coreutils", "cp": "coreutils", "rm": "coreutils", "sort": "coreutils", "lsinitramfs": "initramfs-tools-core", "cpio": "cpio", "zstd": "zstd"}[name]
 			t.Skipf("missing utility %s; install package %s on Debian/Ubuntu to run this practical test: %v", name, packageName, err)
 		}
 	}
@@ -228,28 +228,24 @@ func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
 	if err := os.Mkdir(bin, 0700); err != nil {
 		t.Fatal(err)
 	}
-	fixture := `#!/bin/sh
-printf '%s\n' "$*" >> "$TRACE_FILE"
-case "$2" in nginx) exit 0;; sshd) exit 3;; *) exit 9;; esac
-`
-	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte(fixture), 0700)
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte(quickstartSystemctlFixture), 0700)
 	script := filepath.Join(dir, "check.yesh")
 	source := readTestFile(t, practicalExample(t, "service-check.yesh"))
 	writeTestFile(t, script, append(source, []byte("\ntouch after\n")...), 0600)
 	trace := filepath.Join(dir, "trace")
 	cmd := practicalCommand(t, dir, script)
-	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace, "CHECK_MODE=inactive")
 	out, err := cmd.CombinedOutput()
 	exit, ok := err.(*exec.ExitError)
 	if !ok || exit.ExitCode() != 1 {
 		t.Fatalf("service failure: %v %s", err, out)
 	}
-	for _, want := range []string{"nginx is running", "sshd is not running"} {
+	for _, want := range []string{"nginx is active", "sshd active check failed"} {
 		if !bytes.Contains(out, []byte(want)) {
 			t.Fatalf("missing %q: %s", want, out)
 		}
 	}
-	if got := string(readTestFile(t, trace)); got != "is-active nginx\nis-active sshd\n" {
+	if got := string(readTestFile(t, trace)); got != "show --property=Version\nis-active --quiet -- nginx\nis-active --quiet -- sshd\n" {
 		t.Fatalf("service calls: %q", got)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "after")); !os.IsNotExist(err) {

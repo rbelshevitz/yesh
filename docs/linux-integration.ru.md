@@ -99,7 +99,7 @@ umask 077 и установка/снятие sticky-bit в собственны�
 
 ## Проверенное окружение, 2026-10-27
 
-- Ubuntu 24.04.4, WSL2 kernel `6.18.54.1-microsoft-standard-WSL2`.
+- Ubuntu 24.04.4 LTS, WSL2 kernel `6.18.54.1-microsoft-standard-WSL2`.
 - `/proc`, `/proc/self/fd`, `/sys/module` доступны для чтения.
 - cgroup v2 доступна; controllers: cpuset, cpu, io, memory, hugetlb, pids, rdma.
   Mount read-only: delegation и изменение лимитов здесь не проверяются.
@@ -107,9 +107,11 @@ umask 077 и установка/снятие sticky-bit в собственны�
   `screen` отсутствует. `findmnt`, `lsblk`, `journalctl` доступны.
   `rsyslogd` установлен; `udevadm info` читает sysfs для loopback,
   `modprobe -n -v loop` завершился успешно.
-- В `/etc/wsl.conf` есть `systemd=true`, но PID 1 в sandbox — `codex`,
-  cgroup процесса — `/non-systemd`; `systemctl is-system-running` получает
-  `Failed to connect to bus: Operation not permitted`. Чтение journal доступно.
+- В WSL включён systemd (`/etc/wsl.conf`, `systemd=true`). В sandbox агента
+  PID 1 — `codex`, cgroup процесса — `/non-systemd`, поэтому именно из sandbox
+  `systemctl is-system-running` получает `Failed to connect to bus:
+  Operation not permitted`; это ограничение агента, а не отсутствие systemd в WSL.
+  Чтение journal доступно.
 - Каталог модулей текущего ядра присутствует. Загрузка/выгрузка модулей,
   изменение cgroup и запуск tmux sessions не выполнялись.
 - Пользователь установил pv 1.8.5, rsnapshot 1.4.5, lsinitramfs/cpio/zstd;
