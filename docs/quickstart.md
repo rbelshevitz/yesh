@@ -109,19 +109,21 @@ Run a script normally:
 ./yesh examples/service-check.yesh
 ```
 
-Inspect expanded commands and branches without running them:
+Preview the script in **dry-run** mode: inspect expanded commands and branches
+without running external programs:
 
 ```text
 ./yesh --plan examples/service-check.yesh
 ```
 
 `--plan` is useful during review: it shows the argument vectors and planned
-branches while avoiding command execution.
+branches while avoiding external command execution. It previews the plan; it
+does not run the script.
 
 ## The boundary
 
-yesh is not Bash compatibility mode and not Python with a command shortcut.
-It deliberately has a smaller language:
+yesh is a small language for Unix automation, not Python with a command
+shortcut. It deliberately keeps its language surface small:
 
 - use Unix tools such as `grep`, `sed`, `awk`, `ssh`, `systemctl`, and `rsync`;
 - use yesh for readable control flow, typed strings/lists, direct arguments,

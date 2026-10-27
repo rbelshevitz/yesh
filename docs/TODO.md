@@ -13,6 +13,11 @@ The project priority is:
 
 The detailed engineering plan is available in [Russian](TODO.ru.md).
 
+Russian project notes use Р.П.П. for «реальные практические примеры».
+English documentation calls these **Real-World Examples** or **Practical
+Examples**. The phrase describes work with real tools or a controlled test
+fixture; it does not claim a formal proof or universal production safety.
+
 ## Done in the current runtime
 
 - Go runtime with no Python dependency;

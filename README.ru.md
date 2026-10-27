@@ -2,6 +2,7 @@
 
 ![status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)
+[![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Читаемая и безопасная Unix-оболочка для DevOps и системного
@@ -68,12 +69,29 @@ go build -trimpath -o yesh ./cmd/yesh
 ./yesh examples/hello.yesh
 ```
 
-План выполнения без запуска внешних команд:
+Предварительный просмотр (**dry-run**): показать команды и ветви, которые
+предусмотрены скриптом, без запуска внешних команд:
 
 ```text
 ./yesh --plan examples/service-check.yesh
 ```
 
+Команды будут показаны уже с раскрытыми аргументами, но внешние программы
+(`systemctl`, `echo` и другие) запущены не будут. Это режим проверки плана,
+а не выполнение скрипта.
+
 Русские проектные документы, man-страница и практические примеры находятся
 в `docs/` и `man/`. Публичные runnable-примеры в `examples/` поддерживаются
 на английском языке.
+
+## Связь с Bash
+
+[Bash](https://www.gnu.org/software/bash/) — оболочка проекта GNU, **Bourne
+Again SHell**. Первоначально её разработал
+[Brian Fox](https://www.gnu.org/people/people.en.html); сейчас Bash
+сопровождает Chet Ramey.
+
+yesh — независимая реализация на Go со своим небольшим синтаксисом вокруг
+привычных Unix-команд. yesh опирается на рабочие сценарии Unix-оболочек, но
+не копирует и не встраивает исходный код Bash. Цель yesh — сделать обычные
+административные скрипты понятнее и безопаснее для ревью.

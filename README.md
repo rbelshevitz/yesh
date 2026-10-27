@@ -2,6 +2,7 @@
 
 ![status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)
+[![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A readable, safety-first Unix shell for DevOps and system administration.
@@ -99,3 +100,14 @@ rsync, rsnapshot, configuration changes and cancelled jobs.
 
 The runnable examples also include read-only process, journal, mount and SSH
 health checks in `examples/`.
+
+## Relationship to Bash
+
+[Bash](https://www.gnu.org/software/bash/) is the GNU Project's **Bourne Again
+SHell**. It was originally developed by [Brian Fox](https://www.gnu.org/people/people.en.html)
+and is currently maintained by Chet Ramey.
+
+yesh is an independent implementation written in Go, with its own smaller
+syntax around familiar Unix commands. It takes inspiration from Unix shell
+workflows, not from copying or embedding Bash source code. Its purpose is to
+make everyday administration scripts easier to read and safer to review.
