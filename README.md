@@ -2,7 +2,7 @@
 
 ![status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)
-![license: TBD](https://img.shields.io/badge/license-TBD-lightgrey.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A readable, safety-first Unix shell for DevOps and system administration.
 
