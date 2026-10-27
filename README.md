@@ -43,8 +43,9 @@ go build -trimpath -o yesh ./cmd/yesh
 ./yesh examples/hello.yesh
 ```
 
-Start with the [English quickstart](docs/quickstart.md) for a Bash-to-yesh
-comparison and the rules behind the syntax.
+Start with the [English quickstart](docs/quickstart.md) or
+[Russian quickstart](docs/quickstart.ru.md) for a Bash-to-yesh comparison and
+the rules behind the syntax.
 
 yesh is a language sketch focused on readable DevOps and administration scripts.
 The examples and design documents are the source of truth for its semantics.
