@@ -65,8 +65,9 @@ Real remote changes and restore tests belong in a dedicated test VM.
 
 The first Real-World Examples in this slice are the runnable
 `examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current
-validation uses fake SSH/SCP tools and a local source fixture; it does not claim
-that a real remote copy or restore has been completed.
+validation uses fake SSH/SCP tools and a local source fixture. A local loopback
+SSH/SCP transfer was also completed manually and verified byte-for-byte; a
+copy to a separate remote machine or a restore workflow is not claimed yet.
 
 ## Language and runtime backlog
 
