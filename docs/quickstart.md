@@ -34,7 +34,7 @@ done
 services = [nginx, sshd]
 
 for service in services:
-    if systemctl is-active service:
+    if systemctl is-active --quiet service:
         echo service "is running"
     else:
         echo service "is not running"

@@ -52,6 +52,16 @@ Timeouts, cancellation, missing commands and signal termination are errors.
 The only file predicate form is "exists path", with one nonempty string.
 Missing targets are false; permission failures and symlink loops are errors.
 The old exists(path) spelling is rejected with a migration hint.
+.PP
+The \fBmatches\fR condition compares one string with a \fBregex\fR value:
+.nf
+name = api-42
+if name matches regex '^api-[0-9]+$':
+    echo "matched"
+.fi
+.PP
+Regular expressions use Go's RE2 syntax. A regex value is for conditions and
+cannot be passed as a command argument.
 .SS Completion
 .nf
 if exists /etc/os-release:
@@ -98,7 +108,7 @@ KILL cannot be handled. Processes that escape the group with a new session
 require stronger isolation; full POSIX job control and PTY management
 are not implemented. Windows process cleanup has different semantics.
 .SH SECURITY
-Known shell commands are rejected after argument expansion on every stage.
+Known shell interpreters are rejected after argument expansion on every stage.
 Known code interpreters and execution wrappers are rejected in pipelines.
 For example, curl piped to sh or data piped to xargs is rejected.
 .PP

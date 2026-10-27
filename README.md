@@ -14,6 +14,8 @@ language around them is intentionally small and readable.
 > Read a yesh script from top to bottom. Strings stay strings, lists stay
 > lists, commands stay Unix commands, and failures do not disappear silently.
 
+![A DevOps engineer having a Eureka moment in a data center](docs/yesh-eureka.png)
+
 ## Bash, but readable
 
 | Bash | yesh |
@@ -23,6 +25,30 @@ language around them is intentionally small and readable.
 | `if [[ -n "$path" ]]; then ... fi` | `if exists path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `for item in "${items[@]}"; do ... done` | `for item in items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `set -euo pipefail` | failures are errors by default |
+
+## Which Bash problems yesh is trying to remove
+
+yesh is not trying to replace Unix tools. It is trying to remove the shell
+language problems that make small Bash administration scripts difficult to
+read and easy to get wrong:
+
+- **Too many ways to express the same thing.** Bash conditions and arithmetic
+  use several historical syntaxes with different rules. yesh keeps one clear
+  block form: `if condition:` and `for item in list:`.
+- **Quoting and word-splitting traps.** In Bash, an unquoted expansion can be
+  split into words or interpreted as a glob. In yesh, a string remains one
+  argument and a list is expanded only as a list.
+- **Variables that disappear into punctuation.** yesh uses names directly in
+  value positions, without requiring `$` or layers of `${...}` syntax.
+- **Errors hidden behind boilerplate.** A yesh command failure is an error by
+  default; scripts do not need `set -euo pipefail` just to state their basic
+  failure policy.
+- **Commands reinterpreted as shell text.** yesh passes command arguments
+  directly through its Go runtime instead of reparsing a constructed command
+  string through another shell.
+- **Scripts that are short but hard to review.** Indentation, finite lists,
+  explicit branches, and visible exit paths make the operational intent clear
+  to a reader who did not write the script.
 
 The result is a small Go-based language for scripts that should be easy to
 write and easy to review.
@@ -46,6 +72,9 @@ go build -trimpath -o yesh ./cmd/yesh
 Start with the [English quickstart](docs/quickstart.md) or
 [Russian quickstart](docs/quickstart.ru.md) for a Bash-to-yesh comparison and
 the rules behind the syntax.
+
+See the [English roadmap](docs/TODO.md) or the
+[detailed Russian plan](docs/TODO.ru.md) for current project priorities.
 
 yesh is a language sketch focused on readable DevOps and administration scripts.
 The examples and design documents are the source of truth for its semantics.
