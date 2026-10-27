@@ -1,7 +1,7 @@
 # yesh quickstart
 
-yesh is a small Go-based shell for readable DevOps and system-administration
-scripts.
+yesh is a small Go-based shell for readable system-administration and
+operational scripts.
 
 > **Bash without the historical syntax complexity.**
 

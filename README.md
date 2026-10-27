@@ -5,7 +5,8 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A readable, safety-first Unix shell for DevOps and system administration.
+A readable, safety-first Unix shell for system administration and operational
+automation.
 
 [Русская версия README](README.ru.md)
 
@@ -17,7 +18,7 @@ language around them is intentionally small and readable.
 > Read a yesh script from top to bottom. Strings stay strings, lists stay
 > lists, commands stay Unix commands, and failures do not disappear silently.
 
-![A DevOps engineer having a Eureka moment in a data center](docs/yesh-eureka.png)
+![A system administrator having a Eureka moment in a data center](docs/yesh-eureka.png)
 
 ## Bash, but readable
 
@@ -79,14 +80,14 @@ the rules behind the syntax.
 See the [English roadmap](docs/TODO.md) or the
 [detailed Russian plan](docs/TODO.ru.md) for current project priorities.
 
-yesh is a language sketch focused on readable DevOps and administration scripts.
+yesh is a language sketch focused on readable system-administration and
+operational scripts.
 The examples and design documents are the source of truth for its semantics.
 
 Values keep their type: a string stays one argument and a list expands to
 multiple arguments explicitly. Commands are executed directly by the Go
-runtime, without reparsing a command string through another shell. yesh is not
-a Bash compatibility layer; it is a smaller language for readable Unix
-automation.
+runtime, without reparsing a command string through another shell. yesh is a
+small language for readable Unix automation.
 
 Read the local manual with `man -l man/yesh.1`
 (Russian: `man -l man/ru/yesh.1`). See

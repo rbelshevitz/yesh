@@ -1,7 +1,7 @@
 # yesh roadmap
 
-yesh is an experimental, readable Unix shell for DevOps and system
-administration.
+yesh is an experimental, readable Unix shell for system administration and
+operational automation.
 
 The project priority is:
 
