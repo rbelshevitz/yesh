@@ -44,6 +44,8 @@ This work starts with read-only checks, previews, and local test fixtures.
 Real remote changes and restore tests belong in a dedicated test VM.
 
 - [ ] typed remote-node description with explicit host, user, and port;
+- [x] basic read-only SSH health and SCP argument-vector examples with explicit
+  port, timeout, batch mode, and host-key policy;
 - [ ] use the system SSH client, agent, and config without reading or storing
   private keys, passwords, or passphrases;
 - [ ] explicit host-key policy; never silently allow
@@ -60,6 +62,11 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] a shared plan/report showing hosts, paths, commands, volume, and changes;
 - [ ] tests for host-key failure, timeout, broken transfer, full disk,
   unmounted backup disk, locks, reruns, and restore verification.
+
+The first Real-World Examples in this slice are the runnable
+`examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current
+validation uses fake SSH/SCP tools and a local source fixture; it does not claim
+that a real remote copy or restore has been completed.
 
 ## Language and runtime backlog
 

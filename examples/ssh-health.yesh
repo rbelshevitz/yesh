@@ -1,10 +1,12 @@
 # Check hosts through the user's normal SSH config or agent.
 # No private keys or passwords are stored in this script.
+port = 22
+ssh_options = [-p, port, -o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
 hosts = [web-1, web-2]
 
 for host in hosts:
-    if ssh -o BatchMode=yes -o ConnectTimeout=5 host hostname:
-        ssh -o BatchMode=yes -o ConnectTimeout=5 host uptime
+    if ssh ssh_options host hostname:
+        ssh ssh_options host uptime
     else:
-        echo host "is unreachable"
+        echo host "health check failed"
         exit 1

@@ -1,0 +1,12 @@
+# Copy one backup artifact through the user's normal SSH config or agent.
+# No private keys, passwords, or passphrases are stored in this script.
+port = 22
+scp_options = [-P, port, -o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
+source = "backup.tar.gz"
+destination = "user@backup-1:/srv/incoming/backup.tar.gz"
+
+if exists source:
+    scp scp_options -- source destination
+else:
+    echo "source file is missing"
+    exit 2

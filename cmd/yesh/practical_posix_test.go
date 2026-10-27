@@ -222,6 +222,60 @@ func TestPOSIXPracticalDeployArguments(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalSSHHealthAndSCPArguments(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ssh", "scp"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	trace := filepath.Join(dir, "trace")
+	env := []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"), "TRACE_FILE=" + trace}
+	writeTestFile(t, filepath.Join(dir, "backup.tar.gz"), []byte("fixture\n"), 0600)
+
+	health := practicalCommand(t, dir, practicalExample(t, "ssh-health.yesh"))
+	health.Env = append(health.Env, env...)
+	if out, err := health.CombinedOutput(); err != nil {
+		t.Fatalf("ssh health fixture: %v %s", err, out)
+	}
+
+	scp := practicalCommand(t, dir, practicalExample(t, "scp-copy.yesh"))
+	scp.Env = append(scp.Env, env...)
+	if out, err := scp.CombinedOutput(); err != nil {
+		t.Fatalf("scp fixture: %v %s", err, out)
+	}
+
+	want := []string{
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-1", "hostname",
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-1", "uptime",
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-2", "hostname",
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-2", "uptime",
+		"scp", "-P", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "--", "backup.tar.gz", "user@backup-1:/srv/incoming/backup.tar.gz",
+		"",
+	}
+	if got := strings.Split(string(readTestFile(t, trace)), "\x00"); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("unexpected SSH/SCP argv: %q", got)
+	}
+
+	missing := practicalCommand(t, dir, practicalExample(t, "scp-copy.yesh"))
+	missing.Dir = filepath.Join(dir, "missing-source")
+	if err := os.Mkdir(missing.Dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	missing.Env = append(missing.Env, env...)
+	out, err := missing.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 || string(out) != "source file is missing\n" {
+		t.Fatalf("missing source: %v %s", err, out)
+	}
+	if got := string(readTestFile(t, trace)); strings.Count(got, "scp\x00") != 1 {
+		t.Fatalf("scp ran for missing source: %q", got)
+	}
+}
+
 func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "bin")
