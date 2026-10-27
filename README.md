@@ -37,3 +37,6 @@ Design notes cover [syntax and declarative operations](docs/syntax-review.ru.md)
 and [file permissions](docs/permissions.ru.md).
 Runnable [practical examples](docs/practical-examples.ru.md) cover archives,
 rsync, rsnapshot, configuration changes and cancelled jobs.
+
+The runnable examples also include read-only process, journal, mount and SSH
+health checks in `examples/`.

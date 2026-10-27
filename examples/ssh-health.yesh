@@ -1,0 +1,10 @@
+# Check hosts through the user's normal SSH config or agent.
+# No private keys or passwords are stored in this script.
+hosts = [web-1, web-2]
+
+for host in hosts:
+    if ssh -o BatchMode=yes -o ConnectTimeout=5 host hostname:
+        ssh -o BatchMode=yes -o ConnectTimeout=5 host uptime
+    else:
+        echo host "is unreachable"
+        exit 1
