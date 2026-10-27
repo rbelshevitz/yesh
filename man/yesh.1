@@ -87,7 +87,7 @@ cannot be passed as a command argument.
 .nf
 if exists /etc/os-release:
     exit 0
-exit 2
+exit 1
 .fi
 .PP
 exit code terminates the entire script, including nested blocks, with an
@@ -153,7 +153,7 @@ An RSS budget can be checked for an existing process set:
 if memory nginx rss at_most 512MiB:
     echo "within budget"
 else:
-    exit 4
+    exit 1
 .fi
 .PP
 The condition sums RSS for that set. It does not rescan for a different set

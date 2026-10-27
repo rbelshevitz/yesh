@@ -80,7 +80,7 @@ if memory nginx rss at_most 512MiB:
     echo "nginx RSS is within the budget"
 else:
     summarize nginx memory rss
-    exit 4
+    exit 1
 ```
 
 Условие суммирует RSS уже выбранного набора. Оно не ищет процессы заново и

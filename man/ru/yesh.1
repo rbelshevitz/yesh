@@ -91,7 +91,7 @@ if name matches regex '^api-[0-9]+$':
 .nf
 if exists /etc/os-release:
     exit 0
-exit 2
+exit 1
 .fi
 .PP
 exit code завершает весь скрипт, включая вложенные блоки, с явно заданным
@@ -158,7 +158,7 @@ summarize nginx memory rss
 if memory nginx rss at_most 512MiB:
     echo "within budget"
 else:
-    exit 4
+    exit 1
 .fi
 .PP
 Условие суммирует RSS этого набора. Оно не ищет другой набор заново и

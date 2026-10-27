@@ -37,6 +37,26 @@ fixture; it does not claim a formal proof or universal production safety.
   the service-check script, with checks for unavailable systemd, failed
   commands, complete pipeline input, predicates and plans.
 
+## What yesh already simplifies
+
+This is the current practical result, not a promise about future syntax:
+
+- readable conditions: ordinary `if` blocks and indentation instead of Bash's
+  `[ ]`, `[[ ]]`, `(( ))`, `$`, and historical comparison operators;
+- value handling: strings, lists, variables, and regex values remain distinct,
+  with no implicit word splitting or re-parsing of values as code;
+- execution: the runtime starts argv directly, `--plan` shows expanded
+  arguments, and command or pipeline-stage failures remain visible;
+- safer repeatable operations: bounded pipelines, timeouts, process and file
+  descriptor cleanup, and guarded redirections;
+- administration: readable mount/UUID/PARTUUID/free-space checks, SSH/SCP,
+  rsync without implicit `--delete`, and read-only process snapshots with RSS
+  summaries without hand-parsing `ps` or `awk`.
+
+The practical claim is deliberately limited: yesh already makes these scripts
+easier to read and review, but does not yet claim built-in CIDR/net-tools,
+full systemd API, TTY/PTY, typed SSH nodes, or control of other processes.
+
 ## Next practical slice: safe transfer and backup
 
 The next major workflow is:
@@ -80,7 +100,13 @@ copy to a separate remote machine or a restore workflow is not claimed yet.
 
 ## Language and runtime backlog
 
+- [x] Regex conditions use Go's standard RE2 implementation: one `matches`
+  operator, no backreferences, shell re-parsing, or hidden command execution;
+  quoted text such as `"a matches b"` remains data.
 - [ ] structured `match` results with named regex captures;
+- No new Go dependency is needed for the current regex layer: use the standard
+  library `regexp` package. Reconsider only if a concrete requirement proves
+  that a third-party dependency improves safety and readability.
 - [ ] structured command diagnostics: exit code, signal, timeout, stderr,
   duration, and failed pipeline stage;
 - [ ] one consistent builtin execution model, then `cd` and environment
@@ -96,6 +122,40 @@ copy to a separate remote machine or a restore workflow is not claimed yet.
 - [ ] state files and resumable long-running jobs only after safe cancellation
   and ownership boundaries are established;
 - [ ] full isolation for untrusted scripts through operating-system controls.
+
+## Networking and CIDR
+
+The networking layer is primarily for readable preflight checks before SSH,
+SCP, and rsync. It is not intended to replace iproute2 or silently configure
+the host network. It is one of the first practical layers after the current
+documentation and diagnostic work.
+
+- [ ] Typed IPv4/IPv6 addresses and CIDR prefixes using Go's standard
+  `net/netip`: strict parsing, normalization, `contains`, and explicit
+  IPv4/IPv6/mapped-IPv6 family rules; no hand-written mask arithmetic.
+- [ ] A readable address-in-network condition with negative examples and
+  explicit errors for invalid masks, addresses, or mixed address families.
+- [ ] Read-only interface/address reports through checked `ip` invocations;
+  missing tools, permission failures, and incomplete output must remain visible.
+- [ ] Read-only ARP/neighbour report with IP, MAC, state, and interface;
+  a missing entry must not be treated as proof that a host is unreachable.
+- [ ] Read-only route and TCP/UDP listener reports through `ip` and `ss`, with
+  bounded output and no parsing of unstable decorative text without an
+  explicit format.
+- [ ] Bounded DNS, TCP-port, and ICMP checks with explicit timeout/count;
+  ICMP absence must not be treated as proof that a host is unreachable.
+- [ ] Define check semantics: a normal negative result (`port is closed`,
+  `address is outside the CIDR`) is `false`; missing tools, timeout,
+  permission failure, or malformed output are execution errors. Built-in
+  checks must not invent an arbitrary exit-code table; the script author
+  explicitly chooses the final `exit` and its code.
+- [ ] Keep the first version safe: no built-in changes to addresses, routes,
+  firewalls, namespaces, or interface state.
+- Legacy `net-tools` commands (`ifconfig`, `route`, `arp`, `netstat`) are not
+  embedded or required; start with modern `ip`/`ss` from iproute2 and checked
+  arguments.
+- No new Go networking dependency is needed for CIDR. Consider netlink only
+  if external `ip`/`ss` cannot provide a stable, testable interface.
 
 ## Design rule
 

@@ -59,7 +59,7 @@ if findmnt --target mountpoint:
     du -x -d 1 -h -- mountpoint
 else:
     echo "backup mount is missing"
-    exit 2
+    exit 1
 ```
 
 Сравнение с Bash: те же утилиты требуют `"$mountpoint"`, а проверка блока
@@ -90,7 +90,7 @@ if findmnt --target mountpoint:
     blkid --output full
     stat -c "type=%F mode=%a owner=%U:%G" -- mountpoint
 else:
-    exit 2
+    exit 1
 ```
 
 Это отчёт, а не автоматический выбор диска: текущий runtime ещё не извлекает
@@ -107,7 +107,7 @@ if findmnt --source expected_source --target mountpoint:
     echo "backup filesystem identity is correct"
 else:
     echo "backup filesystem identity does not match"
-    exit 3
+    exit 1
 ```
 
 `findmnt` принимает `UUID=` и `PARTUUID=` как точные спецификации источника.
@@ -142,7 +142,7 @@ if free_space target at_least 20GiB:
     rsync -a --itemize-changes -- source target
 else:
     echo "not enough free space"
-    exit 4
+    exit 1
 ```
 
 Размер задаётся целым числом и бинарной единицей `B`, `KiB`, `MiB`, `GiB` или
@@ -228,10 +228,10 @@ if grep -q '^mode=production$' staged:
     install -m 0640 -- staged next
     mv -- next active
 else:
-    exit 3
+    exit 1
 ```
 
-Сравнение с Bash: `if grep ... "$staged"; then install ...; mv ...; else exit 3; fi`.
+Сравнение с Bash: `if grep ... "$staged"; then install ...; mv ...; else exit 1; fi`.
 Правило: неверная подготовленная конфигурация не заменяет рабочий файл.
 Тест проверяет оба исхода, содержимое и итоговые права `0640`.
 
@@ -276,7 +276,7 @@ if memory nginx rss at_most 512MiB:
     echo "nginx RSS is within the budget"
 else:
     summarize nginx memory rss
-    exit 4
+    exit 1
 ```
 
 Полный пример — [process-memory-check.yesh](../examples/process-memory-check.yesh).

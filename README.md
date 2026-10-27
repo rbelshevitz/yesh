@@ -10,13 +10,15 @@ automation.
 
 [Русская версия README](README.ru.md)
 
-yesh is an experiment: Unix commands remain Unix commands, while the shell
-language around them is intentionally small and readable.
+yesh is an experiment: POSIX commands and external Linux administration tools
+remain ordinary commands, while the shell language around them is intentionally
+small and readable.
 
 > **Bash without the historical syntax complexity.**
 >
 > Read a yesh script from top to bottom. Strings stay strings, lists stay
-> lists, commands stay Unix commands, and failures do not disappear silently.
+> lists, commands stay external commands, and failures do not disappear
+> silently.
 
 ![A system administrator having a Eureka moment in a data center](docs/yesh-eureka.png)
 
@@ -66,6 +68,30 @@ The current prototype supports:
 - command failures that stop the script and report the source line;
 - a single `exists path` predicate, regex conditions, and explicit `exit code`.
 
+## What works today
+
+yesh is already useful for small read-only checks and guarded administration
+steps built from ordinary POSIX commands and external Linux tools:
+
+- service checks through ordinary `systemctl` commands;
+- SSH health checks and SCP transfers with an explicit port, timeout, batch
+  mode, and host-key policy;
+- mount, filesystem, UUID/PARTUUID, and free-space preflight checks;
+- rsync preview and copy examples without implicit `--delete`;
+- Linux process snapshots by exact kernel name, including PID, UID, state, RSS,
+  process group, session, and cgroup;
+- readable RSS totals, maximums, averages, and budget checks.
+
+The `--plan` mode shows the exact argument vector (`argv`) that each command
+stage would receive, including expanded lists and external conditions. It does
+not start commands or open redirected output files. For example:
+
+```text
+PLAN ["scp" "-P" "2828" "-o" "BatchMode=yes" "-o" "ConnectTimeout=5" "--" "backup.tar.gz" "user@host:/srv/backup.tar.gz"]
+```
+
+This makes the real operation reviewable before execution.
+
 Build and run the Go binary:
 
 ```text
@@ -109,6 +135,6 @@ SHell**. It was originally developed by [Brian Fox](https://www.gnu.org/people/p
 and is currently maintained by Chet Ramey.
 
 yesh is an independent implementation written in Go, with its own smaller
-syntax around familiar Unix commands. It takes inspiration from Unix shell
-workflows, not from copying or embedding Bash source code. Its purpose is to
+syntax around familiar POSIX/Linux commands. It takes inspiration from
+POSIX/Linux shell workflows, not from copying or embedding Bash source code. Its purpose is to
 make everyday administration scripts easier to read and safer to review.

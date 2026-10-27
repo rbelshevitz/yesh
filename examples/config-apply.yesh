@@ -10,4 +10,4 @@ if grep -q '^mode=production$' staged:
     echo "configuration applied"
 else:
     echo "configuration check failed"
-    exit 3
+    exit 1

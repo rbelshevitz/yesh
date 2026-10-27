@@ -7,4 +7,4 @@ if findmnt --target mountpoint:
     df -h -- mountpoint
 else:
     echo "backup mount is missing"
-    exit 2
+    exit 1
