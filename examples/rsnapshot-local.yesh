@@ -1,5 +1,5 @@
-# Конфигурация rsnapshot готовится отдельно, с no_create_root=1 и lockfile.
-# Перед реальным backup требуется проверка монтирования целевого устройства.
+# Prepare the rsnapshot configuration separately, with no_create_root=1 and a lockfile.
+# Check that the target device is mounted before a real backup.
 config = "rsnapshot.conf"
 rsnapshot -c config configtest
 rsnapshot -c config daily

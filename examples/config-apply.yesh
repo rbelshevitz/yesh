@@ -1,5 +1,5 @@
-# Демонстрационная проверка одного параметра, не универсальный валидатор.
-# Для реальной службы здесь должна быть её штатная проверка конфигурации.
+# Demonstration of one parameter check, not a universal validator.
+# A real service should use its own configuration validator here.
 staged = "staged.conf"
 active = "active.conf"
 next = "active.conf.next"
@@ -7,7 +7,7 @@ next = "active.conf.next"
 if grep -q '^mode=production$' staged:
     install -m 0640 -- staged next
     mv -- next active
-    echo "конфигурация применена"
+    echo "configuration applied"
 else:
-    echo "проверка конфигурации не пройдена"
+    echo "configuration check failed"
     exit 3

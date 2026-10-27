@@ -1,5 +1,5 @@
-# Проверка сервисов на одном хосте.
-# Скрипт читается сверху вниз: список → цикл → проверка → понятная ошибка.
+# Check services on one host.
+# Read top to bottom: list -> loop -> check -> clear error.
 
 services = [nginx, sshd]
 

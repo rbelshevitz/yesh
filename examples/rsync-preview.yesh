@@ -1,4 +1,4 @@
-# Показать изменения, не изменяя источник и назначение.
+# Show changes without modifying the source or destination.
 source = "source/"
 target = "target/"
 rsync -a --dry-run --itemize-changes -- source target

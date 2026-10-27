@@ -1,8 +1,8 @@
-# Минимальный deploy-сценарий.
+# Minimal deployment example.
 
 host = web-1
 release = build/current/
-# Адрес — полное значение: подстановки внутри host:path нет.
+# The address is one complete value: there is no substitution inside host:path.
 target = web-1:/srv/app/
 
 echo "deploying" release "to" host
