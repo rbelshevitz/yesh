@@ -6,6 +6,8 @@
 
 A readable, safety-first Unix shell for DevOps and system administration.
 
+[Русская версия README](README.ru.md)
+
 yesh is an experiment: Unix commands remain Unix commands, while the shell
 language around them is intentionally small and readable.
 
@@ -22,7 +24,7 @@ language around them is intentionally small and readable.
 | --- | --- |
 | `name=world; echo "$name"` | `name = world`<br>`echo name` |
 | `items=(one two three)` | `items = [one, two, three]` |
-| `if [[ -n "$path" ]]; then ... fi` | `if exists path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
+| `if [ -e "$path" ]; then ... fi` | `if exists path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `for item in "${items[@]}"; do ... done` | `for item in items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `set -euo pipefail` | failures are errors by default |
 
@@ -53,7 +55,7 @@ wrong:
 The result is a small Go-based language for scripts that should be easy to
 write and easy to review.
 
-The first prototype supports:
+The current prototype supports:
 
 - assignments such as `name = world` and `items = [one, two]`;
 - `if condition:` and `for item in items:` blocks with indentation;
