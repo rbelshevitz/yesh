@@ -26,11 +26,11 @@ language around them is intentionally small and readable.
 | `for item in "${items[@]}"; do ... done` | `for item in items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `set -euo pipefail` | failures are errors by default |
 
-## Which Bash problems yesh is trying to remove
+## Why yesh is easier to read than Bash
 
-yesh is not trying to replace Unix tools. It is trying to remove the shell
-language problems that make small Bash administration scripts difficult to
-read and easy to get wrong:
+yesh is not trying to replace Unix tools. It removes the shell-language traps
+that make small Bash administration scripts difficult to read and easy to get
+wrong:
 
 - **Too many ways to express the same thing.** Bash conditions and arithmetic
   use several historical syntaxes with different rules. yesh keeps one clear
