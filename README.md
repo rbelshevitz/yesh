@@ -28,6 +28,25 @@ go build -trimpath -o yesh ./cmd/yesh
 yesh is a language sketch focused on readable DevOps and administration scripts.
 The examples and design documents are the source of truth for its semantics.
 
+## Why yesh is simpler than Bash
+
+yesh keeps Unix commands, pipes and redirections, but removes several Bash
+choices that make small scripts hard to read:
+
+| Bash | yesh |
+| --- | --- |
+| `name=world`, `echo "$name"` | `name = world`, `echo name` |
+| `items=(one two three)` and array expansion rules | `items = [one, two, three]` |
+| `if [[ -n "$path" ]]; then ... fi` | `if exists path:` with indentation |
+| `for item in "${items[@]}"; do ... done` | `for item in items:` |
+| `set -euo pipefail` and careful pipeline handling | command and pipeline failures are errors by default |
+
+Values keep their type: a string stays one argument and a list expands to
+multiple arguments explicitly. Commands are executed directly by the Go
+runtime, without reparsing a command string through another shell. yesh is not
+a Bash compatibility layer; it is a smaller language for readable Unix
+automation.
+
 Read the local manual with `man -l man/yesh.1`
 (Russian: `man -l man/ru/yesh.1`). See
 [pipeline safety](docs/pipeline-safety.ru.md), [cron](docs/cron.ru.md),
