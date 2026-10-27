@@ -1,0 +1,11 @@
+# Read-only storage preflight for a backup destination.
+# The check does not mount, unmount, delete, or modify anything.
+mountpoint = /backup
+
+if findmnt --target mountpoint:
+    findmnt --target mountpoint
+    df -P -h -- mountpoint
+    du -x -d 1 -h -- mountpoint
+else:
+    echo "backup mount is missing"
+    exit 2

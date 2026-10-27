@@ -26,6 +26,22 @@ type assignStmt struct {
 
 func (assignStmt) stmt() {}
 
+type showStmt struct {
+	line   int
+	name   string
+	fields []string
+}
+
+func (showStmt) stmt() {}
+
+type summarizeStmt struct {
+	line   int
+	name   string
+	metric string
+}
+
+func (summarizeStmt) stmt() {}
+
 type exitStmt struct {
 	line int
 	code commandToken
@@ -151,6 +167,37 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 				return nil, index, p.err(l.number, "expected: exit code (0..255), without pipeline or redirection")
 			}
 			result = append(result, exitStmt{l.number, tokens[1]})
+			index++
+			continue
+		}
+		if strings.HasPrefix(text, "show ") {
+			tokens, err := words(text)
+			if err != nil || len(tokens) < 2 || len(tokens) == 3 || tokens[1].operator || tokens[1].text == "" {
+				return nil, index, p.err(l.number, "expected: show process_set [fields field ...]")
+			}
+			show := showStmt{line: l.number, name: tokens[1].text}
+			if len(tokens) > 2 {
+				if tokens[2].operator || tokens[2].text != "fields" {
+					return nil, index, p.err(l.number, "expected: show process_set fields field ...")
+				}
+				for _, token := range tokens[3:] {
+					if token.operator || token.text == "" {
+						return nil, index, p.err(l.number, "process fields must be names")
+					}
+					show.fields = append(show.fields, token.text)
+				}
+			}
+			result = append(result, show)
+			index++
+			continue
+		}
+		if strings.HasPrefix(text, "summarize ") {
+			tokens, err := words(text)
+			if err != nil || len(tokens) != 4 || tokens[1].operator || tokens[2].operator || tokens[3].operator ||
+				tokens[1].text == "" || tokens[2].text != "memory" || tokens[3].text != "rss" {
+				return nil, index, p.err(l.number, "expected: summarize process_set memory rss")
+			}
+			result = append(result, summarizeStmt{line: l.number, name: tokens[1].text, metric: tokens[3].text})
 			index++
 			continue
 		}

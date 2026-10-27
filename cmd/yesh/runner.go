@@ -141,13 +141,25 @@ func closeFiles(files ...[]*os.File) {
 	}
 }
 
-func formatPipeline(stages []stage) string {
+func (r *runtime) formatPipeline(stages []stage) string {
+	secretValues := make(map[string]bool)
+	for _, v := range r.values {
+		if v.secret && v.scalar != "" {
+			secretValues[v.scalar] = true
+		}
+	}
 	var out strings.Builder
 	for i, s := range stages {
 		if i > 0 {
 			out.WriteString(" | ")
 		}
-		fmt.Fprintf(&out, "%q", s.argv)
+		display := append([]string(nil), s.argv...)
+		for i, arg := range display {
+			if secretValues[arg] {
+				display[i] = "<environment value>"
+			}
+		}
+		fmt.Fprintf(&out, "%q", display)
 		if s.input != "" {
 			fmt.Fprintf(&out, " < %q", s.input)
 		}
@@ -172,7 +184,7 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 		return err
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %s\n", formatPipeline(stages))
+		fmt.Fprintf(os.Stdout, "PLAN %s\n", r.formatPipeline(stages))
 		return nil
 	}
 	parent := r.ctx

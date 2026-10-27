@@ -28,6 +28,9 @@ fixture; it does not claim a formal proof or universal production safety.
 - command failure handling, process groups, bounded execution, cancellation,
   descriptor cleanup, and pipeline safety checks;
 - `exists path` and typed RE2 regular-expression conditions;
+- explicit non-empty environment values with masked `--plan` output;
+- `free_space path at_least amount` using filesystem statistics and checked
+  whole binary units;
 - Linux/POSIX tests for SIGPIPE, stuck writers, cancellation, and resource
   cleanup.
 - executable quickstart examples kept in sync across English, Russian and
@@ -53,8 +56,14 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] no hidden shell code on the remote host;
 - [ ] SCP transfers with source/destination validation and partial-result
   reporting;
-- [ ] rsync preview before writing, explicit source and destination, mount and
-  free-space checks, and no implicit `--delete`;
+- [x] read-only storage preflight example with `findmnt`, `df`, and bounded
+  `du`; no implicit mount, unmount, deletion, or cross-filesystem traversal;
+- [x] read-only storage identity report with `lsblk`, `blkid`, and `stat`;
+- [x] UUID/PARTUUID matching through `findmnt` before an rsync action;
+- [x] rsync preview/copy examples with explicit source and destination,
+  mount, identity, and free-space checks; no implicit `--delete`;
+- [x] safe rsync validation on a dedicated ext4 loopback image (positive copy
+  and wrong-UUID rejection); real block-partition/PARTUUID validation remains;
 - [ ] rsnapshot `configtest`, locking, mount checks, retention, free-space
   checks, and hard-link snapshot safety;
 - [ ] `pv` with progress separated from binary data and all pipeline stages
@@ -75,10 +84,15 @@ copy to a separate remote machine or a restore workflow is not claimed yet.
 - [ ] structured command diagnostics: exit code, signal, timeout, stderr,
   duration, and failed pipeline stage;
 - [ ] one consistent builtin execution model, then `cd` and environment
-  operations;
+  mutation operations (`export` and process-local changes);
 - [ ] bounded file search and safe, planned atomic replacement;
-- [ ] typed process and systemd diagnostics;
-- [ ] storage, mount, `fstab`, initramfs, module, and device diagnostics;
+- [x] read-only exact-name process snapshots with bounded `/proc` scanning and
+  fixed-field `show` output; signals and broader filters remain;
+- [ ] typed process and systemd diagnostics beyond this read-only slice;
+- [ ] read-only systemd service status from stable `systemctl show` fields and
+  bounded `journalctl` output;
+- [ ] extend typed storage, mount, `fstab`, initramfs, module, and device
+  diagnostics beyond the current read-only examples;
 - [ ] state files and resumable long-running jobs only after safe cancellation
   and ownership boundaries are established;
 - [ ] full isolation for untrusted scripts through operating-system controls.

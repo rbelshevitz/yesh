@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,10 +11,13 @@ import (
 )
 
 type value struct {
-	scalar string
-	list   []string
-	isList bool
-	regex  *regexp.Regexp
+	scalar      string
+	list        []string
+	isList      bool
+	regex       *regexp.Regexp
+	secret      bool
+	processes   []processInfo
+	isProcesses bool
 }
 
 type runtime struct {
@@ -59,6 +63,9 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 	if v, ok := r.values[raw]; ok {
 		return v, nil
 	}
+	if strings.HasPrefix(raw, "processes ") {
+		return r.evalProcessQuery(raw, line)
+	}
 	if strings.HasPrefix(raw, "regex ") {
 		pattern, err := r.eval(strings.TrimSpace(strings.TrimPrefix(raw, "regex ")), line)
 		if err != nil {
@@ -78,6 +85,17 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 			return value{}, fmt.Errorf("%s:%d: %w", r.filename, line, err)
 		}
 		return value{regex: compiled}, nil
+	}
+	if raw == "environment" || strings.HasPrefix(raw, "environment ") {
+		name := strings.TrimSpace(strings.TrimPrefix(raw, "environment "))
+		if !validEnvironmentName(name) {
+			return value{}, fmt.Errorf("%s:%d: environment expects one variable name", r.filename, line)
+		}
+		v, ok := os.LookupEnv(name)
+		if !ok || v == "" {
+			return value{}, fmt.Errorf("%s:%d: environment %s is missing or empty", r.filename, line, name)
+		}
+		return value{scalar: v, secret: true}, nil
 	}
 	if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
 		inside := strings.TrimSpace(raw[1 : len(raw)-1])
@@ -115,6 +133,18 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 		return value{}, fmt.Errorf("%s:%d: empty value", r.filename, line)
 	}
 	return value{scalar: raw}, nil
+}
+
+func validEnvironmentName(name string) bool {
+	if name == "" || (name[0] != '_' && (name[0] < 'A' || name[0] > 'Z') && (name[0] < 'a' || name[0] > 'z')) {
+		return false
+	}
+	for _, c := range name[1:] {
+		if c != '_' && (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return true
 }
 
 // Split only at commas outside strings and nested brackets. Nested lists

@@ -16,6 +16,8 @@ const (
 	commandCondition conditionKind = iota
 	existsCondition
 	matchesCondition
+	freeSpaceCondition
+	processMemoryCondition
 )
 
 type conditionExpr struct {
@@ -56,6 +58,23 @@ func parseCondition(text string) (conditionExpr, error) {
 			}
 		}
 		expr.kind = matchesCondition
+	} else if keyword(0, "free_space") {
+		if len(terms) != 4 || terms[1].operator || !keyword(2, "at_least") || terms[3].operator {
+			return expr, fmt.Errorf("expected: free_space path at_least amount")
+		}
+		if _, err := parseByteSize(terms[3].text); err != nil {
+			return expr, err
+		}
+		expr.kind = freeSpaceCondition
+	} else if keyword(0, "memory") {
+		if len(terms) != 5 || terms[1].operator || terms[2].operator || terms[3].operator ||
+			terms[4].operator || !keyword(3, "at_most") || terms[2].text != "rss" {
+			return expr, fmt.Errorf("expected: memory process_set rss at_most amount")
+		}
+		if _, err := parseByteSize(terms[4].text); err != nil {
+			return expr, err
+		}
+		expr.kind = processMemoryCondition
 	}
 	return expr, nil
 }
@@ -112,6 +131,37 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 			return false, fmt.Errorf("%s:%d: matches expects text matches regex", r.filename, line)
 		}
 		return right.regex.MatchString(left.scalar), nil
+	case freeSpaceCondition:
+		path, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		if path.isList || path.regex != nil || path.scalar == "" || strings.ContainsRune(path.scalar, 0) {
+			return false, fmt.Errorf("%s:%d: free_space expects one non-empty path string", r.filename, line)
+		}
+		need, err := parseByteSize(expr.terms[3].text)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: %w", r.filename, line, err)
+		}
+		free, err := freeBytes(path.scalar)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: free_space: %w", r.filename, line, err)
+		}
+		return free >= need, nil
+	case processMemoryCondition:
+		set, ok := r.values[expr.terms[1].text]
+		if !ok || !set.isProcesses {
+			return false, fmt.Errorf("%s:%d: memory expects a process set", r.filename, line)
+		}
+		need, err := parseByteSize(expr.terms[4].text)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: %w", r.filename, line, err)
+		}
+		total, err := processRSSTotal(set.processes)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: memory: %w", r.filename, line, err)
+		}
+		return total <= need, nil
 	}
 	if r.plan {
 		return false, fmt.Errorf("%s:%d: --plan cannot evaluate command condition: %s", r.filename, line, expr.text)

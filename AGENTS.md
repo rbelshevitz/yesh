@@ -96,8 +96,9 @@ Windows-проверки подтверждают только переноси�
 `journalctl`, затем read-only диагностика хранилищ (`lsblk`, `blkid`, `findmnt`,
 `df`) и только после этого явные операции mount/umount. Работа с `fstab`, UUID/
 PARTUUID и блочными устройствами должна проходить через preflight-проверки.
-Следующий слой — типизированный поиск процессов, сигналы, process groups,
-cgroups v2 и systemd transient units; `sed`/`awk` остаются внешними командами,
+Следующий слой — типизированный read-only поиск процессов, собственный job
+lifecycle и systemd transient units; общий signal/pkill API, PID-группы и
+unsafe-режим не планируются; `sed`/`awk` остаются внешними командами,
 а yesh получает только безопасные `search`/`replace`/`fields`-упрощайзеры.
 Регулярные выражения — отдельный тип на базе Go RE2: один синтаксис `regex`,
 именованные группы, без shell-экранирования, backreferences и скрытого кода.

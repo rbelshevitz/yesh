@@ -1,11 +1,40 @@
 package main
 
 import (
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+func TestEnvironmentValueIsExplicitAndNonEmpty(t *testing.T) {
+	t.Setenv("YESH_TEST_VALUE", "UUID=example")
+	r := &runtime{values: map[string]value{}, filename: "environment.yesh"}
+	v, err := r.eval("environment YESH_TEST_VALUE", 3)
+	if err != nil || v.scalar != "UUID=example" || !v.secret {
+		t.Fatalf("environment value: %#v %v", v, err)
+	}
+	for _, source := range []string{"environment", "environment BAD-NAME", "environment MISSING_VALUE"} {
+		if _, err := r.eval(source, 4); err == nil {
+			t.Fatalf("accepted %q", source)
+		}
+	}
+	if err := os.Setenv("YESH_TEST_VALUE", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.eval("environment YESH_TEST_VALUE", 5); err == nil {
+		t.Fatal("accepted empty environment value")
+	}
+}
+
+func TestEnvironmentValueIsMaskedInPlan(t *testing.T) {
+	r := &runtime{values: map[string]value{"secret": {scalar: "do-not-print", secret: true}}}
+	plan := r.formatPipeline([]stage{{argv: []string{"echo", "do-not-print"}}})
+	if strings.Contains(plan, "do-not-print") || !strings.Contains(plan, "<environment value>") {
+		t.Fatalf("secret leaked in plan: %s", plan)
+	}
+}
 
 func TestStringsHaveOneMeaningAcrossContexts(t *testing.T) {
 	r := &runtime{values: map[string]value{}, filename: "strings.yesh"}

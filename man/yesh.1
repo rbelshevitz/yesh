@@ -35,6 +35,17 @@ Single quotes preserve raw text. Double quotes decode Go-style escape
 sequences identically in assignments, lists and command arguments.
 Values are never reinterpreted as pipeline operators, shell substitutions,
 or glob patterns.
+.PP
+An external value may be read explicitly with
+.B environment NAME
+in an assignment:
+.nf
+expected_source = environment YESH_BACKUP_SOURCE
+.fi
+.PP
+The name must be a valid environment variable name and its value must be
+non-empty. Missing and empty values are errors. In plan mode the value is
+masked; yesh does not print it as part of an expanded command.
 .SS Blocks
 .nf
 if exists /etc/os-release:
@@ -52,6 +63,16 @@ Timeouts, cancellation, missing commands and signal termination are errors.
 The only file predicate form is "exists path", with one nonempty string.
 Missing targets are false; permission failures and symlink loops are errors.
 The old exists(path) spelling is rejected with a migration hint.
+.PP
+Free space can be checked without parsing df output:
+.nf
+if free_space target at_least 20GiB:
+    rsync -a source target
+.fi
+.PP
+The amount is a positive whole number with one of B, KiB, MiB, GiB or TiB.
+The runtime reads filesystem statistics directly. Missing paths, unsupported
+platforms, overflow and invalid units are errors.
 .PP
 The \fBmatches\fR condition compares one string with a \fBregex\fR value:
 .nf
@@ -107,6 +128,38 @@ The CLI handles INT, TERM and HUP by cancelling the active command.
 KILL cannot be handled. Processes that escape the group with a new session
 require stronger isolation; full POSIX job control and PTY management
 are not implemented. Windows process cleanup has different semantics.
+.PP
+The Linux read-only process snapshot uses an exact kernel name:
+.nf
+nginx = processes where name is "nginx"
+show nginx fields pid uid state rss cgroup
+.fi
+.PP
+It prints selected fields from the fixed set pid, uid, state, rss, ppid,
+pgid, sid, name and cgroup; RSS is in bytes. Without a fields clause it
+prints the full set. The operation does not send signals or modify processes.
+.PP
+An RSS summary is available without parsing ps or awk:
+.nf
+summarize nginx memory rss
+.fi
+.PP
+It prints process count, total RSS, maximum RSS and integer average RSS in
+binary units with exact byte counts in parentheses. RSS can count shared
+pages more than once and is not the unique physical memory cost of a service.
+.PP
+An RSS budget can be checked for an existing process set:
+.nf
+if memory nginx rss at_most 512MiB:
+    echo "within budget"
+else:
+    exit 4
+.fi
+.PP
+The condition sums RSS for that set. It does not rescan for a different set
+and does not treat RSS as PSS.
+Regex matching, arbitrary field selection and process control are not part
+of this first snapshot interface.
 .SH SECURITY
 Known shell interpreters are rejected after argument expansion on every stage.
 Known code interpreters and execution wrappers are rejected in pipelines.

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 func (r *runtime) execute(items []statement) error {
@@ -32,6 +33,34 @@ func (r *runtime) execute(items []statement) error {
 				return err
 			}
 			r.values[s.name] = v
+		case showStmt:
+			v, ok := r.values[s.name]
+			if !ok || !v.isProcesses {
+				return fmt.Errorf("%s:%d: show expects a process set", r.filename, s.line)
+			}
+			if r.plan {
+				if len(s.fields) == 0 {
+					fmt.Fprintf(os.Stdout, "PLAN show %s\n", s.name)
+				} else {
+					fmt.Fprintf(os.Stdout, "PLAN show %s fields %s\n", s.name, strings.Join(s.fields, " "))
+				}
+				continue
+			}
+			if err := writeProcessTable(os.Stdout, v.processes, s.fields); err != nil {
+				return fmt.Errorf("%s:%d: show: %w", r.filename, s.line, err)
+			}
+		case summarizeStmt:
+			v, ok := r.values[s.name]
+			if !ok || !v.isProcesses {
+				return fmt.Errorf("%s:%d: summarize expects a process set", r.filename, s.line)
+			}
+			if r.plan {
+				fmt.Fprintf(os.Stdout, "PLAN summarize %s memory %s\n", s.name, s.metric)
+				continue
+			}
+			if err := writeProcessSummary(os.Stdout, v.processes, s.metric); err != nil {
+				return fmt.Errorf("%s:%d: summarize: %w", r.filename, s.line, err)
+			}
 		case commandStmt:
 			if err := r.run(s.text, s.line, true); err != nil {
 				return err
@@ -42,7 +71,7 @@ func (r *runtime) execute(items []statement) error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(os.Stdout, "PLAN IF %s\n", formatPipeline(stages))
+				fmt.Fprintf(os.Stdout, "PLAN IF %s\n", r.formatPipeline(stages))
 				if err := r.execute(s.body); err != nil {
 					return err
 				}

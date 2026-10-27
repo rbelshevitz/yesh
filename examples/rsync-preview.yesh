@@ -1,4 +1,15 @@
 # Show changes without modifying the source or destination.
 source = "source/"
 target = "target/"
-rsync -a --dry-run --itemize-changes -- source target
+
+if exists target:
+    if findmnt --target target:
+        findmnt --target target
+        df -P -h -- target
+        rsync -a --dry-run --itemize-changes -- source target
+    else:
+        echo "target is not on a mounted filesystem"
+        exit 3
+else:
+    echo "target directory is missing"
+    exit 2

@@ -35,7 +35,7 @@ func practicalDependencies(t *testing.T, names ...string) {
 	t.Helper()
 	for _, name := range names {
 		if _, err := exec.LookPath(name); err != nil {
-			packageName := map[string]string{"pv": "pv", "rsnapshot": "rsnapshot", "rsync": "rsync", "tar": "tar", "gzip": "gzip", "install": "coreutils", "grep": "grep", "mv": "coreutils", "cat": "coreutils", "cp": "coreutils", "rm": "coreutils", "sort": "coreutils", "lsinitramfs": "initramfs-tools-core", "cpio": "cpio", "zstd": "zstd"}[name]
+			packageName := map[string]string{"pv": "pv", "rsnapshot": "rsnapshot", "rsync": "rsync", "tar": "tar", "gzip": "gzip", "install": "coreutils", "grep": "grep", "mv": "coreutils", "cat": "coreutils", "cp": "coreutils", "rm": "coreutils", "sort": "coreutils", "df": "coreutils", "du": "coreutils", "findmnt": "util-linux", "lsinitramfs": "initramfs-tools-core", "cpio": "cpio", "zstd": "zstd"}[name]
 			t.Skipf("missing utility %s; install package %s on Debian/Ubuntu to run this practical test: %v", name, packageName, err)
 		}
 	}
@@ -308,7 +308,7 @@ func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
 }
 
 func TestPOSIXPracticalRsyncPreviewAndCopy(t *testing.T) {
-	practicalDependencies(t, "rsync")
+	practicalDependencies(t, "rsync", "findmnt", "df")
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source"), filepath.Join(dir, "target")
 	for _, name := range []string{source, target} {
@@ -336,6 +336,197 @@ func TestPOSIXPracticalRsyncPreviewAndCopy(t *testing.T) {
 	}
 	if got := string(readTestFile(t, filepath.Join(source, "file with spaces"))); got != "new payload\n" {
 		t.Fatal("source changed")
+	}
+}
+
+func TestPOSIXPracticalStorageCheck(t *testing.T) {
+	practicalDependencies(t, "findmnt", "df", "du")
+	for _, tc := range []struct {
+		name, mountpoint string
+		wantCode         int
+		wantOutput       []string
+	}{
+		{"mounted directory", t.TempDir(), 0, []string{"Filesystem"}},
+		{"missing directory", filepath.Join(t.TempDir(), "missing"), 2, []string{"backup mount is missing"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := readTestFile(t, practicalExample(t, "storage-check.yesh"))
+			source = bytes.Replace(source, []byte("mountpoint = /backup"), []byte("mountpoint = "+tc.mountpoint), 1)
+			script := filepath.Join(t.TempDir(), "storage-check.yesh")
+			writeTestFile(t, script, source, 0600)
+			cmd := practicalCommand(t, filepath.Dir(script), script)
+			out, err := cmd.CombinedOutput()
+			code := 0
+			if exit, ok := err.(*exec.ExitError); ok {
+				code = exit.ExitCode()
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if code != tc.wantCode {
+				t.Fatalf("code=%d want=%d: %s", code, tc.wantCode, out)
+			}
+			for _, want := range tc.wantOutput {
+				if !bytes.Contains(out, []byte(want)) {
+					t.Fatalf("output %q does not contain %q", out, want)
+				}
+			}
+		})
+	}
+}
+
+func TestPOSIXPracticalStorageDeviceCheck(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	for _, name := range []string{"findmnt", "lsblk", "blkid", "stat"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		if name == "findmnt" {
+			body += "exit \"${FINDMNT_STATUS:-0}\"\n"
+		}
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	script := filepath.Join(dir, "device-check.yesh")
+	source := readTestFile(t, practicalExample(t, "storage-device-check.yesh"))
+	source = bytes.Replace(source, []byte("mountpoint = /backup"), []byte("mountpoint = "+dir), 1)
+	writeTestFile(t, script, source, 0600)
+
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("device report: %v %s", err, out)
+	}
+	want := []string{
+		"findmnt", "--target", dir,
+		"findmnt", "--target", dir,
+		"findmnt", "-no", "SOURCE,FSTYPE,OPTIONS", "--target", dir,
+		"lsblk", "--fs", "--output", "NAME,TYPE,FSTYPE,LABEL,UUID,PARTUUID,MOUNTPOINTS",
+		"blkid", "--output", "full",
+		"stat", "-c", "type=%F mode=%a owner=%U:%G", "--", dir,
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("device report argv: %q want %q", got, want)
+	}
+
+	writeTestFile(t, trace, nil, 0600)
+	cmd = practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace, "FINDMNT_STATUS=1")
+	if out, err := cmd.CombinedOutput(); err == nil || !bytes.Contains(out, []byte("path is not on a mounted filesystem")) {
+		t.Fatalf("missing mount: %v %s", err, out)
+	}
+	traceData := readTestFile(t, trace)
+	for _, name := range []string{"lsblk", "blkid", "stat"} {
+		if bytes.Contains(traceData, []byte(name+"\x00")) {
+			t.Fatalf("%s ran after failed mount: %q", name, traceData)
+		}
+	}
+}
+
+func TestPOSIXPracticalStorageIdentityCheck(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	findmnt := "#!/bin/sh\nprintf '%s\\000' findmnt \"$@\" >> \"$TRACE_FILE\"\nexit \"${FINDMNT_STATUS:-0}\"\n"
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte(findmnt), 0700)
+	script := filepath.Join(dir, "identity-check.yesh")
+	source := readTestFile(t, practicalExample(t, "storage-identity-check.yesh"))
+	source = bytes.Replace(source, []byte("mountpoint = /backup"), []byte("mountpoint = "+dir), 1)
+	source = bytes.Replace(source, []byte("UUID=replace-with-the-real-uuid"), []byte("UUID=11111111-2222-3333-4444-555555555555"), 1)
+	writeTestFile(t, script, source, 0600)
+
+	run := func(status string) (int, []byte) {
+		writeTestFile(t, filepath.Join(dir, "trace"), nil, 0600)
+		cmd := practicalCommand(t, dir, script)
+		cmd.Env = append(cmd.Env,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+filepath.Join(dir, "trace"),
+			"FINDMNT_STATUS="+status,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, out
+	}
+
+	if code, out := run("0"); code != 0 || !bytes.Contains(out, []byte("identity is correct")) {
+		t.Fatalf("matching identity: code=%d output=%s", code, out)
+	}
+	want := []string{"findmnt", "--source", "UUID=11111111-2222-3333-4444-555555555555", "--target", dir, "findmnt", "--source", "UUID=11111111-2222-3333-4444-555555555555", "--target", dir}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, filepath.Join(dir, "trace"))), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("identity argv: %q want %q", got, want)
+	}
+	if code, out := run("1"); code != 3 || !bytes.Contains(out, []byte("identity does not match")) {
+		t.Fatalf("mismatching identity: code=%d output=%s", code, out)
+	}
+}
+
+func TestPOSIXPracticalRsyncSafeCopyChecksIdentity(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	for _, name := range []string{"findmnt", "df", "rsync"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		if name == "findmnt" {
+			body += "exit \"${FINDMNT_STATUS:-0}\"\n"
+		}
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "source"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "target"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "safe-copy.yesh")
+	source := readTestFile(t, practicalExample(t, "rsync-safe-copy.yesh"))
+	writeTestFile(t, script, source, 0600)
+
+	run := func(status string) (int, []byte) {
+		writeTestFile(t, trace, nil, 0600)
+		cmd := practicalCommand(t, dir, script)
+		cmd.Env = append(cmd.Env,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+trace,
+			"YESH_BACKUP_SOURCE=UUID=11111111-2222-3333-4444-555555555555",
+			"FINDMNT_STATUS="+status,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, out
+	}
+
+	if code, out := run("0"); code != 0 || len(out) != 0 {
+		t.Fatalf("matching safe copy: code=%d output=%s", code, out)
+	}
+	traceData := readTestFile(t, trace)
+	for _, name := range []string{"findmnt\x00", "df\x00", "rsync\x00"} {
+		if !bytes.Contains(traceData, []byte(name)) {
+			t.Fatalf("matching safe copy did not run %s: %q", name, traceData)
+		}
+	}
+	if code, out := run("1"); code != 3 || !bytes.Contains(out, []byte("identity does not match")) {
+		t.Fatalf("mismatching safe copy: code=%d output=%s", code, out)
+	}
+	if bytes.Contains(readTestFile(t, trace), []byte("rsync\x00")) {
+		t.Fatal("rsync ran after identity mismatch")
 	}
 }
 
