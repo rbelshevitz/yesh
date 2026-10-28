@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 )
@@ -91,7 +92,7 @@ func selectStorageDevice(data []byte, kind, id string) (storageDevice, error) {
 		if key != id {
 			continue
 		}
-		if !filepath.IsAbs(d.Path) || !strings.HasPrefix(d.Path, "/dev/") || !validDeviceNumber(d.Number) {
+		if !pathpkg.IsAbs(d.Path) || !strings.HasPrefix(d.Path, "/dev/") || !validDeviceNumber(d.Number) {
 			return storageDevice{}, fmt.Errorf("invalid device record")
 		}
 		if seen[d.Number] {
@@ -195,7 +196,7 @@ func (r *runtime) executeStorage(s storageStmt) error {
 }
 
 func validateMountPath(path string) error {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+	if !pathpkg.IsAbs(path) || pathpkg.Clean(path) != path {
 		return fmt.Errorf("mountpoint must be a clean absolute directory path")
 	}
 	return nil

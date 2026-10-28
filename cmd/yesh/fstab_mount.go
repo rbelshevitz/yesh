@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
+	pathpkg "path"
 	"strings"
 )
 
@@ -10,7 +10,7 @@ import (
 func selectFstabMount(snapshot *fstabSnapshot, path string) (fstabEntry, string, string, error) {
 	var entries []fstabEntry
 	for _, e := range snapshot.Entries {
-		if filepath.IsAbs(e.Target) && filepath.Clean(e.Target) == path {
+		if pathpkg.IsAbs(e.Target) && pathpkg.Clean(e.Target) == path {
 			entries = append(entries, e)
 		}
 	}
