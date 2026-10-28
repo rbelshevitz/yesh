@@ -101,12 +101,10 @@ go build -trimpath -o yesh ./cmd/yesh
 ./yesh examples/hello.yesh
 ```
 
-Start with the [English quickstart](docs/quickstart.md) or
-[Russian quickstart](docs/quickstart.ru.md) for a Bash-to-yesh comparison and
-the rules behind the syntax.
+Start with the [English quickstart](docs/quickstart.md) for a Bash-to-yesh
+comparison and the rules behind the syntax.
 
-See the [English roadmap](docs/TODO.md) or the
-[detailed Russian plan](docs/TODO.ru.md) for current project priorities.
+See the [English roadmap](docs/TODO.md) for current project priorities.
 
 ## Documentation and scope
 
@@ -121,19 +119,21 @@ multiple arguments explicitly. Commands are executed directly by the Go
 runtime, without reparsing a command string through another shell. yesh is a
 small language for readable Unix automation.
 
-Read the local manual with `man -l man/yesh.1`
-(Russian: `man -l man/ru/yesh.1`). See
-[pipeline safety](docs/pipeline-safety.ru.md), [cron](docs/cron.ru.md),
-[package manager design](docs/packages.ru.md), and
-[POSIX integration checks](docs/linux-integration.ru.md).
-Design notes cover [syntax and declarative operations](docs/syntax-review.ru.md)
-and [file permissions](docs/permissions.ru.md).
-Runnable [English practical examples](docs/practical-examples.md) and their
-[Russian companion](docs/practical-examples.ru.md) cover archives,
-rsync, rsnapshot, configuration changes and cancelled jobs.
+Read the English local manual with `man -l man/yesh.1`.
+See [predictable pipelines](docs/pipeline-safety.md) for the execution and
+redirect safety rules.
+The core design notes are [control flow](docs/control-flow.md),
+[storage safety](docs/storage.md), [remote operations](docs/remote-ops.md),
+[processes and text](docs/processes-and-text.md), and
+[systemd integration](docs/systemd.md).
+Runnable [English practical examples](docs/practical-examples.md) cover archives,
+rsync, rsnapshot, configuration changes, and read-only administration.
 
 The runnable examples also include read-only process, journal, mount and SSH
 health checks in `examples/`.
+
+Russian project documents and the Russian manual are linked from
+[README.ru.md](README.ru.md); they are not presented as English documentation.
 
 ## Comparison with Bash
 
