@@ -92,6 +92,11 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] tests for host-key failure, timeout, broken transfer, full disk,
   unmounted backup disk, locks, reruns, and restore verification.
 
+The storage examples above are read-only preflight checks. yesh does not yet
+provide a built-in `mount`, `unmount`, `require mounted`, device-resolution, or
+`fstab` API; those remain planned safety work and must not be treated as a
+root-capable interface.
+
 The first Real-World Examples in this slice are the runnable
 `examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current
 validation uses fake SSH/SCP tools and a local source fixture. A local loopback
@@ -117,8 +122,10 @@ copy to a separate remote machine or a restore workflow is not claimed yet.
 - [ ] typed process and systemd diagnostics beyond this read-only slice;
 - [ ] read-only systemd service status from stable `systemctl show` fields and
   bounded `journalctl` output;
-- [ ] extend typed storage, mount, `fstab`, initramfs, module, and device
-  diagnostics beyond the current read-only examples;
+- [ ] extend typed storage, mount, and `fstab` diagnostics beyond the current
+  read-only examples;
+- [ ] add explicit, preflight-checked `mount`/`unmount` operations only after
+  device identity, mountpoint, timeout, busy-state, and wrong-device tests;
 - [ ] state files and resumable long-running jobs only after safe cancellation
   and ownership boundaries are established;
 - [ ] full isolation for untrusted scripts through operating-system controls.

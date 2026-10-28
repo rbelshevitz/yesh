@@ -123,7 +123,7 @@ Read the English local manual with `man -l man/yesh.1`.
 See [predictable pipelines](docs/pipeline-safety.md) for the execution and
 redirect safety rules.
 The core design notes are [control flow](docs/control-flow.md),
-[storage safety](docs/storage.md), [remote operations](docs/remote-ops.md),
+[storage design](docs/storage.md), [remote operations](docs/remote-ops.md),
 [processes and text](docs/processes-and-text.md), and
 [systemd integration](docs/systemd.md).
 Runnable [English practical examples](docs/practical-examples.md) cover archives,

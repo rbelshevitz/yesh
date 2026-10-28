@@ -1,5 +1,8 @@
 # Storage, Block Devices, and fstab: Design
 
+> Status: design only. The target syntax in this document is not implemented
+> and must not be run. In particular, do not experiment with it as root.
+
 Disk operations are a separate safety boundary. They must not be reduced to a
 string command such as `mount`: a wrong device or mountpoint can damage data.
 
