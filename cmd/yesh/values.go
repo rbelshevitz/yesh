@@ -11,6 +11,8 @@ import (
 )
 
 type value struct {
+	fstab       *fstabSnapshot
+	device      *storageDevice
 	scalar      string
 	list        []string
 	isList      bool
@@ -43,7 +45,7 @@ type scriptExit struct{ code int }
 func (e scriptExit) Error() string { return fmt.Sprintf("script exited with status %d", e.code) }
 
 func exitCode(v value) (int, error) {
-	if v.isList || v.regex != nil || v.scalar == "" {
+	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.scalar == "" {
 		return 0, fmt.Errorf("exit expects a decimal code from 0 to 255")
 	}
 	for _, c := range v.scalar {
@@ -63,6 +65,12 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 	if v, ok := r.values[raw]; ok {
 		return v, nil
 	}
+	if raw == "fstab" || strings.HasPrefix(raw, "fstab ") {
+		return r.evalFstab(raw, line)
+	}
+	if strings.HasPrefix(raw, "device ") {
+		return r.evalDevice(raw, line)
+	}
 	if strings.HasPrefix(raw, "processes ") {
 		return r.evalProcessQuery(raw, line)
 	}
@@ -71,7 +79,7 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 		if err != nil {
 			return value{}, err
 		}
-		if pattern.isList || pattern.regex != nil {
+		if pattern.fstab != nil || pattern.device != nil || pattern.isList || pattern.regex != nil {
 			return value{}, fmt.Errorf("%s:%d: regex pattern must be one string", r.filename, line)
 		}
 		if len(pattern.scalar) > maxRegexPattern {
@@ -112,7 +120,7 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 			if err != nil {
 				return value{}, err
 			}
-			if v.isList || v.regex != nil {
+			if v.fstab != nil || v.device != nil || v.isList || v.regex != nil {
 				return value{}, fmt.Errorf("%s:%d: nested lists are not supported", r.filename, line)
 			}
 			result = append(result, v.scalar)
@@ -195,6 +203,9 @@ func (r *runtime) expand(token string, line int) ([]string, error) {
 		if v.isList {
 			return v.list, nil
 		}
+		if v.fstab != nil || v.device != nil {
+			return nil, fmt.Errorf("%s:%d: device/fstab value cannot be used as a command argument", r.filename, line)
+		}
 		if v.regex != nil {
 			return nil, fmt.Errorf("%s:%d: regex cannot be used as a command argument", r.filename, line)
 		}
@@ -206,6 +217,9 @@ func (r *runtime) expand(token string, line int) ([]string, error) {
 	}
 	if v.isList {
 		return v.list, nil
+	}
+	if v.fstab != nil || v.device != nil {
+		return nil, fmt.Errorf("%s:%d: device/fstab value cannot be used as a command argument", r.filename, line)
 	}
 	if v.regex != nil {
 		return nil, fmt.Errorf("%s:%d: regex cannot be used as a command argument", r.filename, line)

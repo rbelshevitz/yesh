@@ -19,6 +19,13 @@ type commandStmt struct {
 
 func (commandStmt) stmt() {}
 
+type storageStmt struct {
+	line  int
+	terms []commandToken
+}
+
+func (storageStmt) stmt() {}
+
 type assignStmt struct {
 	line        int
 	name, value string
@@ -167,6 +174,18 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 				return nil, index, p.err(l.number, "expected: exit code (0..255), without pipeline or redirection")
 			}
 			result = append(result, exitStmt{l.number, tokens[1]})
+			index++
+			continue
+		}
+		if text == "inspect" || strings.HasPrefix(text, "inspect ") || text == "require" || strings.HasPrefix(text, "require ") {
+			terms, err := words(text)
+			if err != nil {
+				return nil, index, p.err(l.number, err.Error())
+			}
+			if err := validateStorageStatement(terms); err != nil {
+				return nil, index, p.err(l.number, err.Error())
+			}
+			result = append(result, storageStmt{l.number, terms})
 			index++
 			continue
 		}

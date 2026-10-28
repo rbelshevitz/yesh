@@ -92,10 +92,31 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] tests for host-key failure, timeout, broken transfer, full disk,
   unmounted backup disk, locks, reruns, and restore verification.
 
-The storage examples above are read-only preflight checks. yesh does not yet
-provide a built-in `mount`, `unmount`, `require mounted`, device-resolution, or
-`fstab` API; those remain planned safety work and must not be treated as a
-root-capable interface.
+The Linux read-only storage interface is implemented:
+
+- `device by uuid|partuuid identity` resolves one device from available lsblk metadata;
+- `inspect` displays device or fstab snapshots;
+- `fstab path` reads a bounded private snapshot through libmount, rejecting
+  parser diagnostics and partial results even with exit status zero;
+- `require mounted path from device filesystem type` checks the exact mount;
+- `require mounted path from fstab_snapshot` selects one UUID/PARTUUID entry
+  and checks device identity, major:minor and filesystem against the kernel mount table.
+
+See [storage](storage.md) and [the runnable check](../examples/fstab-mount-check.yesh).
+Plan defers storage reads and queries. Kernel mount lookup disables path
+canonicalization and precedes directory inspection. Missing/ambiguous entries,
+wrong devices, plain directories and autofs-only targets fail before the next action.
+The interface does not write fstab or run mount helpers or daemon-reload.
+
+The real WSL check uses synthetic fstab data and a real root ext4 mount;
+PARTUUID and autofs rejection also have fixtures. Real GPT/PARTUUID, automount
+activation, backup-mount/restore and boot testing remain unproven. Effective
+options, write access, free space and concurrent changes are separate concerns.
+Path/LABEL sources, swap, bind/loop/subvolume and auto/type lists are unsupported
+by this mount requirement. Whole-filesystem bind mounts cannot be distinguished
+from ordinary mounts; uniqueness covers only available device metadata.
+Built-in mount/unmount remain planned. The next storage step is to define the
+readonly-mount contract and a dedicated test environment.
 
 The first Real-World Examples in this slice are the runnable
 `examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current
@@ -122,8 +143,10 @@ copy to a separate remote machine or a restore workflow is not claimed yet.
 - [ ] typed process and systemd diagnostics beyond this read-only slice;
 - [ ] read-only systemd service status from stable `systemctl show` fields and
   bounded `journalctl` output;
-- [ ] extend typed storage, mount, and `fstab` diagnostics beyond the current
-  read-only examples;
+- [x] typed read-only device resolution, fstab snapshots and exact active-mount
+  checks, including binding one fstab entry to its UUID/PARTUUID device;
+- [ ] effective mount-option and specialized filesystem diagnostics beyond
+  the supported whole-filesystem identity/type check;
 - [ ] add explicit, preflight-checked `mount`/`unmount` operations only after
   device identity, mountpoint, timeout, busy-state, and wrong-device tests;
 - [ ] state files and resumable long-running jobs only after safe cancellation

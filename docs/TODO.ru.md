@@ -32,7 +32,11 @@
   защищает от типичной ошибки Bash. Простая команда `rsync` сама по себе
   не является доказательством преимущества yesh.
 
-Ближайшие шаги:
+Читающая storage-веха закрыта: чтение fstab и проверка записи по UUID/PARTUUID,
+устройству и активному mount реализованы. Следующий шаг этого направления —
+контракт readonly mount и отдельный тестовый стенд, без изменения дисков хоста.
+
+Остальные направления (длительные операции по-прежнему отложены пользователем):
 
 1. При возвращении к длительным операциям реализовать согласованный
    `--command-timeout` (пользователь отложил реализацию); затем определить
@@ -56,29 +60,24 @@ SELinux/securityfs не видны; это не доказывает отклю�
 Последний checkpoint:
 
 ```text
-Цель: добавить безопасный read-only снимок процессов для Linux.
-Сделано: чтение `/proc/<pid>` с PID, start_time, UID, состоянием, RSS, PPID,
-PGID, SID, TTY и cgroup; bounded-сканирование `/proc`; точный поиск по имени;
-`processes where name is ...`; `show` с закрытым набором полей; реальный WSL
-тест nginx нашёл пять процессов (master и workers).
-Решения: PID без start_time не считать identity; исчезнувший процесс при
-гонке пропускать, ошибки доступа не скрывать; сигналы, regex и cgroup-запись
-не включать в read-only срез.
-Открыто: executable/argv/user name, VSZ/PSS/swap/CPU, job lifecycle;
-systemd status/journal пока не обёрнуты; GPT/PARTUUID остаётся отдельной
-Linux-задачей.
-Следующий шаг: read-only systemd-диагностика через стабильные поля
-`systemctl show` и ограниченный `journalctl`; общий сигнал чужим процессам
-не планируется.
-Проверки: Windows go test -trimpath ./..., go vet ./..., go build -trimpath ./cmd/yesh,
-git diff --check — PASS; WSL process snapshot, exact-name query, bounded list,
-real nginx process set, public query and selected fields — PASS (5 nginx
-processes).
-Файлы: cmd/yesh/process_snapshot_linux.go, cmd/yesh/process_snapshot_windows.go,
-cmd/yesh/process_query.go, cmd/yesh/process_query_test.go,
-cmd/yesh/process_snapshot_linux_test.go, examples/process-snapshot.yesh,
-docs/processes-and-text.ru.md, docs/practical-examples.ru.md, docs/TODO.md,
-docs/TODO.ru.md, man/yesh.1, man/ru/yesh.1.
+Цель: связать конкретную запись fstab с устройством и активным mount.
+Сделано: require mounted path from snapshot; уникальная запись/UUID/PARTUUID,
+точный target/major:minor/type; проверка ядра без канонизации до обхода каталога;
+отказы до следующего шага и plan без запросов.
+Решения: только целая ФС с UUID/PARTUUID и явным типом; специальные источники,
+bind/loop/subvol/auto и неоднозначные записи отклоняются; fstab не записывается.
+Открыто: эффективные options, реальные GPT/PARTUUID и automount/network/boot;
+mount/umount пока проект; снимки не блокируют параллельные изменения.
+Следующий шаг: определить контракт readonly mount и отдельный стенд для него.
+Проверки: Go 1.27.3: полный go test -trimpath ./..., Linux/POSIX/storage/fstab
+с -race, vet и build -trimpath — PASS. Fuzz идентификаторов — PASS; случай
+UUID='0' сохранён отдельной проверкой кавычек. Искусственный fstab совпал
+с реальным /dev/sdd ext4 в WSL; незамонтированный каталог с nofail отклонён.
+Дубликаты/ошибки identity/type/device, subtree, autofs-only и запрет публикации
+после отказа — PASS. Активация настоящего automount и boot не проверены.
+Файлы: cmd/yesh/fstab_mount*.go, storage.go, storage_linux_test.go,
+cmd/yesh/testdata/fuzz/FuzzFstabMountIdentity; examples/fstab-mount-check.yesh,
+docs/storage*.md, docs/practical-examples.ru.md, docs/TODO.ru.md, man/*.
 ```
 
 ## Что yesh уже упрощает
@@ -378,23 +377,104 @@ POSIX/MVP. Его проверять и реализовывать только 
 ## Накопители и монтирование
 
 - [x] Базовое получение сведений через `findmnt`, `df` и ограниченный `du`
-  без изменения системы; `lsblk`, `blkid`, `stat` остаются следующим слоем.
+  без изменения системы.
 - [x] Диагностический отчёт через `lsblk`, `blkid` и `stat` без изменения системы.
 - [x] Проверка заданного `UUID=`/`PARTUUID=` через `findmnt` до запуска rsync;
   несовпадение останавливает пример.
 - [x] Отдельный сценарий rsync для резервного диска объединяет проверку пути,
   файловой системы, идентификатора и свободного места до записи.
-- [ ] Расширить только читаемые сведения типизированным сравнением UUID/PARTUUID.
-- [ ] Разрешение устройства по UUID/PARTUUID с проверкой уникальности.
-- [ ] `require mounted` с проверкой фактического источника и файловой системы.
-- [ ] Защита от неправильной точки монтирования и записи на локальную корневую файловую систему.
+- [x] Расширить только читаемые сведения типизированным сравнением UUID/PARTUUID.
+- [x] Разрешение устройства по UUID/PARTUUID с проверкой уникальности.
+- [x] `require mounted` с проверкой фактического источника и файловой системы.
+- [x] Preflight отклоняет обычный каталог на корневой ФС, если ожидается
+  отдельный mount; это не глобальный запрет записи и не блокировка mount changes.
 - [ ] Явные mount/umount с ограничением времени и проверкой занятости.
-- [ ] `fstab` сначала только разбирать и диагностировать; автоматическая запись запрещена.
-- [ ] `mkfs`, `wipefs`, `dd`, `fdisk`, `parted` запрещены встроенным интерфейсом первой версии.
+- [x] `fstab` сначала только разбирать и диагностировать; автоматическая запись запрещена.
+- [x] Встроенный storage-интерфейс не предоставляет `mkfs`, `wipefs`, `dd`,
+  `fdisk`, `parted`; политика обычных внешних команд от этого не меняется.
 
-Текущие примеры накопителей — только read-only preflight-проверки. Встроенных
-`mount`, `umount`, `require mounted`, разрешения устройства и API для `fstab`
-пока нет; это будущая safety-работа, а не root-интерфейс текущей версии.
+Реализован Linux read-only интерфейс: `device by uuid|partuuid`, `inspect`,
+`require mounted path from device filesystem type`; пример
+[`storage-preflight.yesh`](../examples/storage-preflight.yesh), правила и границы —
+[storage](storage.ru.md). Утилиты util-linux, 10 секунд выполнения плюс до двух
+секунд отмены, 4 MiB на поток;
+plan откладывает все storage-запросы. Точный mountpoint не пропускает обычный
+каталог на корневой ФС; проверки остаются снимками, а не блокировкой изменений.
+Bind mount всей ФС не отличим от обычного mount. Встроенных `mount`, `umount`
+пока нет. `fstab path` читает снимок через libmount; `inspect` показывает записи
+и дубликаты target. Примеры: [чтение](../examples/fstab-inspect.yesh) и
+[проверка записи и mount](../examples/fstab-mount-check.yesh).
+Уникальность identity установлена только среди доступных метаданных lsblk;
+недоступные метаданные не доказывают глобальную уникальность.
+
+- [x] Связать запись fstab с устройством и активным mount:
+  `require mounted path from snapshot`, уникальная запись/UUID/PARTUUID,
+  точный mountpoint, major:minor и тип ФС. Plan откладывает все проверки.
+- [x] Проверять таблицу mount ядра без канонизации до обращения к каталогу;
+  autofs без ожидаемой ФС не считается успехом. Реальная активация automount
+  остаётся отдельной стендовой проверкой.
+- [ ] Проверять эффективные mount options и специальные типы (bind, swap,
+  btrfs subvolume, сеть); текущий контракт отклоняет неподдержанный способ
+  источника/тип действия и не обещает проверки options или boot.
+
+### fstab: обязательные нюансы реализации
+
+Исследовано по [fstab(5)](https://man7.org/linux/man-pages/man5/fstab.5.html),
+[libmount](https://www.kernel.org/pub/linux/utils/util-linux/v2.41/libmount-docs/libmount-Table-of-filesystems.html),
+[systemd.mount](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html)
+и [systemd-fstab-generator](https://www.freedesktop.org/software/systemd/man/latest/systemd-fstab-generator.html).
+Локально подтверждено на util-linux 2.39.3: повреждённая строка перед правильной
+даёт findmnt status 0, JSON только правильной записи и parse error в stderr.
+
+- [x] Чтение через штатный libmount: parser stderr и неполное число записей
+  отклоняют частичный результат даже при status 0; смешанный valid/invalid
+  файл проверен тестом.
+- [x] Ограниченный снимок обычного файла; лимиты входа/строки/числа записей,
+  таймаут утилиты, удаление приватного временного снимка и plan без чтения.
+- [x] Сохранить исходный порядок записей; не сортировать и не превращать
+  повторные target в словарь. Дубликат может требовать разъяснения намерения,
+  а несколько swap с `none` не означают конфликт mountpoint.
+- [x] Libmount корректно разбирает `\040`/`\011`/`\134` и кавычки,
+  без shell lexer для полей. На фикстурах проверены LABEL/UUID/PARTUUID,
+  комментарии, пустой файл и пропущенные необязательные поля.
+- [x] Опции — не обычный Split по запятой: значения вроде SELinux context
+  могут содержать запятые в кавычках; повторные опции и порядок сохраняются.
+  Неизвестные опции не удалять и не объявлять корректными без проверки потребителя.
+- [x] Отчёт не должен раскрывать пароли/credential values из сетевых источников
+  и options; хранение снимка на диске только приватное и временное.
+
+Принятые границы:
+
+- Чтение синтаксиса, диагностика конфигурации и проверка активного mount —
+  разные результаты. `findmnt --verify` также проверяет usability; чтение
+  fstab не считается проверкой boot.
+- Проверка mount из fstab поддерживает целую ФС с UUID/PARTUUID и явным типом.
+  Path/LABEL, swap, auto/список типов, bind/rbind, loop, move/remount и subvolume
+  отклоняются; несколько активных mount в одной точке не разрешаются выбором первого.
+- `nofail` не доказывает готовность backup. `noauto` не отключает
+  `x-systemd.automount`; ни один из этих флагов не разрешает пропустить
+  проверку активной ФС. Читающий разбор не обходит target, а проверка mount
+  сначала читает таблицу ядра без канонизации.
+- Systemd трактует passno как boolean с root-first проверкой; традиционное
+  fsck ordering не переносится на generator. Учитываются как ограничения,
+  а не как реализованная модель зависимостей systemd.
+- Запись `/etc/fstab`, `mount -a`, daemon-reload и systemd generator на хосте
+  не входят в этот интерфейс и не запускались его тестами.
+
+Остаётся проверить или реализовать:
+
+- [ ] Эффективные mount options, доступ для записи и свободное место как
+  отдельные требования; успешный identity/type check их не подтверждает.
+- [ ] Специализированные проверки bind/rbind, swap, сетевых ФС, псевдо-ФС,
+  btrfs subvolumes и automount; не разрешать каждую source как block device.
+- [ ] Диагностика зависимостей systemd: `_netdev`, nofail/automount,
+  native units, initrd и kernel command line, без изменения системы.
+- [ ] Реальные GPT/PARTUUID и отдельный backup-mount; текущий WSL-тест
+  использует искусственный fstab и настоящий root ext4, не backup/restore.
+- [ ] Настоящий automount: подтвердить отсутствие непреднамеренной активации;
+  сейчас проверены порядок запросов и autofs-only отказ на подменённых утилитах.
+- [ ] Mount/umount, сетевые ФС и boot — только отдельный стенд с положительным
+  и отрицательным сценариями; обычные тесты не меняют конфигурацию хоста.
 
 ## Загрузка системы и диагностика устройств
 
@@ -497,8 +577,9 @@ read-only/preview и локальные тестовые стенды; наст�
 
 Общий срок скрипта, ожидание блокировки и предел отсутствия прогресса —
 следующие отдельные настройки, не скрытые значения `--command-timeout`.
-Проверка требуемым Go 1.27 остаётся открытой; временный modfile для Go 1.22.2
-допустим только с явным указанием ограничения, без изменения `go.mod` проекта.
+Текущий runtime проверен Go 1.27.3 без временного modfile. Сам
+`--command-timeout` остаётся отложенным и ещё не реализован; ранние проверки
+с временным modfile для Go 1.22.2 не заменяют проверку нового интерфейса.
 
 - [x] [Проектирование](long-running-and-state.ru.md): время выполнения,
   прогресс, события, снимок состояния и прикладная точка возобновления.

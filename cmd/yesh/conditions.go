@@ -101,7 +101,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if v.isList || v.regex != nil || v.scalar == "" || strings.ContainsRune(v.scalar, 0) {
+		if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.scalar == "" || strings.ContainsRune(v.scalar, 0) {
 			return false, fmt.Errorf("%s:%d: exists expects one non-empty path string", r.filename, line)
 		}
 		ok, err := fileExists(v.scalar)
@@ -127,7 +127,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if left.isList || left.regex != nil || right.regex == nil {
+		if left.fstab != nil || left.device != nil || left.isList || left.regex != nil || right.regex == nil {
 			return false, fmt.Errorf("%s:%d: matches expects text matches regex", r.filename, line)
 		}
 		return right.regex.MatchString(left.scalar), nil
@@ -136,7 +136,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if path.isList || path.regex != nil || path.scalar == "" || strings.ContainsRune(path.scalar, 0) {
+		if path.fstab != nil || path.device != nil || path.isList || path.regex != nil || path.scalar == "" || strings.ContainsRune(path.scalar, 0) {
 			return false, fmt.Errorf("%s:%d: free_space expects one non-empty path string", r.filename, line)
 		}
 		need, err := parseByteSize(expr.terms[3].text)

@@ -13,6 +13,10 @@ func (r *runtime) execute(items []statement) error {
 			return fmt.Errorf("%s: execution limit of %d steps exceeded", r.filename, maxSteps)
 		}
 		switch s := raw.(type) {
+		case storageStmt:
+			if err := r.executeStorage(s); err != nil {
+				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
+			}
 		case exitStmt:
 			v, err := r.conditionValue(s.code, s.line)
 			if err != nil {

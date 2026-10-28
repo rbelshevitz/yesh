@@ -160,6 +160,64 @@ The condition sums RSS for that set. It does not rescan for a different set
 and does not treat RSS as PSS.
 Regex matching, arbitrary field selection and process control are not part
 of this first snapshot interface.
+.SS Read-only storage (Linux)
+.nf
+backup = device by uuid "replace-with-real-uuid"
+inspect backup
+require mounted /mnt/backup from backup filesystem "ext4"
+.fi
+.PP
+Use uuid or partuuid for an exact, unique identity. inspect prints the lookup
+snapshot as JSON. require mounted repeats lookup and checks the exact directory,
+device major:minor and filesystem; a directory merely contained in the root
+mount fails. Symlink mountpoints and filesystem subtrees are rejected.
+Whole-filesystem bind mounts cannot be distinguished. These are snapshots,
+not protection against concurrent device/mount changes or a write permission test.
+.PP
+Queries require lsblk and findmnt (util-linux), have a ten-second execution limit plus a two-second cancellation grace period,
+and accept at most 4 MiB per output stream. Missing/ambiguous identities and
+query failures stop execution. Device values cannot become command arguments.
+Plan mode defers all storage queries and path checks. Mount/unmount
+are not implemented by this typed interface.
+.SS fstab snapshots (Linux)
+.nf
+mounts = fstab "/etc/fstab"
+inspect mounts
+.fi
+.PP
+Reads a regular-file snapshot through findmnt/libmount without device evaluation,
+path canonicalization or mounting. Parser diagnostics fail the query even with
+exit status zero. Empty files are valid. Limits: 4 MiB input, 64 KiB per line,
+10,000 records; the private temporary snapshot is removed after the query.
+.PP
+Inspection prints ordered entries, dump/fsck numbers and duplicate-target
+diagnostics. Swap entries sharing none are not duplicate targets. Option values
+and non-local sources are hidden to avoid printing credentials; option order
+and values are retained internally. Plan defers all reading.
+.PP
+This is configuration, not active mount or boot verification. nofail does not
+prove storage readiness; noauto does not disable x-systemd.automount. systemd
+handles passno differently from traditional fsck ordering. No fstab writing,
+mount helpers, daemon-reload or systemd generator execution is performed.
+.PP
+To bind one configuration entry to its device and exact active mount:
+.nf
+mounts = fstab "/etc/fstab"
+require mounted /mnt/backup from mounts
+.fi
+.PP
+Exactly one entry (including lexically equivalent paths) must match. Its
+UUID/PARTUUID must resolve uniquely, and its explicit filesystem type and device
+must match the kernel mount table. UUID/PARTUUID tags may have enclosing quotes.
+Swap, path/LABEL sources, auto/type lists, bind/rbind, loop, move/remount and
+btrfs subvolume options are unsupported and fail explicitly.
+.PP
+Kernel lookup disables canonicalization and precedes directory inspection;
+an autofs-only target fails before traversal. nofail, noauto and automount
+options never excuse a missing mount. Plan defers entry/device/mount checks.
+The loaded fstab snapshot is used; later edits are not reread. This verifies
+mountpoint, device and filesystem, not options, write access, free space or boot.
+Concurrent mount/device changes still require an external boundary.
 .SH SECURITY
 Known shell interpreters are rejected after argument expansion on every stage.
 Known code interpreters and execution wrappers are rejected in pipelines.
