@@ -12,4 +12,4 @@ if exists target:
         exit 3
 else:
     echo "target directory is missing"
-        exit 2
+    exit 2
