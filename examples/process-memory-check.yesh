@@ -6,4 +6,4 @@ if memory nginx rss at_most 512MiB:
 else:
     echo "nginx RSS is above the budget"
     summarize nginx memory rss
-    exit 1
+    exit 4

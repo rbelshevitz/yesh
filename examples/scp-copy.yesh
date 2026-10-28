@@ -9,4 +9,4 @@ if exists source:
     scp scp_options -- source destination
 else:
     echo "source file is missing"
-    exit 1
+    exit 2

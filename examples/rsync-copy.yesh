@@ -9,7 +9,7 @@ if exists target:
         rsync -a --itemize-changes -- source target
     else:
         echo "target is not on a mounted filesystem"
-        exit 1
+        exit 3
 else:
     echo "target directory is missing"
-    exit 1
+        exit 2

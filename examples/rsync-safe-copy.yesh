@@ -14,13 +14,13 @@ if exists source:
                 rsync -a --itemize-changes -- source target
             else:
                 echo "not enough free space"
-                exit 1
+                exit 4
         else:
             echo "target filesystem identity does not match"
-            exit 1
+            exit 3
     else:
         echo "target directory is missing"
-        exit 1
+        exit 2
 else:
     echo "source directory is missing"
-    exit 1
+    exit 2

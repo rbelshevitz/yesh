@@ -10,4 +10,4 @@ if findmnt --target mountpoint:
     stat -c "type=%F mode=%a owner=%U:%G" -- mountpoint
 else:
     echo "path is not on a mounted filesystem"
-    exit 1
+    exit 2

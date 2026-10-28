@@ -11,4 +11,4 @@ if exists source:
     mv -- "backup-state.json.partial" "backup-state.json"
 else:
     echo "source directory is missing"
-    exit 1
+    exit 2

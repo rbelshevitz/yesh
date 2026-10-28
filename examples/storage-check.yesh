@@ -8,4 +8,4 @@ if findmnt --target mountpoint:
     du -x -d 1 -h -- mountpoint
 else:
     echo "backup mount is missing"
-    exit 1
+    exit 2

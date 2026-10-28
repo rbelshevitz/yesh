@@ -8,4 +8,4 @@ if findmnt --source expected_source --target mountpoint:
     echo "backup filesystem identity is correct"
 else:
     echo "backup filesystem identity does not match"
-    exit 1
+    exit 3
