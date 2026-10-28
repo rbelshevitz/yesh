@@ -92,6 +92,8 @@ PLAN ["scp" "-P" "2828" "-o" "BatchMode=yes" "-o" "ConnectTimeout=5" "--" "backu
 
 This makes the real operation reviewable before execution.
 
+## Build and run
+
 Build and run the Go binary:
 
 ```text
@@ -106,9 +108,13 @@ the rules behind the syntax.
 See the [English roadmap](docs/TODO.md) or the
 [detailed Russian plan](docs/TODO.ru.md) for current project priorities.
 
+## Documentation and scope
+
 yesh is a language sketch focused on readable system-administration and
 operational scripts.
 The examples and design documents are the source of truth for its semantics.
+
+## Core execution model
 
 Values keep their type: a string stays one argument and a list expands to
 multiple arguments explicitly. Commands are executed directly by the Go
