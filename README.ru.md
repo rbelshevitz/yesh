@@ -114,7 +114,7 @@ go build -trimpath -o yesh ./cmd/yesh
 в `docs/` и `man/`. Публичные runnable-примеры в `examples/` поддерживаются
 на английском языке.
 
-## Связь с Bash
+## Сравнение с Bash
 
 [Bash](https://www.gnu.org/software/bash/) — оболочка проекта GNU, **Bourne
 Again SHell**. Первоначально её разработал
