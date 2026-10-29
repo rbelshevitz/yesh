@@ -835,6 +835,45 @@ func TestPOSIXPracticalRsnapshotConfigtestFailureStopsRotation(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalRsnapshotLockConflictStopsPublication(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "rsnapshot.trace")
+	lock := filepath.Join(dir, "rsnapshot.pid")
+	writeTestFile(t, lock, []byte("held by another backup\n"), 0600)
+	writeTestFile(t, filepath.Join(dir, "rsnapshot.conf"), []byte("lockfile\t"+lock+"\n"), 0600)
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\nlast=\"\"\nfor last do :; done\nif [ \"$last\" = daily ] && [ -e \"$LOCK_FILE\" ]; then exit 75; fi\nexit 0\n"), 0700)
+	script := filepath.Join(dir, "backup.yesh")
+	source := string(readTestFile(t, practicalExample(t, "rsnapshot-local.yesh"))) + "\ntouch published\n"
+	writeTestFile(t, script, []byte(source), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"LOCK_FILE="+lock,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		code := -1
+		if ok {
+			code = exit.ExitCode()
+		}
+		t.Fatalf("lock conflict exit code=%d output=%q", code, out)
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	want := []string{"rsnapshot", "-c", "rsnapshot.conf", "configtest", "rsnapshot", "-c", "rsnapshot.conf", "daily"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("lock conflict argv: got %q want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("rotation marker exists after lock conflict: %v", err)
+	}
+}
+
 func TestPOSIXPracticalCancelledJobDoesNotCommit(t *testing.T) {
 	dir := t.TempDir()
 	pidfile := filepath.Join(dir, "pid")
