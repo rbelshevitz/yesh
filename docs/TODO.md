@@ -145,7 +145,7 @@ Path/LABEL sources, swap, bind/loop/subvolume and auto/type lists are unsupporte
 by this mount requirement. Whole-filesystem bind mounts cannot be distinguished
 from ordinary mounts; uniqueness covers only available device metadata.
 Built-in mount/unmount remain planned. The next storage step is to define the
-readonly-mount contract and a dedicated test environment.
+readonly-mount checks and a dedicated test environment.
 
 Storage security decisions for the next slice:
 

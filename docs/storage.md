@@ -166,7 +166,7 @@ Plan defers entry selection, device lookup and actual mount checks.
 This verifies target, device and filesystem only: mount options, write access,
 free space, boot readiness and concurrent changes are separate checks.
 
-## Read-only mount contract (next storage slice)
+## Read-only mount checks (next storage slice)
 
 The current `require mounted` operation intentionally does not imply that a
 backup is writable, read-only, or large enough. These are separate observations
@@ -184,7 +184,7 @@ Before adding a storage builtin, the Linux test environment must demonstrate:
 - a race disclaimer: these are preflight observations, not a lease or a
   guarantee for a later backup operation.
 
-Until that contract has a privileged fixture and negative tests, scripts should
+Until these rules have a privileged fixture and negative tests, scripts should
 use the existing external `findmnt`, `df`, and `free_space` checks explicitly.
 No `mount`, `umount`, `/etc/fstab` write, or implicit write probe is provided.
 
