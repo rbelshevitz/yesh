@@ -1,4 +1,4 @@
-# Упрощённый rsnapshot через yesh
+# Упрощённая работа с rsnapshot через yesh
 
 Статус: предметный интерфейс ниже пока проектируется. Уже исполняемый
 пример обычных команд — [rsnapshot-local.yesh](../examples/rsnapshot-local.yesh).
@@ -7,8 +7,54 @@
 
 rsnapshot уже умеет сложную и полезную часть: incremental snapshots на базе
 rsync и hard links, включая backup удалённых машин через SSH. yesh не должен
-переписывать этот engine. Его задача — заменить трудно читаемый конфиг на
-проверяемый сценарий.
+переписывать этот engine или заменять его конфигурацию новым DSL. Его задача —
+сделать операционный запуск читаемым и проверяемым: preflight, `configtest`,
+test mode, lock, явный interval и `--plan`.
+
+Минимальный рабочий wrapper
+[`rsnapshot-preflight.yesh`](../examples/rsnapshot-preflight.yesh) сохраняет
+обычный `rsnapshot.conf` как source of truth:
+
+```yesh
+config = environment YESH_RSNAPSHOT_CONFIG
+level = environment YESH_RSNAPSHOT_LEVEL
+rsnapshot -c $config configtest
+rsnapshot -c $config -t $level
+# apply is a separate, explicit operator step:
+# rsnapshot -c $config $level
+```
+
+Remote backup также остаётся штатной возможностью rsnapshot через `cmd_ssh`,
+`ssh_args`, agent/`known_hosts` и строки `backup user@host:/path target/`.
+yesh проверяет границы и порядок запуска, но не повторяет rotation engine.
+
+Для реального interval есть отдельный guarded wrapper
+[`rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh). Он требует заранее
+созданный оператором confirmation-файл после просмотра `rsnapshot -t`; сам
+wrapper этот файл не создаёт. Это защита от случайного запуска, а не замена
+review effective-конфигурации.
+
+## Коварные места rsnapshot
+
+- В шаблоне конфигурации `rsync_long_args` может содержать
+  `--delete --numeric-ids --relative --delete-excluded`. Нельзя считать
+  отсутствие этих флагов в yesh-файле доказательством безопасного запуска:
+  смотреть нужно на реальный `rsnapshot -t LEVEL` и конфигурацию.
+- При `sync_first=1` команда `rsnapshot sync` выполняет передачу, а interval
+  (`hourly`, `daily` и т. п.) в основном ротирует уже готовые snapshots.
+  Без `sync_first` передача выполняется на самом низком interval. Это должно
+  быть явно видно в wrapper и `--plan`.
+- Без `no_create_root=1` rsnapshot может создать отсутствующий `snapshot_root`;
+  для съёмного диска это риск записи в обычный локальный каталог при
+  незамонтированном backup mount.
+- Каталог lockfile не должен быть world-writable. `snapshot_root` должен быть
+  недоступен для записи обычным пользователям, иначе hard-link snapshots можно
+  изменить после создания.
+- Remote `snapshot_root` через SSH rsnapshot не поддерживает. Для такой схемы
+  rsnapshot должен работать на destination-сервере либо использоваться
+  отдельный staging/NFS-подход.
+- Конфигурация rsnapshot чувствительна к tabs, а не пробелам; `configtest` обязателен
+  до test mode и реального interval.
 
 ## Целевой синтаксис
 

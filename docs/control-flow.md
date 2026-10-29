@@ -76,5 +76,27 @@ branch immediately belonging to an `if` at the same level. Header errors are
 found while parsing the complete file, before commands run. Words such as
 `if`, `matches`, and `else` inside strings are data.
 
+## Scoped locks
+
+On Linux, `with lock path:` holds an exclusive advisory file lock for the
+indented body and releases it on success, error, cancellation, or script exit:
+
+```yesh
+lock = "/var/lib/yesh/backup.lock"
+with lock $lock:
+    rsync -a --link-dest previous source/ temporary/
+    publish temporary to current
+```
+
+The lock is non-blocking: a second process fails before entering the body.
+`--plan` shows the lock path but does not acquire it. This is an orchestration
+primitive, not a replacement for utility-specific locks or a permission
+sandbox; the lock file's parent and ownership must be provisioned separately.
+
+`publish source to destination` uses Linux/POSIX rename semantics. It requires
+both paths to be on the same filesystem and does not silently fall back to a
+copy. It provides atomic namespace visibility, not a power-loss durability
+guarantee; fsync of files and directories remains an explicit future policy.
+
 Missing files and denial while inspecting a parent directory are different
 `stat` results; the runtime does not hide that distinction.

@@ -147,6 +147,9 @@ argv предотвращает повторный разбор команд she
 [`SAFETY.md`](../SAFETY.md) и [`SAFETY.ru.md`](../SAFETY.ru.md).
 
 - [ ] Определить контролируемые `PATH` и environment для privileged/runbook-запуска.
+- [ ] Определить явную политику destructive actions для `rsync --delete`,
+  `--delete-excluded`, `--delete-missing-args`, `--remove-source-files` и
+  рекурсивного удаления.
 - [ ] Добавить типизированную проверку аргументов или узкие обёртки для опасных
   внешних команд (`ssh`, `rsync`, `mount`, `systemctl` и destinations).
 - [ ] Расширить fuzzing на lexer/parser, раскрытие значений, redirects и
@@ -599,6 +602,13 @@ read-only/preview и локальные тестовые стенды; наст�
 - [ ] rsync: `--dry-run`/preview до записи, явный источник и назначение,
   отсутствие неявного `--delete`, проверка mount и свободного места; отдельно
   различать exit code и предупреждения.
+- [ ] Добавить opt-in real-host интеграционный тест rsync через SSH: наличие
+  remote rsync, права destination, host-key policy и совместимость версий/опций
+  (включая `--fsync`) должны быть явными.
+- [ ] Отдельно описать remote snapshot semantics: текущий incremental-пример
+  локальный, потому что `exists` и `publish` работают локально; remote staging
+  и remote atomic publication требуют явно заданной SSH-операции и не должны
+  подразумеваться из аргумента `host:path`.
 - [x] rsnapshot: `configtest`, lock conflict, две ротации, retention и
   hard-link snapshots проверены локальным примером и интеграционными тестами.
 - [ ] rsnapshot: mount/source check и свободное место перед ротацией.
@@ -644,26 +654,79 @@ SHA-256 через SSH. Адреса, логины и ключи в репози
 - [x] pv: реальная передача двоичных данных, прогресс в stderr отдельно от данных.
 - [x] rsnapshot: configtest, две ротации, старое/новое содержимое,
   повторное использование hard links и освобождение lock.
+- [ ] Упростить работу с rsnapshot без замены engine: исполняемый wrapper на
+  yesh должен проверить snapshot root/mount и зависимости, запустить
+  `rsnapshot -c CONFIG configtest`, показать `rsnapshot -c CONFIG -t LEVEL` и
+  требовать явный apply-шаг для `rsnapshot -c CONFIG LEVEL`.
+- [ ] Перед apply показывать effective-конфигурацию rsnapshot: destructive
+  флаги в `rsync_long_args`, семантику interval при `sync_first`,
+  `no_create_root`, права родителя lockfile, владельца snapshot root и ошибки
+  конфигурации из-за tabs/пробелов.
+- [ ] Добавить opt-in remote-rsnapshot fixture с существующими настройками
+  rsnapshot `backup user@host:/path target/`, `cmd_ssh`, `ssh_args`, agent и
+  `known_hosts`. Не копировать grammar rsnapshot и не реализовывать rotation
+  engine внутри yesh.
 - [x] Отмена задания: завершение группы, сохранение частичного результата,
   отсутствие готового файла и ложного успешного состояния.
 - [x] При отсутствии утилиты назвать требуемый пакет; не выдавать пропуск за успех.
+- [x] Linux `with lock path:`: неблокирующий advisory-lock с освобождением при
+  успехе, ошибке, отмене и завершении скрипта.
+- [x] `publish source to destination`: rename в одной filesystem без fallback
+  на копирование; crash-durability и namespace atomicity разделены.
+- [x] Тесты publish для существующего destination-каталога и cross-filesystem
+  move с сохранением временного source.
+- [ ] Добавить явный durability-профиль с `rsync --fsync`, fsync каталогов и
+  filesystem-specific crash-тестом; не выводить безопасность при потере питания
+  из одного rename или кода выхода процесса.
+- [ ] Добавить filesystem preflight для backup destination: фиксировать тип
+  filesystem и mount flags через `findmnt`, классифицировать поддержку Unix
+  metadata, предупреждать о FAT/exFAT/case-folding/Unicode-normalization и
+  требовать явный урезанный профиль rsync до destructive actions. Возможность
+  hard link и reuse через `--link-dest` проверять runtime-тестом, а не выводить
+  только из имени filesystem.
 - [ ] Backup реального mount: проверка source/UUID, свободного места,
   отказ при незамонтированном диске; только в отдельной тестовой среде.
 - [ ] Реальный SSH/systemd и восстановление после сбоя машины в отдельной VM.
+
+### Production-like стенд rsnapshot
+
+- [ ] Использовать disposable Rocky/Linux VM или host с отдельной ext4/xfs
+  filesystem и известным UUID/PARTUUID; никогда не брать production mount.
+- [ ] Подготовить настоящий `rsnapshot.conf` с `no_create_root=1`, закрытым
+  lockfile, явным `retain`, путями утилит и проверенными `rsync_*_args`.
+- [ ] Собрать fixture с пробелами, binary-данными, symlink, hard link,
+  изменёнными/удалёнными файлами и объёмом для проверки свободного места.
+- [ ] Добавить opt-in SSH target с отдельным пользователем/каталогом, ключом
+  через agent, заранее подготовленным `known_hosts`, `BatchMode=yes` и rsync
+  на обеих машинах.
+- [ ] Прогнать guarded yesh-wrapper через configtest, rsnapshot test mode,
+  явное confirmation, rotation, restore и cleanup.
+- [ ] Проверить failure matrix: неверный UUID, незамонтированный root, плохой
+  config, занятый/stale lock, отсутствующий source, partial transfer, SSH
+  failure, заполненную filesystem, rerun и неожиданные удаления.
+- [ ] Записать версии утилит, тип и mount flags filesystem, точный argv, exit
+  codes, содержимое snapshot и checksum restore; fixture и логи хранить вне
+  production-путей.
 
 Первый полный benchmark-кейс — инкрементальный rsync backup с retention. Он
 пока открыт: адаптация должна покрыть lock/state, preview, частичный сбой,
 повторный запуск и проверку восстановления, а не просто обернуть один вызов
 `rsync`. См. [каталог Bash-корпуса](bash-corpus.ru.md).
 
+Первая исполняемая часть уже покрыта
+`TestPOSIXPracticalIncrementalRsyncRoundTrip`: два реальных локальных запуска,
+атомарная публикация, проверка изменившегося файла и reuse inode через
+`--link-dest`. Полная негативная матрица, явный retention и сравнение restore
+остаются открытыми.
+
 Цель продукта — тонкая backup-оболочка, а не скрытый backup-engine:
 `rsync`/`rsnapshot` остаются видимыми, а preflight, lock, публикация,
 retention, restore и `--plan` становятся явными и пригодными для ревью.
 
-До benchmark не добавляем backup-specific `snapshot` DSL. Первые кандидаты
-языка — только общая область lock и атомарная публикация готового временного
-результата, и только если одна и та же проблема подтвердится минимум в двух
-workflow. Нельзя зеркалить наборы ключей `rsync` или `rsnapshot`: специфические
+До benchmark не добавляем backup-specific `snapshot` DSL. Общая область lock и
+публикация в одной filesystem уже реализованы как общие примитивы; fsync для
+crash-durability и retention остаются отдельными задачами. Нельзя зеркалить наборы
+ключей `rsync` или `rsnapshot`: специфические
 параметры остаются явными аргументами команд, а их семантика принадлежит самим
 утилитам.
 

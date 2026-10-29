@@ -33,6 +33,21 @@ fixture; it does not claim a formal proof or universal production safety.
   whole binary units;
 - Linux/POSIX tests for SIGPIPE, stuck writers, cancellation, and resource
   cleanup.
+- Linux `with lock path:` blocks with non-blocking advisory acquisition and
+  release on success, error, cancellation, or script exit.
+- `publish source to destination` for same-filesystem rename without a copy
+  fallback; crash durability remains separate from namespace atomicity.
+- publish tests cover an existing destination directory and a cross-filesystem
+  move without losing the temporary source.
+- [ ] Add an explicit durability profile with `rsync --fsync`, directory fsync,
+  and filesystem-specific crash testing; do not infer power-loss safety from
+  rename or process exit alone.
+- [ ] Add a filesystem compatibility preflight for backup destinations: record
+  `findmnt` filesystem type and mount flags, classify Unix metadata support,
+  warn on FAT/exFAT/case-folding/Unicode-normalizing targets, and require an
+  explicit reduced rsync profile before destructive actions. Keep hard-link
+  capability and `--link-dest` reuse as tested runtime properties, not guesses
+  from a filesystem name.
 - executable quickstart examples kept in sync across English, Russian and
   the service-check script, with checks for unavailable systemd, failed
   commands, complete pipeline input, predicates and plans.
@@ -66,6 +81,9 @@ boundary and operational rules.
 
 - [ ] Define a controlled `PATH` and environment policy for privileged and
   runbook execution.
+- [ ] Define an explicit destructive-action policy for `rsync --delete`,
+  `--delete-excluded`, `--delete-missing-args`, `--remove-source-files`, and
+  recursive removal.
 - [ ] Add typed validation or narrow wrappers for high-impact external command
   arguments (`ssh`, `rsync`, `mount`, `systemctl`, and destinations).
 - [ ] Expand fuzzing to lexer/parser, value expansion, redirects, and runtime
@@ -132,10 +150,29 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [x] UUID/PARTUUID matching through `findmnt` before an rsync action;
 - [x] rsync preview/copy examples with explicit source and destination,
   mount, identity, and free-space checks; no implicit `--delete`;
+- [ ] add an opt-in real-host rsync-over-SSH integration test with explicit
+  remote rsync availability, destination permissions, SSH host-key policy, and
+  version/option compatibility (including `--fsync`);
+- [ ] document remote snapshot semantics separately: the current incremental
+  example is local-only because `exists` and `publish` are local operations;
+  remote staging plus remote atomic publication requires an explicit SSH-side
+  operation and must not be implied by a `host:path` argument;
 - [x] safe rsync validation on a dedicated ext4 loopback image (positive copy
   and wrong-UUID rejection); real block-partition/PARTUUID validation remains;
 - [x] rsnapshot `configtest`, lock conflict handling, retention, and hard-link
   snapshot safety are covered by the local example and integration tests;
+- [ ] simplify rsnapshot operation without replacing it: an executable yesh
+  wrapper should validate the configured snapshot root/mount and dependencies,
+  run `rsnapshot -c CONFIG configtest`, show `rsnapshot -c CONFIG -t LEVEL`,
+  and require an explicit apply step for `rsnapshot -c CONFIG LEVEL`;
+- [ ] make the rsnapshot wrapper inspect effective configuration before apply:
+  surface `rsync_long_args` deletion flags, `sync_first` interval semantics,
+  `no_create_root`, lockfile parent permissions, snapshot-root ownership, and
+  tab-sensitive config errors;
+- [ ] add an opt-in remote-rsnapshot fixture using rsnapshot's existing
+  `backup user@host:/path target/`, `cmd_ssh`, `ssh_args`, agent, and
+  `known_hosts` configuration. Do not mirror its config grammar or reimplement
+  its rotation engine in yesh.
 - [ ] rsnapshot mount/source and free-space checks before rotation;
 - [ ] `pv` with progress separated from binary data and all pipeline stages
   checked for completion;
@@ -144,18 +181,43 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] tests for host-key-specific failure, transfer timeout, full disk, and an
   unmounted backup disk.
 
+### Production-like rsnapshot testbed
+
+- [ ] Use a disposable Rocky/Linux VM or host with a dedicated ext4/xfs backup
+  filesystem and a known UUID/PARTUUID; never use a production mount.
+- [ ] Prepare a real `rsnapshot.conf` with `no_create_root=1`, a private
+  lockfile, explicit `retain`, tool paths, and reviewed `rsync_*_args`.
+- [ ] Build a fixture containing spaces, binary data, symlinks, hard links,
+  changed/deleted files, and enough data to exercise free-space checks.
+- [ ] Add an opt-in SSH target with a dedicated account/path, agent-backed key,
+  pre-provisioned `known_hosts`, `BatchMode=yes`, and rsync installed on both
+  hosts.
+- [ ] Run the guarded yesh wrapper through configtest, rsnapshot test mode,
+  explicit confirmation, rotation, restore, and cleanup.
+- [ ] Exercise the failure matrix: wrong UUID, unmounted root, bad config,
+  stale/held lock, missing source, partial transfer, remote SSH failure,
+  full filesystem, rerun, and unexpected-delete detection.
+- [ ] Record tool versions, filesystem type/mount flags, exact argv, exit
+  codes, snapshot contents, and restore checksums; keep the fixture and logs
+  outside production paths.
+
 The first full benchmark case is incremental rsync backup with retention. It
 is intentionally still open: the adaptation must cover lock/state handling,
 preview, partial failure, rerun behavior, and restore verification rather than
 just wrap one `rsync` invocation. See [the corpus catalog](bash-corpus.md).
 
+The first executable slice is now covered by
+`TestPOSIXPracticalIncrementalRsyncRoundTrip`: two real local runs, atomic
+publication, changed-file verification, and `--link-dest` inode reuse. The
+full negative matrix, explicit retention, and restore comparison remain open.
+
 The product target is a thin backup facade, not a hidden backup engine:
 `rsync`/`rsnapshot` remain visible, while yesh makes preflight, lock,
 publication, retention, restore, and `--plan` explicit and reviewable.
 
-Do not add a backup-specific `snapshot` DSL before the benchmark. The first
-language candidates, only if confirmed by at least two workflows, are generic
-scoped locking and atomic publication of a completed temporary result.
+Do not add a backup-specific `snapshot` DSL before the benchmark. Scoped
+locking and same-filesystem publication are generic implemented primitives;
+fsync-based crash durability and retention policy remain separate concerns.
 Do not mirror `rsync` or `rsnapshot` option sets: utility-specific flags remain
 explicit command arguments and their semantics stay owned by those utilities.
 

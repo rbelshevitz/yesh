@@ -87,3 +87,26 @@ echo "эта строка не выполняется"
 [stat(2)](https://man7.org/linux/man-pages/man2/stat.2.html),
 [os.Stat](https://pkg.go.dev/os#Stat),
 [ошибки файловой системы Go](https://pkg.go.dev/io/fs#ErrNotExist).
+
+## Область блокировки
+
+В Linux `with lock path:` держит эксклюзивную advisory-блокировку на время
+тела с отступом и освобождает её при успехе, ошибке, отмене или завершении
+скрипта:
+
+```yesh
+lock = "/var/lib/yesh/backup.lock"
+with lock $lock:
+    rsync -a --link-dest previous source/ temporary/
+    publish temporary to current
+```
+
+Блокировка неблокирующая: второй процесс получает отказ до входа в тело.
+`--plan` показывает путь, но не захватывает lock. Это примитив оркестрации,
+а не замена lock самой утилиты и не sandbox; родительский каталог и его права
+должны быть подготовлены отдельно.
+
+`publish source to destination` использует семантику Linux/POSIX rename. Оба
+пути должны быть в одной filesystem; незаметного fallback на копирование нет.
+Это атомарная видимость имени, но не гарантия сохранности после потери питания:
+fsync файлов и каталогов остаётся отдельной будущей политикой.

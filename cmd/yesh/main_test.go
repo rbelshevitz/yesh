@@ -9,6 +9,48 @@ func TestParserRejectsWhile(t *testing.T) {
 	}
 }
 
+func TestParserAcceptsScopedLock(t *testing.T) {
+	items, err := parse("lock = \"/tmp/yesh.lock\"\nwith lock $lock:\n    echo protected\n", "test.yesh")
+	if err != nil {
+		t.Fatalf("parse scoped lock: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected assignment and lock, got %#v", items)
+	}
+	if _, ok := items[1].(lockStmt); !ok {
+		t.Fatalf("expected lock statement, got %#v", items[1])
+	}
+}
+
+func TestParserRejectsLockWithoutPathOrBody(t *testing.T) {
+	for _, source := range []string{"with lock:\n    echo protected\n", "with lock /tmp/yesh.lock:\n"} {
+		if _, err := parse(source, "test.yesh"); err == nil {
+			t.Errorf("expected scoped lock rejection for %q", source)
+		}
+	}
+}
+
+func TestParserAcceptsPublish(t *testing.T) {
+	items, err := parse("publish \"temporary tree\" to current\n", "test.yesh")
+	if err != nil {
+		t.Fatalf("parse publish: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one statement, got %#v", items)
+	}
+	if _, ok := items[0].(publishStmt); !ok {
+		t.Fatalf("expected publish statement, got %#v", items[0])
+	}
+}
+
+func TestParserRejectsAmbiguousPublish(t *testing.T) {
+	for _, source := range []string{"publish source destination\n", "publish source to\n", "publish source to destination extra\n"} {
+		if _, err := parse(source, "test.yesh"); err == nil {
+			t.Errorf("expected publish rejection for %q", source)
+		}
+	}
+}
+
 func TestRuntimeRejectsUnsafeCommandForms(t *testing.T) {
 	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
 	for _, command := range []string{

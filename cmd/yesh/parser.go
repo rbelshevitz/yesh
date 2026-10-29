@@ -72,6 +72,21 @@ type forStmt struct {
 
 func (forStmt) stmt() {}
 
+type lockStmt struct {
+	line int
+	path string
+	body []statement
+}
+
+func (lockStmt) stmt() {}
+
+type publishStmt struct {
+	line         int
+	source, dest commandToken
+}
+
+func (publishStmt) stmt() {}
+
 type parser struct {
 	lines    []line
 	filename string
@@ -114,6 +129,35 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 		}
 		if text == "for:" {
 			return nil, index, p.err(l.number, "expected: for name in values:")
+		}
+		if strings.HasPrefix(text, "with lock ") {
+			if !strings.HasSuffix(text, ":") {
+				return nil, index, p.err(l.number, "expected ':' after with lock path")
+			}
+			path := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(text, "with lock"), ":"))
+			if path == "" {
+				return nil, index, p.err(l.number, "with lock requires a path")
+			}
+			body, next, err := p.child(index, indent)
+			if err != nil {
+				return nil, index, err
+			}
+			result = append(result, lockStmt{line: l.number, path: path, body: body})
+			index = next
+			continue
+		}
+		if strings.HasPrefix(text, "publish ") {
+			tokens, err := words(text)
+			if err != nil {
+				return nil, index, p.err(l.number, err.Error())
+			}
+			if len(tokens) != 4 || tokens[0].operator || tokens[0].text != "publish" ||
+				tokens[1].operator || tokens[2].operator || tokens[2].text != "to" || tokens[3].operator {
+				return nil, index, p.err(l.number, "expected: publish source to destination")
+			}
+			result = append(result, publishStmt{line: l.number, source: tokens[1], dest: tokens[3]})
+			index++
+			continue
 		}
 		if text == "if" || strings.HasPrefix(text, "if ") {
 			if !strings.HasSuffix(text, ":") {

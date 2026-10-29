@@ -1,0 +1,56 @@
+# Environment-dependent example: run only with a disposable source and
+# destination. Every path below is supplied through the environment so the
+# script does not hide host-specific locations or credentials.
+#
+# YESH_RSYNC_SOURCE     existing source directory; keep the trailing slash to
+#                       copy its contents rather than add another directory.
+# YESH_RSYNC_ROOT       existing directory that owns all snapshots and the lock.
+# YESH_RSYNC_PREVIOUS   optional previous published snapshot; it is used only
+#                       as --link-dest and is never modified.
+# YESH_RSYNC_CURRENT    new final snapshot path; it must not already exist.
+# YESH_RSYNC_TEMPORARY  new private staging path; it must not already exist.
+# YESH_RSYNC_LOCK       lock-file path in the trusted snapshot root.
+#
+# rsync writes only to temporary. `publish $temporary to $current` then does
+# one same-filesystem atomic rename: it makes the completed directory visible
+# under current without copying it. publish does not overwrite, delete, or
+# move across filesystems; any such condition is an error.
+#
+# Example setup (use a disposable tree, not a production backup mount):
+#   export YESH_RSYNC_SOURCE=/srv/example-source/
+#   export YESH_RSYNC_ROOT=/srv/example-snapshots
+#   export YESH_RSYNC_PREVIOUS=/srv/example-snapshots/snapshot.0
+#   export YESH_RSYNC_CURRENT=/srv/example-snapshots/snapshot.1
+#   export YESH_RSYNC_TEMPORARY=/srv/example-snapshots/snapshot.1.tmp
+#   export YESH_RSYNC_LOCK=/srv/example-snapshots/.rsync.lock
+#   yesh --plan examples/rsync-incremental.yesh
+# Review the argv, then run without --plan.
+source = environment YESH_RSYNC_SOURCE
+root = environment YESH_RSYNC_ROOT
+previous = environment YESH_RSYNC_PREVIOUS
+current = environment YESH_RSYNC_CURRENT
+temporary = environment YESH_RSYNC_TEMPORARY
+lock = environment YESH_RSYNC_LOCK
+
+if exists $source:
+    if exists $root:
+        if exists $current:
+            echo "current snapshot already exists"
+            exit 3
+        else:
+            if exists $temporary:
+                echo "temporary snapshot already exists"
+                exit 4
+            else:
+                with lock $lock:
+                    if exists $previous:
+                        rsync -a --fsync --delay-updates --link-dest $previous -- $source $temporary
+                    else:
+                        rsync -a --fsync --delay-updates -- $source $temporary
+                    publish $temporary to $current
+    else:
+        echo "snapshot root is missing"
+        exit 2
+else:
+    echo "source directory is missing"
+    exit 2

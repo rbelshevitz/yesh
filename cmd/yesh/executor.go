@@ -115,6 +115,46 @@ func (r *runtime) execute(items []statement) error {
 					return err
 				}
 			}
+		case lockStmt:
+			v, err := r.eval(s.path, s.line)
+			if err != nil {
+				return err
+			}
+			if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.scalar == "" {
+				return fmt.Errorf("%s:%d: with lock expects one non-empty path", r.filename, s.line)
+			}
+			if r.plan {
+				fmt.Fprintf(os.Stdout, "PLAN lock %q\n", v.scalar)
+				if err := r.execute(s.body); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := r.withLock(v.scalar, func() error { return r.execute(s.body) }); err != nil {
+				return fmt.Errorf("%s:%d: lock %q: %w", r.filename, s.line, v.scalar, err)
+			}
+		case publishStmt:
+			source, err := r.expandWord(s.source, s.line)
+			if err != nil {
+				return err
+			}
+			dest, err := r.expandWord(s.dest, s.line)
+			if err != nil {
+				return err
+			}
+			if len(source) != 1 || len(dest) != 1 || source[0] == "" || dest[0] == "" {
+				return fmt.Errorf("%s:%d: publish expects one non-empty source and destination", r.filename, s.line)
+			}
+			if r.plan {
+				fmt.Fprintf(os.Stdout, "PLAN publish %q to %q\n", source[0], dest[0])
+				continue
+			}
+			if source[0] == dest[0] {
+				return fmt.Errorf("%s:%d: publish source and destination must differ", r.filename, s.line)
+			}
+			if err := os.Rename(source[0], dest[0]); err != nil {
+				return fmt.Errorf("%s:%d: publish %q to %q: %w", r.filename, s.line, source[0], dest[0], err)
+			}
 		}
 	}
 	return nil

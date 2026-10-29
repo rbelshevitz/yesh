@@ -63,6 +63,8 @@ The current prototype supports:
 
 - assignments such as `name = world` and `items = [one, two]`;
 - `if condition:` and `for item in $items:` blocks with indentation;
+- Linux-scoped `with lock $path:` blocks for non-blocking advisory locks;
+- `publish source to destination` for same-filesystem atomic rename;
 - ordinary commands, pipes, and redirections;
 - explicit `$name` variable expansion, with bare words kept literal;
 - command failures that stop the script and report the source line;

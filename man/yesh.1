@@ -69,6 +69,21 @@ The only file predicate form is "exists path", with one nonempty string.
 Missing targets are false; permission failures and symlink loops are errors.
 The old exists(path) spelling is rejected with a migration hint.
 .PP
+On Linux, an exclusive non-blocking advisory lock can scope a block:
+.nf
+with lock /var/lib/yesh/backup.lock:
+    rsync -a source/ temporary/
+    mv -- temporary current
+.fi
+.PP
+The lock is released on success, error, cancellation, or script exit.
+Plan mode displays the path without acquiring it. The parent directory and
+permissions are the operator's responsibility; this is not a sandbox.
+.PP
+Use Bpublish source to destinationR for an atomic same-filesystem rename.
+It never falls back to copying across filesystems; it provides namespace
+atomicity, not power-loss durability.
+.PP
 Free space can be checked without parsing df output:
 .nf
 if free_space $target at_least 20GiB:

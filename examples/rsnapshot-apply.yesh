@@ -1,0 +1,40 @@
+# Guarded rsnapshot apply wrapper. The rsnapshot.conf remains authoritative;
+# this script adds operator-facing checks before a destructive interval.
+#
+# Required environment:
+#   YESH_RSNAPSHOT_CONFIG   prepared rsnapshot.conf
+#   YESH_RSNAPSHOT_LEVEL    interval, for example daily
+#   YESH_RSNAPSHOT_ROOT     expected local snapshot_root/mount path
+#   YESH_RSNAPSHOT_SOURCE   expected mount source, preferably UUID=... or
+#                           PARTUUID=... rather than a mutable /dev name
+#   YESH_RSNAPSHOT_CONFIRM  path that the operator creates after reviewing
+#                           the test output; it is not created by this script
+#
+# This wrapper does not parse or rewrite rsnapshot.conf. In particular, review
+# rsync_long_args, sync_first, retain, no_create_root, lockfile, backup_script,
+# and remote SSH entries in `rsnapshot -t` before creating the confirmation.
+config = environment YESH_RSNAPSHOT_CONFIG
+level = environment YESH_RSNAPSHOT_LEVEL
+root = environment YESH_RSNAPSHOT_ROOT
+mount_source = environment YESH_RSNAPSHOT_SOURCE
+confirm = environment YESH_RSNAPSHOT_CONFIRM
+
+if exists $config:
+    if exists $root:
+        if findmnt --source $mount_source --target $root:
+            rsnapshot -c $config configtest
+            rsnapshot -c $config -t $level
+            if exists $confirm:
+                rsnapshot -c $config $level
+            else:
+                echo "review rsnapshot test output and create the confirmation file"
+                exit 4
+        else:
+            echo "snapshot root is not mounted"
+            exit 3
+    else:
+        echo "snapshot root is missing"
+        exit 2
+else:
+    echo "rsnapshot config is missing"
+    exit 2

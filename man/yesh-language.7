@@ -75,6 +75,23 @@ Only finite lists are accepted. The runtime enforces iteration and total-step
 limits. The
 .B while
 statement is disabled.
+.SS with lock
+.EX
+with lock /var/lib/yesh/backup.lock:
+    rsync -a source/ temporary/
+    mv -- temporary current
+.EE
+.PP
+On Linux this takes an exclusive non-blocking advisory lock for the indented
+body and releases it on every exit path. In plan mode it is only displayed.
+.SS publish
+.EX
+publish temporary to current
+.EE
+.PP
+publish uses a same-filesystem rename and fails on a cross-filesystem move;
+it does not silently copy. It provides namespace atomicity, not crash
+durability without explicit fsync policy.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"

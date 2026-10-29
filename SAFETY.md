@@ -46,6 +46,16 @@ when isolation is required.
 - Put `--` before path operands when the external program supports it.
 - Validate destinations, identities, units, hosts, and numeric limits before
   invoking tools such as `rsync`, `ssh`, `mount`, or `systemctl`.
+- Treat deletion flags as a separate approval boundary. The current rsync
+  examples do not use `--delete`; if a retention/mirror workflow needs it,
+  require a `--plan`/`--dry-run` review, an explicit destination and mount
+  identity, a bounded `--max-delete`, and a policy for excluded files and
+  missing sources. Never infer permission to delete from the presence of a
+  source path.
+- Treat an rsnapshot configuration as executable policy: inspect its effective
+  `rsync_long_args`, `sync_first`, `snapshot_root`, `no_create_root`,
+  `lockfile`, and backup-script entries before applying an interval. A clean
+  yesh wrapper cannot make a dangerous rsnapshot.conf safe by itself.
 - Keep credentials in the user's SSH agent/config or an external secret store;
   never put passwords or private keys in a yesh script.
 - Use `--plan` for review, but remember that a plan is not a transaction and
