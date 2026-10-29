@@ -30,6 +30,31 @@ Every selected case needs observable inputs and side effects, positive and
 negative tests, and a concrete `--plan` comparison. Add a new yesh builtin only
 when the same problem appears in at least two independent scripts.
 
+## 100–200 line benchmark
+
+The primary product benchmark is not repository popularity. Select real
+administration workflows that are roughly 100–200 lines after removing only
+project-specific boilerplate. A successful adaptation should make a reviewer
+less likely to return to Bash, not merely produce fewer characters.
+
+Prefer workflows with several observable stages: preflight, an external tool,
+publication or restart, verification, and a useful failure path. Measure each
+case with the same checklist:
+
+- Bash and yesh both perform a positive run in a disposable fixture;
+- missing input, wrong target, permission failure, timeout, and partial failure
+  are tested where the workflow has those states;
+- a second run is safe or the non-idempotent step is explicitly documented;
+- `--plan` exposes the exact argv and does not mutate the fixture;
+- output, error output, exit status, and preserved previous state are checked;
+- the adaptation records which Bash hazards disappeared and which complexity
+  remains external in `rsync`, `ssh`, `systemctl`, or another tool.
+
+Do not count a scenario as a success if yesh only hides a command behind a new
+keyword, or if the adaptation needs undocumented escape hatches. Do not begin
+with destructive installers or production credentials; use backup, service,
+storage, SSH/SCP, and recovery workflows with disposable fixtures.
+
 This is currently a candidate catalog, not vendored code. Next, select 20–30
 scripts, pin each source URL and commit, then add adaptations under `examples/`
 with tests.
