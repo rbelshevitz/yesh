@@ -58,3 +58,8 @@ storage, SSH/SCP, and recovery workflows with disposable fixtures.
 This is currently a candidate catalog, not vendored code. Next, select 20–30
 scripts, pin each source URL and commit, then add adaptations under `examples/`
 with tests.
+
+The first full case is documented in [the incremental rsync benchmark](benchmark-rsync.md)
+and its [Russian version](benchmark-rsync.ru.md). It is a design and
+acceptance specification until the independent adaptation and negative matrix
+are implemented.
