@@ -132,6 +132,13 @@ summarize $nginx memory rss
 The snapshot is read-only. It does not send signals or modify processes. RSS
 totals are estimates of resident memory, not unique physical memory.
 
+All three process examples were also run directly on Rocky Linux 9.8. That
+host had no `nginx` or `sshd`: the snapshot correctly produced an empty set,
+the memory check accepted zero RSS, and the report showed the available
+processes plus negative `pgrep` results. Fixture-based tests separately cover
+exact-name matching, snapshot fields, RSS aggregation, and bounded `/proc`;
+the real-nginx scenario remains an environment-specific check.
+
 [service-check.yesh](../examples/service-check.yesh) uses ordinary `systemctl`
 commands and stops after an inactive service. The fixtures verify argv, order,
 and that later commands do not run. This does not test a real systemd bus.
