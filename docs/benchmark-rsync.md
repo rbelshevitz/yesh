@@ -1,5 +1,29 @@
 # Incremental rsync benchmark
 
+## Topology of the current workflow
+
+**Important:** yesh runs on the backup host, not on the source host. The
+backup host is the rsync destination in this workflow. `YESH_RSYNC_ROOT` is a
+local directory on that host, and it contains the published snapshots, the
+lock, staging directories, and any retention quarantine. The executable
+example accepts either a local source or an rsync source such as
+`backup-source:/srv/data/`. It does not use `exists $source`: that checks the
+local filesystem and cannot validate an SSH or rsync-daemon address. Rsync
+itself validates access to and reads from the source.
+
+The current yesh workflow runs on the backup host. The snapshot root is a
+local destination directory on that host. This matters because inventory,
+locking, publication, and retention inspect and change the destination
+filesystem. A remote destination is a separate workflow and is not implied by
+the current examples.
+
+This example supports only a destination local to the machine where yesh runs.
+Remote destinations are not supported by this workflow.
+
+[`rsync-destination-preflight.yesh`](../examples/rsync-destination-preflight.yesh)
+is the read-only first step: it checks the destination mount, type, ownership,
+free space, and then reports `KEEP`/`PRUNE` from the actual local root.
+
 This is the first full 100–200 line corpus benchmark for yesh. The source
 behavior is taken from the pinned MIT-licensed
 [`pedroetb/rsync-incremental-backup`](https://github.com/pedroetb/rsync-incremental-backup)
@@ -18,8 +42,55 @@ fixture/
 ```
 
 The fixture includes spaces in names, a binary file, a removed source file,
-and a failed/partial transfer. Real mount, UUID/PARTUUID, full-disk, and
-production SSH tests are separate environment-dependent cases.
+and a failed/partial transfer. Real mount, UUID/PARTUUID, and full-disk tests
+are separate environment-dependent cases.
+
+## Confirmed remote run
+
+A real SSH pull was confirmed on a separate Debian machine with `rsync 3.2.7`.
+`yesh` ran on the backup host, while the source used the form
+`user@host:/tmp/.../data/`. Both sides used disposable directories under
+`/tmp`.
+
+Two consecutive runs were checked:
+
+1. the remote tree was pulled into a new temporary snapshot and published;
+2. one remote file was changed and another was added, then a second snapshot
+   was published with `--link-dest` pointing to the previous snapshot.
+
+The changed and new file contents were verified, the unchanged file retained
+the same inode, the temporary staging directory did not remain, and both
+temporary trees were removed afterward. This confirms the real
+`remote source → local destination` SSH transfer; it does not prove arbitrary
+production permissions, key configuration, or network fault tolerance.
+
+The same check is now an opt-in test,
+`TestPOSIXRealRsyncPullAndIncremental`. The repository stores no host address;
+the test receives `YESH_SSH_TEST_HOST` and `YESH_SSH_TEST_DIR`:
+
+```text
+YESH_RSYNC_SSH_INTEGRATION=1 YESH_SSH_TEST_HOST=user@host \
+YESH_SSH_TEST_DIR=/tmp/yesh-test \
+go test ./cmd/yesh -run TestPOSIXRealRsyncPullAndIncremental -count=1 -v
+```
+
+The test requires SSH with `known_hosts` verification, checks remote `rsync`,
+creates its own temporary directory, and removes it after completion.
+
+The separate `TestPOSIXRealRsyncRemoteFailureDoesNotPublish` test covers a
+remote read failure: a temporary remote file is made unreadable, the new
+snapshot is not published, the previous snapshot is unchanged, the incomplete
+staging directory remains available for diagnosis, and a retry succeeds after
+permissions are restored. This exercises rsync exit code 23, which is a
+partial transfer due to an error and is not success.
+The same test removes the remote source before a retry; source-selection
+failure also cannot publish a snapshot or change the last successful one.
+
+Exit codes 24 and 30/35 are intentionally deferred from the required suite.
+Code 24 needs a reproducible race in which a file disappears during reading;
+codes 30/35 need a separate controlled delay or connection-drop harness.
+Injecting those conditions as a random race would make the test flaky. This is
+deferred coverage, not permission to treat those failures as success.
 
 ## Required stages
 
@@ -42,8 +113,14 @@ The repository now has a real unprivileged two-run fixture test,
 the installed `rsync`, publishes two snapshots, verifies changed and
 unchanged files, and checks that `--link-dest` reuses the unchanged inode.
 It also covers a rerun, missing-source failure, and restore through external
-`rsync`. This is a working slice of the benchmark, not completion of the full
-negative matrix or retention work.
+`rsync`. A separate
+`TestPOSIXPracticalIncrementalRsyncPartialFailureDoesNotPublish` test makes
+the external `rsync` return code 23 and verifies that the new snapshot is not
+published, the previous snapshot is unchanged, staging is closed, and a retry
+can acquire the lock. This is a working slice of the benchmark, not
+completion of the full negative matrix or retention work. The separate
+`TestPOSIXPracticalIncrementalRsyncHeldLockStopsRsync` test holds the advisory
+lock and verifies that `rsync` is not started at all.
 
 ## What this measures in yesh
 
@@ -110,6 +187,29 @@ ordinary explicit argv arguments.
   without testing that mounted filesystem's locking mode; provision the parent
   lock directory as trusted because `O_NOFOLLOW` protects only the final path
   component.
+
+## Retention decision
+
+`rsnapshot` normally deletes the oldest interval before continuing rotation;
+`use_lazy_deletes` only moves deletion later and may leave temporary
+`_delete.*` directories. That is rsnapshot's own contract, not the contract of
+this incremental benchmark.
+
+For yesh, use the stricter rule: publish the new snapshot successfully first,
+then build and show the exact prune list. Only completed directories with a
+narrow, validated name inside the checked root may be removed; source, staging,
+lock, symlinks, and the previous snapshot are excluded. A prune failure does
+not hide or invalidate an already published backup. Without `--apply`, no
+deletion is allowed.
+
+`examples/rsync-retention-plan.yesh` and
+`TestPOSIXPracticalIncrementalRsyncRetentionPlanDoesNotMutate` cover only the
+preview slice. The `rsync retention plan in $root keep $keep` form computes
+candidates in the runtime and does not mutate the filesystem in `--plan`;
+staging, lock, symlink, and published snapshots remain unchanged. The future
+apply operation must receive the root, retention count, and explicit
+current/previous roles; it must refuse to run without them. Applying prune
+still requires a separate explicit contract and test.
 
 ## Filesystem compatibility profile
 

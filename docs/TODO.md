@@ -156,13 +156,21 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [x] UUID/PARTUUID matching through `findmnt` before an rsync action;
 - [x] rsync preview/copy examples with explicit source and destination,
   mount, identity, and free-space checks; no implicit `--delete`;
-- [ ] add an opt-in real-host rsync-over-SSH integration test with explicit
+- [x] confirm rsync-over-SSH manually and with an opt-in test on a separate
+  Debian host: a disposable remote source, two snapshots, `--link-dest`, inode
+  reuse, and cleanup;
+- [x] verify real remote-source failures: rsync code 23 for a read error and a
+  missing source directory, no new snapshot, unchanged previous snapshot,
+  diagnostic staging, and a successful retry after permissions are restored;
+- [ ] separately reproduce rsync codes 24 and 30/35 only after a stable harness
+  exists for source disappearance, delay, and connection drop; do not add random
+  network races to the required test suite;
+- [x] add an opt-in automated real-host rsync-over-SSH integration test with explicit
   remote rsync availability, destination permissions, SSH host-key policy, and
   version/option compatibility (including `--fsync`);
-- [ ] document remote snapshot semantics separately: the current incremental
-  example is local-only because `exists` and `publish` are local operations;
-  remote staging plus remote atomic publication requires an explicit SSH-side
-  operation and must not be implied by a `host:path` argument;
+- [x] document remote snapshot semantics: the current incremental example runs
+  on the destination host; the source may be local or remote, while `exists`
+  and `publish` apply only to the local snapshot directory;
 - [x] safe rsync validation on a dedicated ext4 loopback image (positive copy
   and wrong-UUID rejection); real block-partition/PARTUUID validation remains;
 - [x] rsnapshot `configtest`, lock conflict handling, retention, and hard-link
@@ -207,47 +215,77 @@ Real remote changes and restore tests belong in a dedicated test VM.
   codes, snapshot contents, and restore checksums; keep the fixture and logs
   outside production paths.
 
-The first full benchmark case is incremental rsync backup with retention. It
-is intentionally still open: the adaptation must cover lock/state handling,
-preview, partial failure, rerun behavior, and restore verification rather than
-just wrap one `rsync` invocation. See [the corpus catalog](bash-corpus.md).
+The main verified example is incremental rsync backup with a retention preview.
+Physical retention application remains open: it needs a separate contract and
+test for moving old snapshots into quarantine, rather than another wrapper
+around one `rsync` invocation. See [the corpus catalog](bash-corpus.md).
 
-The first executable slice is now covered by
+Backup direction: make `rsync` and `rsnapshot` materially easier to operate
+without replacing either engine. yesh should be an explainable safety layer:
+`preflight` → `--plan` → explicit `apply` → publish the completed snapshot →
+retention → restore verification. The plan must expose exact argv,
+source/destination, lock, `--link-dest`, and potential deletions; after a
+failure it must be clear what was published, what stayed unchanged, and
+whether retry is safe. For rsnapshot, yesh validates `configtest`, test mode,
+mount, and lock, but does not reimplement its rotation engine.
+
+The success criterion for this workflow is operational, not cosmetic: an
+operator who knows rsync but not yesh can predict copies and retention moves
+before apply, then recover after a failure without guessing. No hidden
+`--delete`, implicit rotation, or deletion of an arbitrary path. The first
+retention apply must move old snapshots into a same-filesystem quarantine under
+the lock; physical purge is a separate explicit action.
+
+The executable slice is now covered by
 `TestPOSIXPracticalIncrementalRsyncRoundTrip`: two real local runs, atomic
-publication, changed-file verification, and `--link-dest` inode reuse. The
-full negative matrix, explicit retention, and restore comparison remain open.
+publication, changed-file verification, and `--link-dest` inode reuse. A
+real remote source is additionally covered by
+`TestPOSIXRealRsyncPullAndIncremental`. A
+separate partial-failure test forces external `rsync` to return 23 after
+writing staging: the ready name is not published, the previous snapshot is
+unchanged, and a retry acquires the released lock. A held-lock test also
+proves that `rsync` is not started and no new snapshot is published. Retention
+preview is covered; physical retention and the remaining negative matrix stay
+open.
 
-### Next WSL2 run: incremental rsync benchmark
+The safe retention preview is now a runtime operation,
+`rsync retention plan in $root keep $keep`: it accepts only real
+`snapshot.<number>` directories, rejects symlinks, and does not mutate the
+filesystem. This is not apply and does not close the full backup plan with
+destructive actions exposed.
+
+### Boundaries and next step: incremental rsync
 
 Use only a disposable fixture under `t.TempDir()` or `/tmp`; never touch real
-mounts, `/etc/fstab`, remote hosts, or production paths. Do not add a
+disks, `/etc/fstab`, or production paths. Do not add a
 `snapshot` DSL or mirror rsync semantics in yesh.
 
 - [ ] Record yesh/rsync versions, filesystem type and mount flags, exact argv,
   and exit codes.
-- [ ] Build a fixture with spaces in names, binary data, symlink, hard link,
+- [x] Build a fixture with spaces in names, binary data, symlink, hard link,
   changed/new/deleted files.
-- [ ] Run the first backup into an empty staging directory and publish only
+- [x] Run the first backup into an empty staging directory and publish only
   after rsync succeeds.
-- [ ] Run the second backup with explicit `--link-dest`; verify tree contents,
+- [x] Run the second backup with explicit `--link-dest`; verify tree contents,
   checksums, and inode reuse for unchanged data.
-- [ ] Restore the second snapshot into a new directory with rsync and compare
+- [x] Restore the second snapshot into a new directory with rsync and compare
   the tree, file types, checksums, and expected links.
-- [ ] Exercise partial rsync failure: no staging directory becomes published,
-  no ready snapshot appears, and the lock is released.
-- [ ] Exercise missing source, held lock, and rerun; failures must not report
-  success or remove the previous snapshot.
-- [ ] Add an explicit retention profile: keep the latest N completed snapshots
-  and remove an old one only after the new snapshot is published successfully.
-- [ ] Verify `--plan`: no rsync, redirect open, or filesystem mutation occurs;
+- [x] Exercise partial rsync failure: no ready snapshot appears, the previous
+  snapshot remains unchanged, and a retry acquires the released lock.
+- [x] Exercise missing source, held lock, and rerun; failures do not report
+  success, start `rsync` under a held lock, or remove the previous snapshot.
+- [x] Add a retention preview: keep the latest N completed snapshots and report
+  older ones; physical application is intentionally not implemented yet.
+- [x] Verify `--plan`: no rsync, redirect open, or filesystem mutation occurs;
   the report exposes source, destination, lock, retention, and expanded argv.
-- [ ] Update `docs/practical-examples.md`, a runnable `.yesh` example, and
+- [x] Update the documentation, runnable `.yesh` examples, and
   `cmd/yesh/practical_posix_test.go`; record expected failure and no-change
-  assertions for every negative case.
+  assertions for the covered negative cases.
 
-Close this slice only when backup/restore, hard-link reuse, retention, partial
-failure, missing source, lock conflict, rerun, and plan pass with finite time on
-one WSL2 machine; a ready name must never point to a partial result.
+The local slice is closed for backup/restore, hard-link reuse, retention
+preview, partial failure, missing source, lock conflict, rerun, and plan. The
+physical retention action and broader filesystem failure matrix remain open; a
+ready name must never point to a partial result.
 
 The product target is a thin backup facade, not a hidden backup engine:
 `rsync`/`rsnapshot` remain visible, while yesh makes preflight, lock,
@@ -342,6 +380,9 @@ set. The test copies one unique file and verifies its SHA-256 through SSH.
   stderr diagnostics and explicit empty-result semantics;
 - [x] bounded `service wait` and restart with an `active` postcondition,
   canonical-id checks, timeout diagnostics and restart snapshot fields;
+- [x] Real disposable Debian/systemd fixture over SSH: `start`, `status`,
+  `wait`, `restart`, terminal `oneshot`, activating timeout, and failed unit
+  with exit status 23; cleanup left no fixture units or sleep processes.
 - [ ] distinguish `oneshot` completion from `active`, queued-job semantics and
   application readiness probes; do not claim that manager state is readiness;
 - [ ] model `LoadState=masked` as an actionable service state: report it in
