@@ -191,10 +191,14 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 		}
 		if strings.HasPrefix(text, "show ") {
 			tokens, err := words(text)
-			if err != nil || len(tokens) < 2 || len(tokens) == 3 || tokens[1].operator || tokens[1].text == "" {
-				return nil, index, p.err(l.number, "expected: show process_set [fields field ...]")
+			name, ok := "", false
+			if len(tokens) > 1 {
+				name, ok = variableReference(tokens[1].text)
 			}
-			show := showStmt{line: l.number, name: tokens[1].text}
+			if err != nil || len(tokens) < 2 || len(tokens) == 3 || tokens[1].operator || !ok {
+				return nil, index, p.err(l.number, "expected: show $process_set [fields field ...]")
+			}
+			show := showStmt{line: l.number, name: name}
 			if len(tokens) > 2 {
 				if tokens[2].operator || tokens[2].text != "fields" {
 					return nil, index, p.err(l.number, "expected: show process_set fields field ...")
@@ -212,11 +216,15 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 		}
 		if strings.HasPrefix(text, "summarize ") {
 			tokens, err := words(text)
-			if err != nil || len(tokens) != 4 || tokens[1].operator || tokens[2].operator || tokens[3].operator ||
-				tokens[1].text == "" || tokens[2].text != "memory" || tokens[3].text != "rss" {
-				return nil, index, p.err(l.number, "expected: summarize process_set memory rss")
+			name, ok := "", false
+			if len(tokens) > 1 {
+				name, ok = variableReference(tokens[1].text)
 			}
-			result = append(result, summarizeStmt{line: l.number, name: tokens[1].text, metric: tokens[3].text})
+			if err != nil || len(tokens) != 4 || tokens[1].operator || tokens[2].operator || tokens[3].operator ||
+				!ok || tokens[2].text != "memory" || tokens[3].text != "rss" {
+				return nil, index, p.err(l.number, "expected: summarize $process_set memory rss")
+			}
+			result = append(result, summarizeStmt{line: l.number, name: name, metric: tokens[3].text})
 			index++
 			continue
 		}

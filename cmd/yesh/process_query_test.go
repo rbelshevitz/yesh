@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestProcessQueryAndShowParseAsLanguageStatements(t *testing.T) {
-	items, err := parse("nginx = processes where name is \"nginx\"\nshow nginx fields pid rss cgroup\nsummarize nginx memory rss\n", "processes.yesh")
+	items, err := parse("nginx = processes where name is \"nginx\"\nshow $nginx fields pid rss cgroup\nsummarize $nginx memory rss\n", "processes.yesh")
 	if err != nil {
 		t.Fatal(err)
 	}

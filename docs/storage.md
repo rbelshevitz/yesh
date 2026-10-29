@@ -10,7 +10,7 @@ string command such as `mount`: a wrong device or mountpoint can damage data.
 
 ```yesh
 disk = device by uuid "..."
-inspect disk
+inspect $disk
 mount disk at /mnt/backup readonly
 require mounted /mnt/backup
 unmount /mnt/backup
@@ -51,8 +51,8 @@ must not pass merely because its parent is mounted.
 
 ```yesh
 backup = device by uuid "replace-with-real-uuid"
-inspect backup
-require mounted /mnt/backup from backup filesystem "ext4"
+inspect $backup
+require mounted /mnt/backup from $backup filesystem "ext4"
 echo "backup preflight passed"
 ```
 
@@ -94,7 +94,7 @@ through this interface. Ordinary external commands keep their existing policy.
 
 ```yesh
 mounts = fstab "/etc/fstab"
-inspect mounts
+inspect $mounts
 echo "fstab snapshot read"
 ```
 
@@ -135,7 +135,7 @@ Sources: [fstab(5)](https://man7.org/linux/man-pages/man5/fstab.5.html),
 
 ```yesh
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 echo "configured backup device is mounted"
 ```
 

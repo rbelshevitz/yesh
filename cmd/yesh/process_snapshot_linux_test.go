@@ -157,15 +157,15 @@ func TestProcessMemoryConditionUsesRSSAggregate(t *testing.T) {
 		values:   map[string]value{"workers": {isProcesses: true, processes: []processInfo{{rssBytes: 10}, {rssBytes: 30}}}},
 		filename: "memory.yesh",
 	}
-	ok, err := r.condition("memory workers rss at_most 40B", 1)
+	ok, err := r.condition("memory $workers rss at_most 40B", 1)
 	if err != nil || !ok {
 		t.Fatalf("at-most condition: ok=%v err=%v", ok, err)
 	}
-	ok, err = r.condition("memory workers rss at_most 39B", 2)
+	ok, err = r.condition("memory $workers rss at_most 39B", 2)
 	if err != nil || ok {
 		t.Fatalf("failing at-most condition: ok=%v err=%v", ok, err)
 	}
-	if _, err := r.condition("memory missing rss at_most 40B", 3); err == nil {
+	if _, err := r.condition("memory $missing rss at_most 40B", 3); err == nil {
 		t.Fatal("missing process set was accepted")
 	}
 }

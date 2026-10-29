@@ -56,21 +56,21 @@ func TestStorageIdentityAndMount(t *testing.T) {
 	}
 }
 func TestStorageSyntaxAndTypes(t *testing.T) {
-	for _, source := range []string{"inspect disk | cat", "inspect disk > file", "require mounted /backup", "require mounted /backup from disk filesystem ext4 | cat"} {
+	for _, source := range []string{"inspect $disk | cat", "inspect $disk > file", "require mounted /backup", "require mounted /backup from $disk filesystem ext4 | cat"} {
 		if _, err := parse(source, "storage.yesh"); err == nil {
 			t.Fatalf("accepted %s", source)
 		}
 	}
 	r := &runtime{values: map[string]value{"disk": {device: &storageDevice{}}}, filename: "storage.yesh", plan: true}
-	for _, raw := range []string{"[disk]", "regex disk", "device by uuid disk", "device by uuid [one,two]", "device by label x"} {
+	for _, raw := range []string{"[$disk]", "regex $disk", "device by uuid $disk", "device by uuid [one,two]", "device by label x"} {
 		if _, err := r.eval(raw, 3); err == nil {
 			t.Fatalf("accepted %s", raw)
 		}
 	}
-	if _, err := r.expand("disk", 3); err == nil || !strings.Contains(err.Error(), "device") {
+	if _, err := r.expand("$disk", 3); err == nil || !strings.Contains(err.Error(), "device") {
 		t.Fatal(err)
 	}
-	for _, raw := range []string{"exists disk", "free_space disk at_least 1B", "disk matches regex x"} {
+	for _, raw := range []string{"exists $disk", "free_space $disk at_least 1B", "$disk matches regex x"} {
 		if _, err := r.condition(raw, 3); err == nil {
 			t.Fatalf("accepted %s", raw)
 		}

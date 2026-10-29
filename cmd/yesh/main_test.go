@@ -55,7 +55,7 @@ func TestRegexValueMatchesWithoutShell(t *testing.T) {
 	}
 	r.values["name"] = value{scalar: "api-42"}
 	r.values["pattern"] = v
-	ok, err := r.condition("name matches pattern", 4)
+	ok, err := r.condition("$name matches $pattern", 4)
 	if err != nil || !ok {
 		t.Fatalf("expected regex match, got ok=%v err=%v", ok, err)
 	}

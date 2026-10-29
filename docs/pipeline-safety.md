@@ -16,9 +16,10 @@ service=api
 printf '%s\n' "$service" 'service' | sort > services.txt
 ```
 
-Rule: a bare name expands to an existing variable; quotes always mean a literal
-argument, and values are never reparsed as operators. `echo service` prints the
-value of an existing variable, while `echo "service"` always prints the word.
+Rule: `$name` expands an existing variable; a bare or quoted word is always a
+literal argument. An unknown or malformed `$` reference is an error, so adding
+an assignment cannot change an existing command's meaning. Values are never
+reparsed as operators. `${name}` is intentionally unsupported.
 A list expands to separate argv elements only when unquoted; a string with
 spaces remains one argv element. An empty string is one argument, while an
 empty list produces zero arguments.
@@ -32,7 +33,7 @@ double quotes is an error reported with its source line.
 ```yesh
 text = "a\nb"
 items = ["a,b", "c"]
-printf '%s' text
+printf '%s' $text
 printf '%s' "a\nb"
 ```
 
@@ -53,7 +54,7 @@ stages, `2>`, `<<`, `&&`, `||`, `;`, `&`, and empty stages are rejected.
 `--plan` shows expanded argv and files without starting commands or opening
 files.
 
-## Data must not become code
+## Execution policy is not isolation
 
 The following forms are rejected before execution:
 
@@ -75,12 +76,14 @@ Bash comparison: `curl ... | sh` executes downloaded data in Bash; yesh rejects
 that pipeline. For a shell-equivalent data-reading pipeline, use `curl ... | cat`
 rather than an interpreter.
 
-This is protection against known dangerous forms, not a sandbox for untrusted
-code. A renamed binary, a shebang script, `awk system()`, `sed e`, `find -exec`,
-a script written to disk, or a program that creates a new session can bypass
-name-based checks. Full isolation requires a separate user, access controls,
-cgroups/namespaces, and an allowlist for executables and argv. Do not run
-untrusted yesh scripts with administrative privileges.
+These are a narrow execution policy, separate from yesh's semantic guarantees
+(direct argv execution, no word splitting or command substitution, and checked
+pipelines). They are not an isolation boundary: a renamed binary, a shebang
+script, `awk system()`, `sed e`, `find -exec`, a script written to disk, or a
+program that creates a new session can bypass name-based checks. Full isolation
+requires a separate user, access controls, cgroups/namespaces, and an allowlist
+for executables and argv. Do not run untrusted yesh scripts with administrative
+privileges.
 
 ## Files
 

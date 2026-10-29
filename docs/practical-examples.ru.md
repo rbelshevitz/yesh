@@ -123,7 +123,7 @@ else:
 
 ```yesh
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 echo "configured backup device is mounted"
 ```
 
@@ -291,7 +291,7 @@ else:
 
 ```yesh
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss cgroup
 ```
 
 Вывод содержит выбранные PID, UID, состояние, RSS в байтах и cgroup. Полный
@@ -305,7 +305,7 @@ master и четыре worker-процесса в одном systemd cgroup.
 Итог по RSS читается напрямую:
 
 ```yesh
-summarize nginx memory rss
+summarize $nginx memory rss
 ```
 
 Результат содержит число процессов, сумму, максимум и целочисленное среднее
@@ -316,10 +316,10 @@ summarize nginx memory rss
 Для проверки бюджета без shell-арифметики используется:
 
 ```yesh
-if memory nginx rss at_most 512MiB:
+if memory $nginx rss at_most 512MiB:
     echo "nginx RSS is within the budget"
 else:
-    summarize nginx memory rss
+    summarize $nginx memory rss
     exit 1
 ```
 

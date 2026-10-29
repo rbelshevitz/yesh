@@ -2,10 +2,10 @@
 name = world
 things = [one, two, three]
 
-echo hello name
+echo hello $name
 
-for thing in things:
-    echo item: thing
+for thing in $things:
+    echo item: $thing
 
 if exists README.md:
     echo the interpreter is here

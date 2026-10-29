@@ -3,8 +3,8 @@
 mountpoint = /backup
 expected_source = "UUID=replace-with-the-real-uuid"
 
-if findmnt --source expected_source --target mountpoint:
-    findmnt --source expected_source --target mountpoint
+if findmnt --source $expected_source --target $mountpoint:
+    findmnt --source $expected_source --target $mountpoint
     echo "backup filesystem identity is correct"
 else:
     echo "backup filesystem identity does not match"

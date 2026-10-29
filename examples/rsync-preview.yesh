@@ -2,11 +2,11 @@
 source = "source/"
 target = "target/"
 
-if exists target:
-    if findmnt --target target:
-        findmnt --target target
-        df -P -h -- target
-        rsync -a --dry-run --itemize-changes -- source target
+if exists $target:
+    if findmnt --target $target:
+        findmnt --target $target
+        df -P -h -- $target
+        rsync -a --dry-run --itemize-changes -- $source $target
     else:
         echo "target is not on a mounted filesystem"
         exit 3

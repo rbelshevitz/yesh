@@ -70,7 +70,7 @@ func TestListsPreserveQuotedDelimiters(t *testing.T) {
 		{`['a,b', 'c']`, []string{"a,b", "c"}},
 		{`["[a,b]", "]", "["]`, []string{"[a,b]", "]", "["}},
 		{`["a\"b,c", 'd']`, []string{"a\"b,c", "d"}},
-		{`["", '', item]`, []string{"", "", "resolved"}},
+		{`["", '', $item]`, []string{"", "", "resolved"}},
 		{`['a  b', "c  d"]`, []string{"a  b", "c  d"}},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestListsPreserveQuotedDelimiters(t *testing.T) {
 }
 
 func TestForPreservesWhitespaceInsideValues(t *testing.T) {
-	items, err := parse("for item in ['a  b', 'c,d']:\n    echo item\n", "for.yesh")
+	items, err := parse("for item in ['a  b', 'c,d']:\n    echo $item\n", "for.yesh")
 	if err != nil {
 		t.Fatal(err)
 	}

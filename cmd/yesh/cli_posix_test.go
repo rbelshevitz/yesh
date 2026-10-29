@@ -133,7 +133,7 @@ func TestPOSIXCLIPlanExpandedArguments(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "marker")
 	script := filepath.Join(dir, "plan.yesh")
-	writeTestFile(t, script, []byte(fmt.Sprintf("args = [one, 'two words']\nprintf args > %q\n", marker)), 0600)
+	writeTestFile(t, script, []byte(fmt.Sprintf("args = [one, 'two words']\nprintf $args > %q\n", marker)), 0600)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	out, err := posixCLI(t, ctx, "--plan", script).CombinedOutput()
@@ -267,7 +267,7 @@ func TestPOSIXExistsPermissionAndLinkErrors(t *testing.T) {
 		defer os.Chmod(hidden, 0700)
 		r := posixRuntime()
 		r.values["path"] = value{scalar: path}
-		if _, err := r.condition("exists path", 3); !errors.Is(err, os.ErrPermission) {
+		if _, err := r.condition("exists $path", 3); !errors.Is(err, os.ErrPermission) {
 			t.Fatalf("EACCES hidden as false: %v", err)
 		}
 	}
@@ -277,7 +277,7 @@ func TestPOSIXExistsPermissionAndLinkErrors(t *testing.T) {
 	}
 	r := posixRuntime()
 	r.values["path"] = value{scalar: loop}
-	if _, err := r.condition("exists path", 3); err == nil {
+	if _, err := r.condition("exists $path", 3); err == nil {
 		t.Fatal("symlink loop treated as absence")
 	}
 	dangling := filepath.Join(dir, "dangling")
@@ -285,7 +285,7 @@ func TestPOSIXExistsPermissionAndLinkErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.values["path"] = value{scalar: dangling}
-	if ok, err := r.condition("exists path", 3); err != nil || ok {
+	if ok, err := r.condition("exists $path", 3); err != nil || ok {
 		t.Fatalf("dangling target: %v %v", ok, err)
 	}
 }
@@ -295,7 +295,7 @@ func TestPOSIXPlanConditionWithQuotedMatches(t *testing.T) {
 	marker := filepath.Join(dir, "executed")
 	script := filepath.Join(dir, "script")
 	fixture := posixFixture(t, "touch "+marker)
-	source := fmt.Sprintf("message = 'a matches b'\nif %s message:\n    echo yes\nelse:\n    echo no\n", fixture)
+	source := fmt.Sprintf("message = 'a matches b'\nif %s $message:\n    echo yes\nelse:\n    echo no\n", fixture)
 	writeTestFile(t, script, []byte(source), 0600)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()

@@ -62,7 +62,15 @@ func exitCode(v value) (int, error) {
 
 func (r *runtime) eval(raw string, line int) (value, error) {
 	raw = strings.TrimSpace(raw)
-	if v, ok := r.values[raw]; ok {
+	if strings.HasPrefix(raw, "$") {
+		name := strings.TrimPrefix(raw, "$")
+		if !validValueName(name) {
+			return value{}, fmt.Errorf("%s:%d: expected variable reference $name", r.filename, line)
+		}
+		v, ok := r.values[name]
+		if !ok {
+			return value{}, fmt.Errorf("%s:%d: undefined variable $%s", r.filename, line, name)
+		}
 		return v, nil
 	}
 	if raw == "fstab" || strings.HasPrefix(raw, "fstab ") {
@@ -143,6 +151,20 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 	return value{scalar: raw}, nil
 }
 
+// Variables are explicit so adding an assignment cannot change the meaning of
+// an existing command word.  Bare words and quoted strings are always data.
+func validValueName(name string) bool {
+	return validEnvironmentName(name)
+}
+
+func variableReference(raw string) (string, bool) {
+	if !strings.HasPrefix(raw, "$") {
+		return "", false
+	}
+	name := strings.TrimPrefix(raw, "$")
+	return name, validValueName(name)
+}
+
 func validEnvironmentName(name string) bool {
 	if name == "" || (name[0] != '_' && (name[0] < 'A' || name[0] > 'Z') && (name[0] < 'a' || name[0] > 'z')) {
 		return false
@@ -199,18 +221,6 @@ func listElements(text string) ([]string, error) {
 }
 
 func (r *runtime) expand(token string, line int) ([]string, error) {
-	if v, ok := r.values[token]; ok {
-		if v.isList {
-			return v.list, nil
-		}
-		if v.fstab != nil || v.device != nil {
-			return nil, fmt.Errorf("%s:%d: device/fstab value cannot be used as a command argument", r.filename, line)
-		}
-		if v.regex != nil {
-			return nil, fmt.Errorf("%s:%d: regex cannot be used as a command argument", r.filename, line)
-		}
-		return []string{v.scalar}, nil
-	}
 	v, err := r.eval(token, line)
 	if err != nil {
 		return nil, err

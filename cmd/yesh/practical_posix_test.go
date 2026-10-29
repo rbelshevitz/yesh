@@ -49,6 +49,39 @@ func practicalCommand(t *testing.T, dir, script string) *exec.Cmd {
 	return cmd
 }
 
+// The first licensed-corpus adaptations deliberately keep their safety
+// properties visible in the source: preview before copy, an explicit mount
+// check, and non-interactive SSH host verification. This test guards those
+// reviewable contracts without requiring a live remote host or a real backup
+// device.
+func TestPOSIXCorpusAdaptationSafetyContracts(t *testing.T) {
+	cases := []struct {
+		name   string
+		file   string
+		must   []string
+		forbid []string
+	}{
+		{name: "rsync preview", file: "rsync-preview.yesh", must: []string{"rsync -a --dry-run", "--itemize-changes", "-- $source $target"}},
+		{name: "mount preflight", file: "storage-check.yesh", must: []string{"findmnt --target $mountpoint", "df -P -h -- $mountpoint"}},
+		{name: "ssh health", file: "ssh-health.yesh", must: []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ConnectTimeout=5"}, forbid: []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := string(readTestFile(t, practicalExample(t, tc.file)))
+			for _, want := range tc.must {
+				if !strings.Contains(data, want) {
+					t.Fatalf("%s missing safety contract %q", tc.file, want)
+				}
+			}
+			for _, banned := range tc.forbid {
+				if strings.Contains(data, banned) {
+					t.Fatalf("%s contains unsafe contract %q", tc.file, banned)
+				}
+			}
+		})
+	}
+}
+
 func TestPOSIXPracticalBackupRoundTrip(t *testing.T) {
 	practicalDependencies(t, "tar", "gzip", "mv")
 	dir := t.TempDir()
@@ -336,6 +369,77 @@ func TestPOSIXPracticalRsyncPreviewAndCopy(t *testing.T) {
 	}
 	if got := string(readTestFile(t, filepath.Join(source, "file with spaces"))); got != "new payload\n" {
 		t.Fatal("source changed")
+	}
+}
+
+func TestPOSIXPracticalRsyncPreviewIntegration(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	// Keep the fixtures intentionally tiny: the test is about yesh's process
+	// orchestration and argv preservation, not rsync/findmnt implementation.
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nprintf '%s\\000' findmnt \"$@\" >> \"$TRACE_FILE\"\nexit \"${FINDMNT_STATUS:-0}\"\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "df"), []byte("#!/bin/sh\nprintf '%s\\000' df \"$@\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\n"), 0700)
+
+	if err := os.Mkdir(filepath.Join(dir, "source"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "target"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "preview.yesh")
+	writeTestFile(t, script, readTestFile(t, practicalExample(t, "rsync-preview.yesh")), 0600)
+
+	run := func(findmntStatus string) (int, []byte, string) {
+		writeTestFile(t, trace, nil, 0600)
+		cmd := practicalCommand(t, dir, script)
+		cmd.Env = append(cmd.Env,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+trace,
+			"FINDMNT_STATUS="+findmntStatus,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, out, string(readTestFile(t, trace))
+	}
+
+	if code, out, got := run("0"); code != 0 {
+		t.Fatalf("preview success: code=%d output=%q trace=%q", code, out, got)
+	} else {
+		want := []string{
+			"findmnt", "--target", "target/",
+			"findmnt", "--target", "target/",
+			"df", "-P", "-h", "--", "target/",
+			"rsync", "-a", "--dry-run", "--itemize-changes", "--", "source/", "target/",
+		}
+		gotArgs := strings.Split(strings.TrimSuffix(got, "\x00"), "\x00")
+		if strings.Join(gotArgs, "|") != strings.Join(want, "|") {
+			t.Fatalf("preview argv: %q want %q", gotArgs, want)
+		}
+	}
+
+	if code, out, got := run("1"); code != 3 || !bytes.Contains(out, []byte("target is not on a mounted filesystem")) {
+		t.Fatalf("unmounted target: code=%d output=%q trace=%q", code, out, got)
+	} else if strings.Contains(got, "rsync\x00") || strings.Contains(got, "df\x00") {
+		t.Fatalf("preflight failure ran later commands: %q", got)
+	}
+
+	if err := os.RemoveAll(filepath.Join(dir, "target")); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, got := run("0"); code != 2 || !bytes.Contains(out, []byte("target directory is missing")) {
+		t.Fatalf("missing target: code=%d output=%q trace=%q", code, out, got)
+	} else if got != "" {
+		t.Fatalf("missing target invoked external commands: %q", got)
 	}
 }
 

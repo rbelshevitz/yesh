@@ -1,5 +1,5 @@
 # Match one UUID/PARTUUID entry to the exact active mount before backup.
 # No mount, automount activation or fstab writing is requested.
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 echo "configured backup device is mounted"

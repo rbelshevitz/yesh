@@ -26,10 +26,10 @@ small and readable.
 
 | Bash | yesh |
 | --- | --- |
-| `name=world; echo "$name"` | `name = world`<br>`echo name` |
+| `name=world; echo "$name"` | `name = world`<br>`echo $name` |
 | `items=(one two three)` | `items = [one, two, three]` |
-| `if [ -e "$path" ]; then ... fi` | `if exists path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
-| `for item in "${items[@]}"; do ... done` | `for item in items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
+| `if [ -e "$path" ]; then ... fi` | `if exists $path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
+| `for item in "${items[@]}"; do ... done` | `for item in $items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `set -euo pipefail` | failures are errors by default |
 
 ## Why yesh is easier to read than Bash
@@ -40,7 +40,7 @@ wrong:
 
 - **Too many ways to express the same thing.** Bash conditions and arithmetic
   use several historical syntaxes with different rules. yesh keeps one clear
-  block form: `if condition:` and `for item in list:`.
+  block form: `if condition:` and `for item in $list:`.
 - **Quoting and word-splitting traps.** In Bash, an unquoted expansion can be
   split into words or interpreted as a glob. In yesh, a string remains one
   argument and a list is expanded only as a list.
@@ -62,11 +62,11 @@ write and easy to review.
 The current prototype supports:
 
 - assignments such as `name = world` and `items = [one, two]`;
-- `if condition:` and `for item in items:` blocks with indentation;
+- `if condition:` and `for item in $items:` blocks with indentation;
 - ordinary commands, pipes, and redirections;
-- name-based variable expansion without `$`;
+- explicit `$name` variable expansion, with bare words kept literal;
 - command failures that stop the script and report the source line;
-- a single `exists path` predicate, regex conditions, and explicit `exit code`.
+- a single `exists $path` predicate, regex conditions, and explicit `exit code`.
 
 ## What works today
 

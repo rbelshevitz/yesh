@@ -90,7 +90,7 @@ func TestLinuxFstabMountPreflight(t *testing.T) {
 			writeTestFile(t, mountFile, append(data, '\n'), 0600)
 			output := filepath.Join(t.TempDir(), "ready")
 			r := &runtime{filename: "mount.yesh", values: map[string]value{"mounts": {fstab: &fstabSnapshot{Entries: entries}}}}
-			items, err := parse("require mounted "+strconvQuote(mount)+" from mounts\necho ready > "+strconvQuote(output), r.filename)
+			items, err := parse("require mounted "+strconvQuote(mount)+" from $mounts\necho ready > "+strconvQuote(output), r.filename)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -123,7 +123,7 @@ func TestLinuxFstabMountPreflight(t *testing.T) {
 	writeTestFile(t, devicesFile, append(storageFixture(device), '\n'), 0600)
 	writeTestFile(t, mountFile, append(data, '\n'), 0600)
 	r := &runtime{values: map[string]value{"mounts": {fstab: &fstabSnapshot{Entries: []fstabEntry{e}}}}}
-	items, _ := parse("require mounted "+strconvQuote(missing)+" from mounts", "autofs.yesh")
+	items, _ := parse("require mounted "+strconvQuote(missing)+" from $mounts", "autofs.yesh")
 	if err := r.execute(items); err == nil || !strings.Contains(err.Error(), "does not match") {
 		t.Fatalf("path accessed before autofs rejection: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestLinuxFstabRealMountBinding(t *testing.T) {
 		// A configured-but-unmounted backup must not pass because its parent is mounted.
 		path := t.TempDir()
 		writeTestFile(t, table, []byte(fmt.Sprintf("UUID=%s %s %s nofail 0 2\n", d.UUID, path, d.FSType)), 0600)
-		items, err = parse("mounts = fstab "+strconvQuote(table)+"\nrequire mounted "+strconvQuote(path)+" from mounts", r.filename)
+		items, err = parse("mounts = fstab "+strconvQuote(table)+"\nrequire mounted "+strconvQuote(path)+" from $mounts", r.filename)
 		if err != nil {
 			t.Fatal(err)
 		}

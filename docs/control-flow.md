@@ -6,7 +6,7 @@ as a false condition.
 
 ```yesh
 config = /etc/os-release
-if exists config:
+if exists $config:
     cat < config
 else:
     echo "configuration file is missing"
@@ -37,7 +37,7 @@ with a correction hint.
 ```yesh
 service = api-42
 pattern = regex '^api-[0-9]+$'
-if service matches pattern:
+if $service matches $pattern:
     echo "matching service"
 ```
 
@@ -57,13 +57,13 @@ are shown. `exists` and `matches` are evaluated without starting processes.
 
 ```yesh
 code = 7
-exit code
+exit $code
 echo "this line is not executed"
 ```
 
 Bash comparison: `code=7; exit "$code"`.
 
-`exit code` terminates the whole script, including nested `if` and `for` blocks,
+`exit $code` terminates the whole script, including nested `if` and `for` blocks,
 with an explicit decimal code from `0` through `255`. It is a built-in control
 operation, not an external process or an `if` result. In a plan it is displayed
 without terminating the plan. A missing, negative, or out-of-range code, list,

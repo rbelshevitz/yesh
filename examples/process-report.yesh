@@ -2,8 +2,8 @@
 ps -eo pid=,ppid=,user=,rss=,stat=,comm= | head -n 25
 
 services = [sshd, nginx]
-for service in services:
-    if pgrep -x service:
-        echo service "is running"
+for service in $services:
+    if pgrep -x $service:
+        echo $service "is running"
     else:
-        echo service "is not running"
+        echo $service "is not running"

@@ -35,20 +35,20 @@ yesh не заменяет Unix-инструменты. Он убирает ло
 
 | Bash | yesh |
 | --- | --- |
-| `name=world; echo "$name"` | `name = world`<br>`echo name` |
+| `name=world; echo "$name"` | `name = world`<br>`echo $name` |
 | `items=(one two three)` | `items = [one, two, three]` |
-| `if [ -e "$path" ]; then ... fi` | `if exists path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
-| `for item in "${items[@]}"; do ... done` | `for item in items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
+| `if [ -e "$path" ]; then ... fi` | `if exists $path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
+| `for item in "${items[@]}"; do ... done` | `for item in $items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
 | `set -euo pipefail` | ошибки обрабатываются по умолчанию |
 
 ## Текущий прототип
 
 - присваивания, строки и списки;
-- `if condition:` и конечный `for item in items:` с отступами;
+- `if condition:` и конечный `for item in $items:` с отступами;
 - обычные команды, конвейеры и перенаправления;
-- раскрытие переменных по имени, без `$`;
+- явное раскрытие переменных через `$name`; обычные слова остаются литералами;
 - остановка при ошибке команды с указанием исходной строки;
-- `exists path`, условия с регулярными выражениями и явный `exit code`;
+- `exists $path`, условия с регулярными выражениями и явный `exit code`;
 - `--plan` для проверки раскрытых аргументов и ветвлений без запуска команд.
 
 ## Что уже работает на практике

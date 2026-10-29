@@ -69,7 +69,7 @@ func parseCondition(text string) (conditionExpr, error) {
 	} else if keyword(0, "memory") {
 		if len(terms) != 5 || terms[1].operator || terms[2].operator || terms[3].operator ||
 			terms[4].operator || !keyword(3, "at_most") || terms[2].text != "rss" {
-			return expr, fmt.Errorf("expected: memory process_set rss at_most amount")
+			return expr, fmt.Errorf("expected: memory $process_set rss at_most amount")
 		}
 		if _, err := parseByteSize(terms[4].text); err != nil {
 			return expr, err
@@ -149,7 +149,11 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		}
 		return free >= need, nil
 	case processMemoryCondition:
-		set, ok := r.values[expr.terms[1].text]
+		name, isReference := variableReference(expr.terms[1].text)
+		if !isReference {
+			return false, fmt.Errorf("%s:%d: memory expects a $process_set", r.filename, line)
+		}
+		set, ok := r.values[name]
 		if !ok || !set.isProcesses {
 			return false, fmt.Errorf("%s:%d: memory expects a process set", r.filename, line)
 		}

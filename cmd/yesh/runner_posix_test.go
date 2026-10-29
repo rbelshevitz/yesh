@@ -71,12 +71,12 @@ func TestPOSIXRedirectionSemantics(t *testing.T) {
 	r := posixRuntime()
 	r.values["input"] = value{scalar: in}
 	r.values["output"] = value{scalar: out}
-	runPOSIX(t, r, "cat < input > output", false)
-	runPOSIX(t, r, "cat < input >> output", false)
+	runPOSIX(t, r, "cat < $input > $output", false)
+	runPOSIX(t, r, "cat < $input >> $output", false)
 	if got := string(readTestFile(t, out)); got != "payload\npayload\n" {
 		t.Fatal(got)
 	}
-	runPOSIX(t, r, "true > output", false)
+	runPOSIX(t, r, "true > $output", false)
 	if len(readTestFile(t, out)) != 0 {
 		t.Fatal("truncate did not empty output")
 	}

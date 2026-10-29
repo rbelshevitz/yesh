@@ -1,9 +1,9 @@
 # Fail if all nginx processes together exceed the RSS budget.
 nginx = processes where name is "nginx"
 
-if memory nginx rss at_most 512MiB:
-    summarize nginx memory rss
+if memory $nginx rss at_most 512MiB:
+    summarize $nginx memory rss
 else:
     echo "nginx RSS is above the budget"
-    summarize nginx memory rss
+    summarize $nginx memory rss
     exit 4

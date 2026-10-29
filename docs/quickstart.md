@@ -38,11 +38,11 @@ services = [nginx, sshd]
 
 systemctl show --property=Version > /dev/null
 
-for service in services:
-    if systemctl is-active --quiet -- service:
-        echo service "is active"
+for service in $services:
+    if systemctl is-active --quiet -- $service:
+        echo $service "is active"
     else:
-        echo service "active check failed"
+        echo $service "active check failed"
         exit 1
 ```
 
@@ -69,8 +69,8 @@ There is no `$service`, `${services[@]}`, `[[ ... ]]`, `then`, `fi`, `do`,
 
 ```yesh
 services = [nginx, sshd]
-for service in services:
-    echo service
+for service in $services:
+    echo $service
 ```
 
 `services` is a list and `service` is one string value. A list is expanded by

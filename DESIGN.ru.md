@@ -17,7 +17,7 @@ yesh предназначен для небольших операционных
 hosts = [web-1, web-2]
 service = nginx
 
-for host in hosts:
+for host in $hosts:
     echo "checking host" host
     ssh host systemctl is-active service
 ```
@@ -40,7 +40,7 @@ for host in hosts:
 ```yesh
 services = [api, worker]
 
-for service in services:
+for service in $services:
     systemctl restart service
     if systemctl is-active service:
         echo service "is running"

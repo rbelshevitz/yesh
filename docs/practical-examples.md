@@ -125,8 +125,8 @@ processes by exact kernel name and displays selected fields:
 
 ```yesh
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
-summarize nginx memory rss
+show $nginx fields pid uid state rss cgroup
+summarize $nginx memory rss
 ```
 
 The snapshot is read-only. It does not send signals or modify processes. RSS

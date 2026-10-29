@@ -1,5 +1,5 @@
 # Read configuration through libmount without resolving devices or mounting.
 # Parser warnings stop the script; inspection hides option values.
 mounts = fstab "/etc/fstab"
-inspect mounts
+inspect $mounts
 echo "fstab snapshot read; active mounts and boot readiness were not checked"

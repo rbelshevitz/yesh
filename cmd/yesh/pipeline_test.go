@@ -17,9 +17,9 @@ func TestPipelinePreflightRejectsUnsafeForms(t *testing.T) {
 	for _, command := range []string{
 		"", "| cat", "cat |", "cat || cat", "cat | | cat", "cat ; cat", "cat && cat", "cat &", "cat << input",
 		"cat >", "cat > | cat", "cat > > out", "cat < > out", "cat > a > b", "cat < a < b", "cat >> a > b",
-		"cat > a | cat", "cat | cat < a", "cat > empty", "cat > paths", `cat > ""`, "empty", `"" arg`, "cat nul", "cat > nul",
+		"cat > a | cat", "cat | cat < a", "cat > $empty", "cat > $paths", `cat > ""`, "$empty", `"" arg`, "cat $nul", "cat > $nul",
 		"cat 2> out", "cat 2>> out", "cat 0< input", "cat $(id)", "cat `id`", "cat 'unterminated", "cat \\",
-		"sh script", "bash -c echo", "/bin/sh -c echo", "cat | /bin/sh", "cat | shell -c echo", "command",
+		"sh script", "bash -c echo", "/bin/sh -c echo", "cat | /bin/sh", "cat | $shell -c echo", "$command",
 		`cat | "sh"`, "cat | /usr/bin/python3.12", "cat | perl", "cat | ruby", "cat | node", "cat | php", "cat | lua",
 		"cat | xargs rm", "cat | env sh", "env sh | cat", "cat | sudo sh", "cat | busybox sh", "cat | timeout 1 sh",
 		"cat | nohup sh", "cat | setsid sh", "cat | nice sh", "cat | doas sh", "cat | command sh", "cat | eval",
@@ -45,10 +45,10 @@ func TestPipelineArgumentsRemainData(t *testing.T) {
 		source string
 		want   []string
 	}{
-		{`echo service "service" 'service'`, []string{"echo", "api server", "service", "service"}},
-		{`printf items`, []string{"printf", "one two", "|", "$(id)", ""}},
-		{`printf injection`, []string{"printf", "x | sh ; touch marker"}},
-		{`printf "" '' empty`, []string{"printf", "", ""}},
+		{`echo $service "service" 'service'`, []string{"echo", "api server", "service", "service"}},
+		{`printf $items`, []string{"printf", "one two", "|", "$(id)", ""}},
+		{`printf $injection`, []string{"printf", "x | sh ; touch marker"}},
+		{`printf "" '' $empty`, []string{"printf", "", ""}},
 		{`printf '|' '>' '<' '>>' ';' '&' '&&' '||'`, []string{"printf", "|", ">", "<", ">>", ";", "&", "&&", "||"}},
 		{"printf \\| \\> \\;", []string{"printf", "|", ">", ";"}},
 		{"printf '$(id)' '`id`' '*?[a]'", []string{"printf", "$(id)", "`id`", "*?[a]"}},
@@ -64,6 +64,28 @@ func TestPipelineArgumentsRemainData(t *testing.T) {
 				t.Fatalf("got %#v, want %#v", stages, tc.want)
 			}
 		})
+	}
+}
+
+func TestBareWordsStayLiteralAndVariablesAreExplicit(t *testing.T) {
+	r := &runtime{values: map[string]value{"service": {scalar: "api server"}}, filename: "variables.yesh"}
+	for _, tc := range []struct {
+		source string
+		want   []string
+	}{
+		{`echo service`, []string{"echo", "service"}},
+		{`echo $service`, []string{"echo", "api server"}},
+		{`echo "$service"`, []string{"echo", "$service"}},
+	} {
+		stages, err := r.parseCommand(tc.source, 1)
+		if err != nil || !reflect.DeepEqual(stages[0].argv, tc.want) {
+			t.Fatalf("%s: %#v %v", tc.source, stages, err)
+		}
+	}
+	for _, source := range []string{`echo $missing`, `echo ${service}`, `echo $9bad`} {
+		if _, err := r.parseCommand(source, 1); err == nil {
+			t.Fatalf("accepted invalid variable reference %q", source)
+		}
 	}
 }
 

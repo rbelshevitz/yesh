@@ -57,6 +57,27 @@ The practical claim is deliberately limited: yesh already makes these scripts
 easier to read and review, but does not yet claim built-in CIDR/net-tools,
 full systemd API, TTY/PTY, typed SSH nodes, or control of other processes.
 
+## Real-world Bash corpus
+
+See the [Bash corpus catalog](bash-corpus.md) for sources and license status.
+
+Before adding language features, evaluate yesh against 20–30 independent
+administration scripts. Each entry needs its Bash source, a yesh adaptation,
+`--plan`, positive and negative tests, and one concrete reviewability or
+safety benefit. A script that merely renames an external command is not
+evidence for a new language feature.
+
+- [ ] Select and sanitize backup/rsync, systemd/journal, storage, SSH/SCP,
+  and network-check scripts; do not import disabled host-key checks, hidden
+  `sudo`, or destructive defaults.
+- [ ] Adapt an initial set without extending the language: service check,
+  read-only storage preflight, backup preview, and SSH health check.
+- [ ] Record every mismatch with Bash as either an unreadable construct,
+  splitting/quoting risk, hidden pipeline failure, or missing safe yesh
+  expressiveness.
+- [ ] Consider a new built-in only after the same justified problem occurs in
+  at least two corpus scenarios.
+
 ## Next practical slice: safe transfer and backup
 
 The next major workflow is:
@@ -108,7 +129,7 @@ canonicalization and precedes directory inspection. Missing/ambiguous entries,
 wrong devices, plain directories and autofs-only targets fail before the next action.
 The interface does not write fstab or run mount helpers or daemon-reload.
 
-The real WSL check uses synthetic fstab data and a real root ext4 mount;
+The last detailed check used WSL with synthetic fstab data and a real root ext4 mount;
 PARTUUID and autofs rejection also have fixtures. Real GPT/PARTUUID, automount
 activation, backup-mount/restore and boot testing remain unproven. Effective
 options, write access, free space and concurrent changes are separate concerns.
@@ -117,6 +138,10 @@ by this mount requirement. Whole-filesystem bind mounts cannot be distinguished
 from ordinary mounts; uniqueness covers only available device metadata.
 Built-in mount/unmount remain planned. The next storage step is to define the
 readonly-mount contract and a dedicated test environment.
+
+- [ ] Re-run the full Linux/POSIX/storage/fstab suite on ordinary Linux (not
+  WSL) with Go 1.27, including race, vet, and build; preserve the first full
+  `--- FAIL` block before classifying an environment-dependent failure.
 
 The first Real-World Examples in this slice are the runnable
 `examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current

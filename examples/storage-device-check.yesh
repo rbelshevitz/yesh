@@ -2,12 +2,12 @@
 # No mount, unmount, partitioning, formatting, or device changes are made.
 mountpoint = /backup
 
-if findmnt --target mountpoint:
-    findmnt --target mountpoint
-    findmnt -no SOURCE,FSTYPE,OPTIONS --target mountpoint
+if findmnt --target $mountpoint:
+    findmnt --target $mountpoint
+    findmnt -no SOURCE,FSTYPE,OPTIONS --target $mountpoint
     lsblk --fs --output NAME,TYPE,FSTYPE,LABEL,UUID,PARTUUID,MOUNTPOINTS
     blkid --output full
-    stat -c "type=%F mode=%a owner=%U:%G" -- mountpoint
+    stat -c "type=%F mode=%a owner=%U:%G" -- $mountpoint
 else:
     echo "path is not on a mounted filesystem"
     exit 2

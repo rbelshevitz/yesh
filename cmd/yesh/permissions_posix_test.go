@@ -27,7 +27,7 @@ func TestPOSIXChmodArgumentsAndModes(t *testing.T) {
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			r.values["mode"] = value{scalar: tc.mode}
-			runPOSIX(t, r, "chmod mode target", false)
+			runPOSIX(t, r, "chmod $mode $target", false)
 			info, err := os.Stat(path)
 			if err != nil {
 				t.Fatal(err)
@@ -40,7 +40,7 @@ func TestPOSIXChmodArgumentsAndModes(t *testing.T) {
 			}
 		})
 	}
-	runPOSIX(t, r, "chmod invalid-mode target", true)
+	runPOSIX(t, r, "chmod invalid-mode $target", true)
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestPOSIXChownExistingIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	stat := info.Sys().(*syscall.Stat_t)
-	command := fmt.Sprintf("chown %d:%d target", stat.Uid, stat.Gid)
+	command := fmt.Sprintf("chown %d:%d $target", stat.Uid, stat.Gid)
 	r := posixRuntime()
 	r.values["target"] = value{scalar: path}
 	runPOSIX(t, r, command, false)
@@ -102,7 +102,7 @@ func TestPOSIXStickyDirectoryBit(t *testing.T) {
 	}
 	r := posixRuntime()
 	r.values["target"] = value{scalar: dir}
-	runPOSIX(t, r, "chmod 1777 target", false)
+	runPOSIX(t, r, "chmod 1777 $target", false)
 	info, err := os.Stat(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func TestPOSIXStickyDirectoryBit(t *testing.T) {
 	if err := os.Remove(file); err != nil {
 		t.Fatalf("sticky blocked owner's unlink: %v", err)
 	}
-	runPOSIX(t, r, "chmod -t target", false)
+	runPOSIX(t, r, "chmod -t $target", false)
 	info, err = os.Stat(dir)
 	if err != nil {
 		t.Fatal(err)

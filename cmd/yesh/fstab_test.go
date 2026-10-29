@@ -49,15 +49,15 @@ func TestFstabBoundsAndInspection(t *testing.T) {
 }
 func TestFstabTypedValues(t *testing.T) {
 	r := &runtime{filename: "fstab.yesh", values: map[string]value{"mounts": {fstab: &fstabSnapshot{}}}, plan: true}
-	for _, raw := range []string{"[mounts]", "regex mounts", "fstab mounts", "device by uuid mounts", "fstab", "fstab a b"} {
+	for _, raw := range []string{"[$mounts]", "regex $mounts", "fstab $mounts", "device by uuid $mounts", "fstab", "fstab a b"} {
 		if _, err := r.eval(raw, 1); err == nil {
 			t.Fatalf("accepted %s", raw)
 		}
 	}
-	if _, err := r.expand("mounts", 1); err == nil {
+	if _, err := r.expand("$mounts", 1); err == nil {
 		t.Fatal("expanded structured table")
 	}
-	items, err := parse("mounts = fstab /nonexistent/fstab\ninspect mounts", "fstab.yesh")
+	items, err := parse("mounts = fstab /nonexistent/fstab\ninspect $mounts", "fstab.yesh")
 	if err != nil {
 		t.Fatal(err)
 	}

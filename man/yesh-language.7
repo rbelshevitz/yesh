@@ -55,20 +55,20 @@ not ordinary false conditions. Use only exists path; exists(path) is rejected.
 exit 2
 .EE
 .PP
-exit code terminates the entire script with an explicit decimal code from
+exit $code terminates the entire script with an explicit decimal code from
 0 to 255, including inside nested blocks. It is not a pipeline stage.
 In plan mode exit is displayed without terminating plan traversal.
 .SS matches
 .EX
 name = api-42
 pattern = regex '^api-[0-9]+$'
-if name matches pattern:
+if $name matches $pattern:
     echo "valid"
 .EE
 .SS for
 .EX
-for host in hosts:
-    ssh host systemctl is-active api
+for host in $hosts:
+    ssh $host systemctl is-active api
 .EE
 .PP
 Only finite lists are accepted. The runtime enforces iteration and total-step
@@ -78,8 +78,8 @@ statement is disabled.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"
-inspect backup
-require mounted /mnt/backup from backup filesystem "ext4"
+inspect $backup
+require mounted /mnt/backup from $backup filesystem "ext4"
 .fi
 .PP
 Use uuid or partuuid for an exact, unique identity. inspect prints the lookup
@@ -97,7 +97,7 @@ are not implemented by this typed interface.
 .SS fstab snapshots (Linux)
 .nf
 mounts = fstab "/etc/fstab"
-inspect mounts
+inspect $mounts
 .fi
 .PP
 Reads a regular-file snapshot through findmnt/libmount without device evaluation,
@@ -118,7 +118,7 @@ mount helpers, daemon-reload or systemd generator execution is performed.
 To bind one configuration entry to its device and exact active mount:
 .nf
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 .fi
 .PP
 Exactly one entry (including lexically equivalent paths) must match. Its

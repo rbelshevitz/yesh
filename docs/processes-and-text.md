@@ -28,8 +28,8 @@ PIDs can be reused. A process query returns structured records, not stdout:
 
 ```yesh
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
-summarize nginx memory rss
+show $nginx fields pid uid state rss cgroup
+summarize $nginx memory rss
 ```
 
 The implemented read-only snapshot matches the exact Linux kernel name and

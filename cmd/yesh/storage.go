@@ -24,16 +24,24 @@ func storageKeyword(t commandToken, word string) bool {
 	return !t.literal && !t.operator && t.text == word
 }
 func validateStorageStatement(t []commandToken) error {
-	if len(t) == 2 && storageKeyword(t[0], "inspect") && !t[1].literal && !t[1].operator {
+	inspectRef := false
+	if len(t) > 1 {
+		_, inspectRef = variableReference(t[1].text)
+	}
+	if len(t) == 2 && storageKeyword(t[0], "inspect") && !t[1].literal && !t[1].operator && inspectRef {
 		return nil
 	}
-	if len(t) == 5 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && !t[2].operator && !t[4].operator && !t[4].literal {
+	sourceRef := false
+	if len(t) > 4 {
+		_, sourceRef = variableReference(t[4].text)
+	}
+	if len(t) == 5 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && !t[2].operator && !t[4].operator && !t[4].literal && sourceRef {
 		return nil
 	}
-	if len(t) == 7 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && storageKeyword(t[5], "filesystem") && !t[2].operator && !t[4].operator && !t[4].literal && !t[6].operator {
+	if len(t) == 7 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && storageKeyword(t[5], "filesystem") && !t[2].operator && !t[4].operator && !t[4].literal && !t[6].operator && sourceRef {
 		return nil
 	}
-	return fmt.Errorf("expected: inspect value; require mounted path from fstab_snapshot; or require mounted path from device filesystem type (without pipeline or redirection)")
+	return fmt.Errorf("expected: inspect $value; require mounted path from $fstab_snapshot; or require mounted path from $device filesystem type (without pipeline or redirection)")
 }
 func (r *runtime) storageString(t commandToken, line int) (string, error) {
 	v, err := r.conditionValue(t, line)
@@ -127,9 +135,9 @@ func validDeviceNumber(s string) bool {
 }
 func (r *runtime) executeStorage(s storageStmt) error {
 	t := s.terms
-	name := t[1].text
+	name, _ := variableReference(t[1].text)
 	if t[0].text == "require" {
-		name = t[4].text
+		name, _ = variableReference(t[4].text)
 	}
 	v, ok := r.values[name]
 	if t[0].text == "require" && len(t) == 5 {

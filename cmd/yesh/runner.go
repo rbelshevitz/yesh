@@ -49,6 +49,8 @@ func validateStages(stages []stage) error {
 		if name == "exit" {
 			return fmt.Errorf("exit is a script statement; use standalone exit code, not a command or pipeline stage")
 		}
+		// This is a narrow, documented execution policy, not an isolation
+		// boundary. The runtime's safety guarantees do not depend on this list.
 		switch name {
 		case "sh", "bash", "dash", "ash", "zsh", "fish", "ksh", "csh", "tcsh", "cmd", "powershell", "pwsh":
 			return fmt.Errorf("nested shell execution is disabled: %s", s.argv[0])

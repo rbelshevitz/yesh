@@ -16,7 +16,7 @@ func (r *runtime) evalProcessQuery(raw string, line int) (value, error) {
 		tokens[2].text != "name" || tokens[3].text != "is" || tokens[4].operator {
 		return value{}, fmt.Errorf("%s:%d: expected: processes where name is process_name", r.filename, line)
 	}
-	name, err := r.eval(tokens[4].text, line)
+	name, err := r.conditionValue(tokens[4], line)
 	if err != nil {
 		return value{}, err
 	}

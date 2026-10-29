@@ -41,7 +41,7 @@ func TestLinuxStoragePreflight(t *testing.T) {
 		data, _ := json.Marshal(map[string]any{"filesystems": []any{map[string]string{"target": mount, "source": d.Path, "fstype": "ext4", "maj:min": number, "fsroot": "/"}}})
 		return append(data, '\n')
 	}
-	source := "disk = device by uuid \"disk-id\"\ninspect disk\nrequire mounted " + strconvQuote(mount) + " from disk filesystem ext4\necho passed > " + strconvQuote(filepath.Join(dir, "published")) + "\n"
+	source := "disk = device by uuid \"disk-id\"\ninspect $disk\nrequire mounted " + strconvQuote(mount) + " from $disk filesystem ext4\necho passed > " + strconvQuote(filepath.Join(dir, "published")) + "\n"
 	for _, tc := range []struct {
 		name           string
 		devices, mount []byte
@@ -88,12 +88,12 @@ func TestLinuxStoragePreflight(t *testing.T) {
 	changed.Number = "8:2"
 	changed.Path = "/dev/other"
 	writeTestFile(t, fixture, append(storageFixture(changed), '\n'), 0600)
-	check, _ := parse("require mounted "+strconvQuote(mount)+" from disk filesystem ext4", "storage.yesh")
+	check, _ := parse("require mounted "+strconvQuote(mount)+" from $disk filesystem ext4", "storage.yesh")
 	if err := r.execute(check); err == nil || !strings.Contains(err.Error(), "changed") {
 		t.Fatalf("device change: %v", err)
 	}
 	writeTestFile(t, fixture, append(storageFixture(d), '\n'), 0600)
-	check, _ = parse("require mounted "+strconvQuote(mount)+" from disk filesystem xfs", "storage.yesh")
+	check, _ = parse("require mounted "+strconvQuote(mount)+" from $disk filesystem xfs", "storage.yesh")
 	if err := r.execute(check); err == nil || !strings.Contains(err.Error(), "filesystem") {
 		t.Fatalf("filesystem: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestLinuxStoragePreflight(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeTestFile(t, mountFixture, []byte(strings.ReplaceAll(string(mountJSON("8:1")), strconvQuote(mount), strconvQuote(link))), 0600)
-	check, _ = parse("require mounted "+strconvQuote(link)+" from disk filesystem ext4", "storage.yesh")
+	check, _ = parse("require mounted "+strconvQuote(link)+" from $disk filesystem ext4", "storage.yesh")
 	if err := r.execute(check); err == nil || !strings.Contains(err.Error(), "symlink") {
 		t.Fatalf("symlink: %v", err)
 	}
@@ -208,14 +208,14 @@ func TestLinuxStorageRealMountRequirement(t *testing.T) {
 		if d.UUID == "" || d.FSType == "" || checkStorageMount(root, "/", d, d.FSType) != nil {
 			continue
 		}
-		items, err := parse("disk = device by uuid "+strconvQuote(d.UUID)+"\nrequire mounted / from disk filesystem "+strconvQuote(d.FSType), r.filename)
+		items, err := parse("disk = device by uuid "+strconvQuote(d.UUID)+"\nrequire mounted / from $disk filesystem "+strconvQuote(d.FSType), r.filename)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := r.execute(items); err != nil {
 			t.Fatal(err)
 		}
-		items, err = parse("require mounted "+strconvQuote(t.TempDir())+" from disk filesystem "+strconvQuote(d.FSType), r.filename)
+		items, err = parse("require mounted "+strconvQuote(t.TempDir())+" from $disk filesystem "+strconvQuote(d.FSType), r.filename)
 		if err != nil {
 			t.Fatal(err)
 		}

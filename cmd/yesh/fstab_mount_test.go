@@ -52,8 +52,8 @@ func TestFstabMountSelection(t *testing.T) {
 func TestFstabMountSyntaxAndPlan(t *testing.T) {
 	r := &runtime{values: map[string]value{}, filename: "mount.yesh", plan: true}
 	for _, source := range []string{
-		"mounts = fstab /does-not-exist\nrequire mounted /backup from mounts",
-		"path = /backup\nmounts = fstab /does-not-exist\nrequire mounted path from mounts",
+		"mounts = fstab /does-not-exist\nrequire mounted /backup from $mounts",
+		"path = /backup\nmounts = fstab /does-not-exist\nrequire mounted $path from $mounts",
 	} {
 		items, err := parse(source, r.filename)
 		if err != nil {
@@ -64,15 +64,15 @@ func TestFstabMountSyntaxAndPlan(t *testing.T) {
 		}
 	}
 	for _, source := range []string{
-		"require mounted /backup from mounts | cat",
-		"require mounted /backup from mounts > file",
+		"require mounted /backup from $mounts | cat",
+		"require mounted /backup from $mounts > file",
 		"require mounted /backup from \"mounts\"",
 	} {
 		if _, err := parse(source, r.filename); err == nil {
 			t.Fatalf("accepted %s", source)
 		}
 	}
-	items, err := parse("require mounted /backup from unknown", r.filename)
+	items, err := parse("require mounted /backup from $unknown", r.filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestFstabMountSyntaxAndPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.values["disk"] = value{device: &storageDevice{}}
-	items, err = parse("require mounted /backup from disk", r.filename)
+	items, err = parse("require mounted /backup from $disk", r.filename)
 	if err != nil {
 		t.Fatal(err)
 	}

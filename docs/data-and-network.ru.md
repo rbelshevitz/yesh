@@ -9,7 +9,7 @@ hosts = [web-1, web-2, web-3]
 services = [api, worker, nginx]
 addresses = [10.0.0.10, 10.0.0.11]
 
-for host in hosts:
+for host in $hosts:
     ssh host systemctl restart api
 ```
 

@@ -2,16 +2,16 @@
 # Set YESH_BACKUP_SOURCE to a verified UUID=... or PARTUUID=... value.
 source = "source/"
 target = "target/"
-mountpoint = target
+mountpoint = $target
 expected_source = environment YESH_BACKUP_SOURCE
 
-if exists source:
-    if exists target:
-        if findmnt --source expected_source --target mountpoint:
-            findmnt --source expected_source --target mountpoint
-            df -P -h -- mountpoint
-            if free_space mountpoint at_least 20MiB:
-                rsync -a --itemize-changes -- source target
+if exists $source:
+    if exists $target:
+        if findmnt --source $expected_source --target $mountpoint:
+            findmnt --source $expected_source --target $mountpoint
+            df -P -h -- $mountpoint
+            if free_space $mountpoint at_least 20MiB:
+                rsync -a --itemize-changes -- $source $target
             else:
                 echo "not enough free space"
                 exit 4

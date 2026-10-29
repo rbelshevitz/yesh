@@ -1,5 +1,5 @@
 # Read-only snapshot of every process whose kernel name is exactly nginx.
 # show does not send signals or change process state.
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
-summarize nginx memory rss
+show $nginx fields pid uid state rss cgroup
+summarize $nginx memory rss

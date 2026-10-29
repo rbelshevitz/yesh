@@ -24,12 +24,17 @@ Both branches of a command-based condition are shown.
 .nf
 service = api
 items = [one, 'two words']
-echo service "service"
-printf '%s\en' items
+echo $service "service"
+printf '%s\en' $items
 .fi
 .PP
-An unquoted existing name expands to its value.
-Quoted words are literal arguments, including empty strings.
+A variable expands only through an unquoted
+.B $name
+reference. A bare or quoted word is a literal argument, including empty strings.
+Unknown or malformed variable references are errors, so adding an assignment
+cannot change an existing command's meaning. The alternative
+.B ${name}
+form is not supported.
 A scalar produces one argument; a list produces separate arguments.
 Single quotes preserve raw text. Double quotes decode Go-style escape
 sequences identically in assignments, lists and command arguments.
@@ -52,8 +57,8 @@ if exists /etc/os-release:
     cat < /etc/os-release
 else:
     echo "no release information"
-for item in items:
-    echo item
+for item in $items:
+    echo $item
 .fi
 .PP
 Blocks use spaces and indentation.
@@ -66,8 +71,8 @@ The old exists(path) spelling is rejected with a migration hint.
 .PP
 Free space can be checked without parsing df output:
 .nf
-if free_space target at_least 20GiB:
-    rsync -a source target
+if free_space $target at_least 20GiB:
+    rsync -a $source $target
 .fi
 .PP
 The amount is a positive whole number with one of B, KiB, MiB, GiB or TiB.
@@ -77,7 +82,7 @@ platforms, overflow and invalid units are errors.
 The \fBmatches\fR condition compares one string with a \fBregex\fR value:
 .nf
 name = api-42
-if name matches regex '^api-[0-9]+$':
+if $name matches regex '^api-[0-9]+$':
     echo "matched"
 .fi
 .PP
@@ -90,7 +95,7 @@ if exists /etc/os-release:
 exit 1
 .fi
 .PP
-exit code terminates the entire script, including nested blocks, with an
+exit $code terminates the entire script, including nested blocks, with an
 explicit decimal code from 0 to 255. It is a control statement, not an
 external command or pipeline stage. In plan mode it is displayed without
 ending plan traversal.
@@ -132,7 +137,7 @@ are not implemented. Windows process cleanup has different semantics.
 The Linux read-only process snapshot uses an exact kernel name:
 .nf
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss cgroup
 .fi
 .PP
 It prints selected fields from the fixed set pid, uid, state, rss, ppid,
@@ -141,7 +146,7 @@ prints the full set. The operation does not send signals or modify processes.
 .PP
 An RSS summary is available without parsing ps or awk:
 .nf
-summarize nginx memory rss
+summarize $nginx memory rss
 .fi
 .PP
 It prints process count, total RSS, maximum RSS and integer average RSS in
@@ -150,7 +155,7 @@ pages more than once and is not the unique physical memory cost of a service.
 .PP
 An RSS budget can be checked for an existing process set:
 .nf
-if memory nginx rss at_most 512MiB:
+if memory $nginx rss at_most 512MiB:
     echo "within budget"
 else:
     exit 1
@@ -163,8 +168,8 @@ of this first snapshot interface.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"
-inspect backup
-require mounted /mnt/backup from backup filesystem "ext4"
+inspect $backup
+require mounted /mnt/backup from $backup filesystem "ext4"
 .fi
 .PP
 Use uuid or partuuid for an exact, unique identity. inspect prints the lookup
@@ -182,7 +187,7 @@ are not implemented by this typed interface.
 .SS fstab snapshots (Linux)
 .nf
 mounts = fstab "/etc/fstab"
-inspect mounts
+inspect $mounts
 .fi
 .PP
 Reads a regular-file snapshot through findmnt/libmount without device evaluation,
@@ -203,7 +208,7 @@ mount helpers, daemon-reload or systemd generator execution is performed.
 To bind one configuration entry to its device and exact active mount:
 .nf
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 .fi
 .PP
 Exactly one entry (including lexically equivalent paths) must match. Its

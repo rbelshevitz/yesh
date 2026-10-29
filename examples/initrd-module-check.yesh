@@ -2,4 +2,4 @@
 # This checks the manifest, not driver compatibility or loading.
 image = "test-initrd.img"
 modulefile = "usr/lib/modules/6.1.0-yesh-test/kernel/drivers/nvme/host/nvme.ko"
-lsinitramfs image | grep -F -x -- modulefile
+lsinitramfs $image | grep -F -x -- $modulefile

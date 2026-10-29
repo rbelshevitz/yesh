@@ -50,7 +50,7 @@ show api
 
 ```yesh
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss cgroup
 ```
 
 `processes where name is` использует точное имя ядра Linux и возвращает
@@ -65,7 +65,7 @@ show nginx fields pid uid state rss cgroup
 Для краткой оценки RSS без `ps | awk` используется отдельная операция:
 
 ```yesh
-summarize nginx memory rss
+summarize $nginx memory rss
 ```
 
 Она показывает количество процессов, сумму RSS, максимум и целочисленное
@@ -76,10 +76,10 @@ summarize nginx memory rss
 Порог читается как обычное условие:
 
 ```yesh
-if memory nginx rss at_most 512MiB:
+if memory $nginx rss at_most 512MiB:
     echo "nginx RSS is within the budget"
 else:
-    summarize nginx memory rss
+    summarize $nginx memory rss
     exit 1
 ```
 
@@ -165,7 +165,7 @@ kernel stack и служебная память могут учитыватьс�
 
 ```yesh
 workers = processes where name matches 'worker'
-show workers fields pid, rss, pss, cpu, state, cgroup
+show $workers fields pid, rss, pss, cpu, state, cgroup
 sort workers by rss descending
 ```
 

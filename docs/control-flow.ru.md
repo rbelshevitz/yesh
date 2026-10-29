@@ -5,7 +5,7 @@
 
 ```yesh
 config = /etc/os-release
-if exists config:
+if exists $config:
     cat < config
 else:
     echo "нет файла конфигурации"
@@ -38,7 +38,7 @@ fi
 ```yesh
 service = api-42
 pattern = regex '^api-[0-9]+$'
-if service matches pattern:
+if $service matches $pattern:
     echo "подходящая служба"
 ```
 
@@ -62,12 +62,12 @@ if service matches pattern:
 
 ```yesh
 code = 7
-exit code
+exit $code
 echo "эта строка не выполняется"
 ```
 
 Сравнение с Bash: `code=7; exit "$code"`.
-Правило: `exit code` завершает весь скрипт с явно указанным десятичным
+Правило: `exit $code` завершает весь скрипт с явно указанным десятичным
 кодом от 0 до 255, в том числе внутри `if` и `for`; code 0 — успешное завершение.
 Это встроенная управляющая операция, не внешний процесс и не результат `if`.
 

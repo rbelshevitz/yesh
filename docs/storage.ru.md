@@ -10,7 +10,7 @@
 
 ```yesh
 disk = device by uuid "..."
-inspect disk
+inspect $disk
 mount disk at /mnt/backup readonly
 require mounted /mnt/backup
 unmount /mnt/backup
@@ -54,8 +54,8 @@ resolve UUID → inspect → verify filesystem → verify mountpoint
 
 ```yesh
 backup = device by uuid "replace-with-real-uuid"
-inspect backup
-require mounted /mnt/backup from backup filesystem "ext4"
+inspect $backup
+require mounted /mnt/backup from $backup filesystem "ext4"
 echo "backup preflight passed"
 ```
 
@@ -99,7 +99,7 @@ LABEL и RO из снимка lookup. Идентификаторы сравни�
 
 ```yesh
 mounts = fstab "/etc/fstab"
-inspect mounts
+inspect $mounts
 echo "fstab snapshot read"
 ```
 
@@ -140,7 +140,7 @@ findmnt --fstab --json --list --nocanonicalize \
 
 ```yesh
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 echo "configured backup device is mounted"
 ```
 

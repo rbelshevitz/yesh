@@ -7,7 +7,7 @@
 ```yesh
 hosts = [web-1, web-2]
 
-for host in hosts:
+for host in $hosts:
     ssh host systemctl restart api
     scp build/api host:/srv/api/api
     rsync -az build/ host:/srv/api/

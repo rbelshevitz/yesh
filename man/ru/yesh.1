@@ -24,13 +24,17 @@ yesh \- читаемый язык автоматизации Unix с огран�
 .nf
 service = api
 items = [one, 'two words']
-echo service "service"
-printf '%s\en' items
+echo $service "service"
+printf '%s\en' $items
 .fi
 .PP
-Имя без кавычек раскрывается в значение существующей переменной.
-Поэтому echo service печатает api, если service задана, и слово service иначе.
-В кавычках всегда передаётся буквальный аргумент; echo "service" печатает слово.
+Переменная раскрывается только явной ссылкой
+.B $name
+без кавычек. Обычное слово и слово в кавычках всегда буквальны; неизвестная
+или неверная ссылка — ошибка, поэтому новое присваивание не меняет смысл
+существующей команды. Форма
+.B ${name}
+не поддерживается.
 Пустая строка остаётся одним аргументом.
 Строка даёт один аргумент, список \- отдельные аргументы.
 Одинарные кавычки сохраняют текст, двойные раскрывают escape-последовательности
@@ -54,8 +58,8 @@ if exists /etc/os-release:
     cat < /etc/os-release
 else:
     echo "нет сведений о системе"
-for item in items:
-    echo item
+for item in $items:
+    echo $item
 .fi
 .PP
 Блоки задаются отступами из пробелов.
@@ -69,8 +73,8 @@ for item in items:
 .PP
 Свободное место можно проверять без разбора вывода df:
 .nf
-if free_space target at_least 20GiB:
-    rsync -a source target
+if free_space $target at_least 20GiB:
+    rsync -a $source $target
 .fi
 .PP
 Размер задаётся положительным целым числом и одной единицей: B, KiB, MiB,
@@ -81,7 +85,7 @@ GiB или TiB.
 Условие \fBmatches\fR сравнивает одну строку со значением \fBregex\fR:
 .nf
 name = api-42
-if name matches regex '^api-[0-9]+$':
+if $name matches regex '^api-[0-9]+$':
     echo "matched"
 .fi
 .PP
@@ -94,7 +98,7 @@ if exists /etc/os-release:
 exit 1
 .fi
 .PP
-exit code завершает весь скрипт, включая вложенные блоки, с явно заданным
+exit $code завершает весь скрипт, включая вложенные блоки, с явно заданным
 десятичным кодом от 0 до 255. Это управляющая операция, не внешняя команда
 и не стадия конвейера. В плане она только показывается, не прерывая просмотр.
 .SS Конвейеры
@@ -137,7 +141,7 @@ KILL после двух секунд ожидания.
 В Linux доступен read-only снимок процессов по точному имени ядра:
 .nf
 nginx = processes where name is "nginx"
-show nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss cgroup
 .fi
 .PP
 Он показывает выбранные поля из фиксированного набора pid, uid, state, rss,
@@ -146,7 +150,7 @@ ppid, pgid, sid, name и cgroup; RSS указан в байтах. Без час
 .PP
 Итог RSS можно получить без разбора вывода ps или awk:
 .nf
-summarize nginx memory rss
+summarize $nginx memory rss
 .fi
 .PP
 Он показывает число процессов, общий RSS, максимум и целочисленное среднее
@@ -155,7 +159,7 @@ summarize nginx memory rss
 .PP
 Бюджет RSS можно проверить для уже выбранного набора процессов:
 .nf
-if memory nginx rss at_most 512MiB:
+if memory $nginx rss at_most 512MiB:
     echo "within budget"
 else:
     exit 1
@@ -168,8 +172,8 @@ else:
 .SS Чтение хранилищ (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"
-inspect backup
-require mounted /mnt/backup from backup filesystem "ext4"
+inspect $backup
+require mounted /mnt/backup from $backup filesystem "ext4"
 .fi
 .PP
 uuid или partuuid задаёт точную уникальную identity; inspect выводит JSON-снимок.
@@ -185,7 +189,7 @@ Device нельзя передать аргументом команды. Plan �
 .SS Снимок fstab (Linux)
 .nf
 mounts = fstab "/etc/fstab"
-inspect mounts
+inspect $mounts
 .fi
 .PP
 Читает снимок обычного файла через findmnt/libmount без разрешения устройств,
@@ -205,7 +209,7 @@ daemon-reload и systemd generator не выполняются.
 Проверка конкретной записи по устройству и точному активному mount:
 .nf
 mounts = fstab "/etc/fstab"
-require mounted /mnt/backup from mounts
+require mounted /mnt/backup from $mounts
 .fi
 .PP
 Требуется одна запись с уникальным UUID/PARTUUID, явным типом ФС и совпадением

@@ -17,10 +17,10 @@ func TestConditionGrammarRespectsQuotedData(t *testing.T) {
 		{`echo 'a matches b'`, commandCondition},
 		{`printf '%s matches %s' a b`, commandCondition},
 		{`echo "exists path"`, commandCondition},
-		{`name matches pattern`, matchesCondition},
-		{`'a matches b' matches pattern`, matchesCondition},
-		{"name\tmatches\tpattern", matchesCondition},
-		{`name matches regex '^api'`, matchesCondition},
+		{`$name matches $pattern`, matchesCondition},
+		{`'a matches b' matches $pattern`, matchesCondition},
+		{"$name\tmatches\t$pattern", matchesCondition},
+		{`$name matches regex '^api'`, matchesCondition},
 		{`exists 'a matches b'`, existsCondition},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
@@ -69,16 +69,16 @@ func TestExistsRequiresPathAndPreservesErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.values["path"] = value{scalar: name}
-	for _, source := range []string{"exists path", "exists '" + name + "'"} {
+	for _, source := range []string{"exists $path", "exists '" + name + "'"} {
 		if ok, err := r.condition(source, 4); err != nil || !ok {
 			t.Fatalf("%s: %v %v", source, ok, err)
 		}
 	}
 	r.values["missing"] = value{scalar: filepath.Join(dir, "missing")}
-	if ok, err := r.condition("exists missing", 4); err != nil || ok {
+	if ok, err := r.condition("exists $missing", 4); err != nil || ok {
 		t.Fatalf("missing: %v %v", ok, err)
 	}
-	for _, source := range []string{"exists paths", "exists empty", "exists nul", `exists ""`} {
+	for _, source := range []string{"exists $paths", "exists $empty", "exists $nul", `exists ""`} {
 		if _, err := r.condition(source, 4); err == nil || !strings.Contains(err.Error(), "exists.yesh:4:") {
 			t.Fatalf("%s: %v", source, err)
 		}
@@ -87,7 +87,7 @@ func TestExistsRequiresPathAndPreservesErrors(t *testing.T) {
 
 func TestMatchesLiteralAndInlineRegex(t *testing.T) {
 	r := &runtime{values: map[string]value{"text": {scalar: "api-42"}}, filename: "matches.yesh"}
-	for _, source := range []string{`text matches regex '^api-[0-9]+$'`, `'a matches b' matches regex '^a matches b$'`} {
+	for _, source := range []string{`$text matches regex '^api-[0-9]+$'`, `'a matches b' matches regex '^a matches b$'`} {
 		if ok, err := r.condition(source, 1); err != nil || !ok {
 			t.Fatalf("%s: %v %v", source, ok, err)
 		}
@@ -101,7 +101,7 @@ func TestExitStopsNestedExecution(t *testing.T) {
 	for _, source := range []string{
 		"exit 0\nafter = bad\n",
 		"if true:\n    exit 7\nafter = bad\n",
-		"for code in [3,4]:\n    exit code\nafter = bad\n",
+		"for code in [3,4]:\n    exit $code\nafter = bad\n",
 	} {
 		t.Run(source, func(t *testing.T) {
 			ast, err := parse(source, "exit.yesh")
