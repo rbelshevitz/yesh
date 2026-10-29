@@ -165,3 +165,31 @@ Stacked active mounts are rejected rather than choosing the first match.
 Plan defers entry selection, device lookup and actual mount checks.
 This verifies target, device and filesystem only: mount options, write access,
 free space, boot readiness and concurrent changes are separate checks.
+
+## Read-only mount contract (next storage slice)
+
+The current `require mounted` operation intentionally does not imply that a
+backup is writable, read-only, or large enough. These are separate observations
+because a mount can be read-only while the directory is accessible, and free
+space can change immediately after the check.
+
+Before adding a storage builtin, the Linux test environment must demonstrate:
+
+- effective options from the kernel mount table, not only options copied from
+  `/etc/fstab`;
+- an explicit read-only requirement and an explicit writable requirement;
+- a write probe that uses a uniquely named file in the target directory,
+  removes only that file, and reports permission/read-only failures distinctly;
+- free-space checks using filesystem statistics with checked binary units;
+- a race disclaimer: these are preflight observations, not a lease or a
+  guarantee for a later backup operation.
+
+Until that contract has a privileged fixture and negative tests, scripts should
+use the existing external `findmnt`, `df`, and `free_space` checks explicitly.
+No `mount`, `umount`, `/etc/fstab` write, or implicit write probe is provided.
+
+Network filesystems are a separate diagnostic path. A local UUID/PARTUUID
+identity check must never be reused for NFS/CIFS. For `credentials=` yesh may
+eventually validate only an external regular file's ownership and restrictive
+mode; it must not read, print, or create that file. Inline `password=` remains
+an error for any future fstab-writing interface.
