@@ -90,10 +90,11 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] typed remote-node description with explicit host, user, and port;
 - [x] basic read-only SSH health and SCP argument-vector examples with explicit
   port, timeout, batch mode, and host-key policy;
-- [ ] use the system SSH client, inherited `SSH_AUTH_SOCK`, OpenSSH config and
+- [x] use the system SSH client, inherited `SSH_AUTH_SOCK`, OpenSSH config and
   `known_hosts` without reading or storing private keys, passwords, or
-  passphrases; test `BatchMode=yes` and no interactive prompt;
-- [ ] explicit host-key policy; never silently allow
+  passphrases; test `BatchMode=yes` and no interactive prompt (the opt-in
+  real-host test is `TestPOSIXRealSSHAndSCP`);
+- [x] explicit host-key policy; never silently allow
   `StrictHostKeyChecking=no`;
 - [ ] allow only explicitly selected host-key bootstrap policy; default
   unattended runs to pre-provisioned `known_hosts` and strict verification;
@@ -167,6 +168,14 @@ read-only SSH connection using the same policy and a real SCP copy through
 yesh to a separate host were also completed with key authentication and
 byte-for-byte checksum verification;
 remote restore and partial-result recovery are not claimed yet.
+
+An opt-in real-host test is available for an operator-controlled test VM:
+`YESH_SSH_INTEGRATION=1 YESH_SSH_TEST_HOST=user@host
+YESH_SSH_TEST_DIR=/tmp/yesh-test go test ./cmd/yesh -run
+TestPOSIXRealSSHAndSCP -count=1 -v`. It requires a pre-existing remote
+directory and strict `known_hosts` verification; authentication comes from the
+normal OpenSSH agent/config, or from `YESH_SSH_IDENTITY_FILE` when explicitly
+set. The test copies one unique file and verifies its SHA-256 through SSH.
 
 ## Language and runtime backlog
 
