@@ -5,13 +5,14 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A readable, safety-first language for Unix automation and preflight checks.
+A readable, safety-first language for Linux automation and preflight checks.
 
 [Русская версия README](README.ru.md)
 
 yesh is an experiment: POSIX commands and external Linux administration tools
-remain ordinary commands, while the shell language around them is intentionally
-small and readable.
+remain ordinary commands, while the language around them is intentionally small
+and readable. yesh is a language and interpreter for Linux automation, not an
+interactive shell or a Bash-compatible shell replacement.
 
 > **Bash without the historical syntax complexity.**
 >
@@ -69,13 +70,17 @@ The current prototype supports:
 - explicit `$name` variable expansion, with bare words kept literal;
 - command failures that stop the script and report the source line;
 - a single `exists $path` predicate, regex conditions, and explicit `exit code`.
+- typed Linux operations for `service status`, bounded `service wait`, restart
+  with a postcondition, and bounded `journal` over `systemctl`/`journalctl`;
+- `--plan` for expanded argv and branch inspection without running commands.
 
 ## What works today
 
 yesh is already useful for small read-only checks and guarded administration
 steps built from ordinary POSIX commands and external Linux tools:
 
-- service checks through ordinary `systemctl` commands;
+- bounded service and journal checks through explicit typed operations over
+  `systemctl`/`journalctl`, without hidden `sudo`;
 - SSH health checks and SCP transfers with an explicit port, timeout, batch
   mode, and host-key policy;
 - mount, filesystem, UUID/PARTUUID, and free-space preflight checks;
@@ -111,14 +116,15 @@ See the [English roadmap](docs/TODO.md) for current project priorities.
 ## Documentation and scope
 
 yesh is a language sketch focused on readable system-administration and
-operational scripts.
+operational scripts, not a general-purpose shell or an interactive command
+environment.
 The examples and design documents are the source of truth for its semantics.
 
 ### Where yesh fits beside Ansible
 
 yesh is not a replacement for Ansible. Ansible is an orchestration system with
 inventory, modules, roles, and a desired-state model for many hosts. yesh is a
-small Unix automation language for transparent local scripts, runbooks,
+small Linux automation language for transparent local scripts, runbooks,
 preflight checks, and command-level steps inside larger automation.
 It keeps `ssh`, `rsync`, `systemctl`, and other tools visible instead of hiding
 them behind a new module model. Use Ansible for fleet orchestration and
@@ -130,7 +136,10 @@ syntax, explicit arguments, and reviewable execution.
 Values keep their type: a string stays one argument and a list expands to
 multiple arguments explicitly. Commands are executed directly by the Go
 runtime, without reparsing a command string through another shell. yesh is a
-small language for readable Unix automation.
+small language for readable Linux automation. It is not a shell interface: it
+does not provide an interactive prompt or interpret a script by passing it to
+Bash. Its runtime starts external commands directly and provides the language's
+own variables, control flow, pipelines, and error handling.
 
 Read the English local manual with `man -l man/yesh.1`.
 See [predictable pipelines](docs/pipeline-safety.md) for the execution and
@@ -144,6 +153,10 @@ The core design notes are [control flow](docs/control-flow.md),
 [systemd integration](docs/systemd.md).
 Runnable [English practical examples](docs/practical-examples.md) cover archives,
 rsync, rsnapshot, configuration changes, and read-only administration.
+
+The systemd/journal design and boundaries are documented in
+[systemd integration](docs/systemd.md); the practical verification map is in
+[the practical examples guide](docs/practical-examples.md).
 
 The runnable examples also include read-only process, journal, mount and SSH
 health checks in `examples/`.
