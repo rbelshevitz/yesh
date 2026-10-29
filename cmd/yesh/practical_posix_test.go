@@ -450,7 +450,7 @@ func TestPOSIXPracticalRsyncPreviewIntegration(t *testing.T) {
 	// orchestration and argv preservation, not rsync/findmnt implementation.
 	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nprintf '%s\\000' findmnt \"$@\" >> \"$TRACE_FILE\"\nexit \"${FINDMNT_STATUS:-0}\"\n"), 0700)
 	writeTestFile(t, filepath.Join(bin, "df"), []byte("#!/bin/sh\nprintf '%s\\000' df \"$@\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"), 0700)
-	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\nexit \"${RSYNC_STATUS:-0}\"\n"), 0700)
 
 	if err := os.Mkdir(filepath.Join(dir, "source"), 0700); err != nil {
 		t.Fatal(err)
@@ -498,6 +498,25 @@ func TestPOSIXPracticalRsyncPreviewIntegration(t *testing.T) {
 		t.Fatalf("unmounted target: code=%d output=%q trace=%q", code, out, got)
 	} else if strings.Contains(got, "rsync\x00") || strings.Contains(got, "df\x00") {
 		t.Fatalf("preflight failure ran later commands: %q", got)
+	}
+
+	copyScript := filepath.Join(dir, "copy.yesh")
+	copySource := readTestFile(t, practicalExample(t, "rsync-copy.yesh"))
+	writeTestFile(t, copyScript, append(copySource, []byte("\ntouch published\n")...), 0600)
+	writeTestFile(t, trace, nil, 0600)
+	cmd := practicalCommand(t, dir, copyScript)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"RSYNC_STATUS=23",
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("rsync failure: code=%v output=%q", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("script continued after failed rsync: %v", err)
 	}
 
 	if err := os.RemoveAll(filepath.Join(dir, "target")); err != nil {
