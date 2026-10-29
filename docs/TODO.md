@@ -57,6 +57,25 @@ The practical claim is deliberately limited: yesh already makes these scripts
 easier to read and review, but does not yet claim built-in CIDR/net-tools,
 full systemd API, TTY/PTY, typed SSH nodes, or control of other processes.
 
+## Security hardening backlog
+
+The runtime has useful safety guarantees, but they are not a sandbox. Direct
+argv execution prevents shell re-parsing; it does not validate the semantics or
+authority of every external command. See [SAFETY.md](../SAFETY.md) for the
+boundary and operational rules.
+
+- [ ] Define a controlled `PATH` and environment policy for privileged and
+  runbook execution.
+- [ ] Add typed validation or narrow wrappers for high-impact external command
+  arguments (`ssh`, `rsync`, `mount`, `systemctl`, and destinations).
+- [ ] Expand fuzzing to lexer/parser, value expansion, redirects, and runtime
+  cancellation; keep existing identity fuzz cases.
+- [ ] Add `govulncheck` and dependency scanning to CI.
+- [ ] Write a threat model and release security checklist.
+- [ ] Run privileged loopback/storage checks only in a disposable VM or
+  dedicated Rocky host; never use production disks or the real `/etc/fstab`.
+- [ ] Define full OS-level isolation for untrusted yesh scripts.
+
 ## Real-world Bash corpus
 
 See the [Bash corpus catalog](bash-corpus.md) for sources and license status.

@@ -133,6 +133,8 @@ small language for readable Unix automation.
 Read the English local manual with `man -l man/yesh.1`.
 See [predictable pipelines](docs/pipeline-safety.md) for the execution and
 redirect safety rules.
+See [execution safety](SAFETY.md) for the security boundary and operational
+rules; this is not a sandbox for untrusted scripts.
 The core design notes are [control flow](docs/control-flow.md),
 [storage design](docs/storage.md), [remote operations](docs/remote-ops.md),
 [processes and text](docs/processes-and-text.md), and

@@ -135,6 +135,24 @@ docs/storage*.md, docs/practical-examples.ru.md, docs/TODO.ru.md, man/*.
 но пока не заявляет встроенные CIDR/net-tools, полноценный systemd API,
 TTY/PTY, typed SSH nodes или управление чужими процессами.
 
+## Веха усиления безопасности
+
+У runtime уже есть полезные гарантии, но это не sandbox. Прямой запуск через
+argv предотвращает повторный разбор команд shell-оболочкой, однако не проверяет
+семантику и полномочия каждой внешней программы. Границы и правила описаны в
+[`SAFETY.md`](../SAFETY.md) и [`SAFETY.ru.md`](../SAFETY.ru.md).
+
+- [ ] Определить контролируемые `PATH` и environment для privileged/runbook-запуска.
+- [ ] Добавить типизированную проверку аргументов или узкие обёртки для опасных
+  внешних команд (`ssh`, `rsync`, `mount`, `systemctl` и destinations).
+- [ ] Расширить fuzzing на lexer/parser, раскрытие значений, redirects и
+  отмену runtime; сохранить существующие fuzz-тесты identity.
+- [ ] Добавить `govulncheck` и проверку зависимостей в CI.
+- [ ] Написать threat model и release security checklist.
+- [ ] Выполнять privileged loopback/storage только в disposable VM или на
+  отдельном Rocky-хосте; не использовать production-диски и настоящий `/etc/fstab`.
+- [ ] Определить полноценную изоляцию недоверенных yesh-скриптов средствами ОС.
+
 ### Критерий читаемого публичного проекта
 
 - [x] README сразу показывает формулу «Bash without the historical syntax

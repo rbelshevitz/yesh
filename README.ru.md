@@ -115,6 +115,10 @@ go build -trimpath -o yesh ./cmd/yesh
 в `docs/` и `man/`. Публичные runnable-примеры в `examples/` поддерживаются
 на английском языке.
 
+Границы безопасности и правила запуска описаны в
+[`SAFETY.md`](SAFETY.md) и [`SAFETY.ru.md`](SAFETY.ru.md). yesh не является
+песочницей для недоверенных скриптов.
+
 ## Сравнение с Bash
 
 [Bash](https://www.gnu.org/software/bash/) — оболочка проекта GNU, **Bourne
