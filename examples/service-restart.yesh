@@ -1,4 +1,16 @@
-# A mutating example: restart exactly one already-known systemd unit.
+# A fixture-backed example of a mutating operation: restart one exact systemd
+# unit.
+#
+# This file is an executable syntax example, not a safe default operation.
+# Run it directly only when `yesh-codex-fixture.service` is the disposable
+# unit created by `scripts/yesh-fixture-test.sh`. Otherwise inspect it with:
+#
+#   ./yesh --plan examples/service-restart.yesh
+#
+# Do not replace the fixture name with a production unit and run it casually:
+# `service restart` changes system state. A real production restart requires
+# an explicit operational decision, appropriate privileges, and a service-
+# specific readiness check after this statement.
 #
 # `systemctl restart` only tells us that systemd accepted and completed the
 # restart job. The yesh operation therefore requires a postcondition and
@@ -11,14 +23,14 @@
 # It is deliberately not `systemctl --wait`: --wait can wait for a
 # long-lived service to terminate rather than confirm that it is active.
 #
-# The unit name is explicit. `systemd-resolved` without `.service`, paths,
+# The unit name is explicit. A name without `.service`, paths,
 # globs and shell operators are rejected; yesh must not silently broaden the
 # target selected by the author.
 #
 # Bash equivalent (less safe to review):
-#   systemctl restart systemd-resolved.service && \
-#     test "$(systemctl show -p Id --value systemd-resolved.service)" = systemd-resolved.service && \
-#     test "$(systemctl show -p ActiveState --value systemd-resolved.service)" = active
+#   systemctl restart yesh-codex-fixture.service && \
+#     test "$(systemctl show -p Id --value yesh-codex-fixture.service)" = yesh-codex-fixture.service && \
+#     test "$(systemctl show -p ActiveState --value yesh-codex-fixture.service)" = active
 # The yesh form keeps argv boundaries, timeout and the postcondition visible.
 # It does not add `sudo`, enable the unit, or repair a failed service.
-service restart systemd-resolved.service until active within 30s
+service restart yesh-codex-fixture.service until active within 10s

@@ -433,7 +433,7 @@ func TestPOSIXPracticalTypedSystemdExamples(t *testing.T) {
 	cmd = practicalCommand(t, dir, practicalExample(t, "service-restart.yesh"))
 	cmd.Env = append(cmd.Env, env...)
 	out, err = cmd.CombinedOutput()
-	if err != nil || !bytes.Contains(out, []byte("SERVICE_RESTART id=systemd-resolved.service active_state=active sub_state=running result=success exec_main_code=0 exec_main_status=0 active_enter_timestamp_monotonic=300")) {
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_RESTART id=yesh-codex-fixture.service active_state=active sub_state=running result=success exec_main_code=0 exec_main_status=0 active_enter_timestamp_monotonic=300")) {
 		t.Fatalf("typed restart: %v %s", err, out)
 	}
 
@@ -453,8 +453,8 @@ func TestPOSIXPracticalTypedSystemdExamples(t *testing.T) {
 	traceText := string(readTestFile(t, trace))
 	for _, want := range []string{
 		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState systemd-journald.service",
-		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ActiveEnterTimestampMonotonic systemd-resolved.service",
-		"systemctl restart systemd-resolved.service",
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ActiveEnterTimestampMonotonic yesh-codex-fixture.service",
+		"systemctl restart yesh-codex-fixture.service",
 		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState systemd-journald.service",
 		"journalctl --no-pager --output=json --unit systemd-journald.service --since -15m --lines 80",
 	} {

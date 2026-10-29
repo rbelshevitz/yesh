@@ -186,14 +186,17 @@ else:
 в этот первый интерфейс снимка не входят.
 .SS Состояние и restart службы systemd (Linux)
 .nf
-service status nginx.service
-service status user nginx.service
-service restart nginx.service until active within 30s
-service wait nginx.service until active within 30s
-journal user nginx.service since 15m lines 20
+service status systemd-journald.service
+service restart yesh-codex-fixture.service until active within 10s
+service wait systemd-journald.service until active within 30s
+journal systemd-journald.service since 15m lines 20
 .fi
 .PP
-Операция status читает одну полную unit через фиксированный список свойств
+Строка restart относится к disposable-fixture: сначала используйте
+`--plan` или создайте этот fixture. Она не предназначена для перезапуска
+production-службы.
+.PP
+Операция status читает один точный unit через фиксированный список свойств
 systemctl show. Restart вызывает systemctl restart, затем в одном конечном
 бюджете проверяет точный Id и требуемый ActiveState. Wait сначала читает
 состояние, затем опрашивает его до postcondition или конечного срока; службу

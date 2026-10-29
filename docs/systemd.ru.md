@@ -9,18 +9,20 @@
 ограниченные записи журнала?» — сохраняя в скрипте имя unit, manager, timeout и
 изменяющее действие.
 
-## Целевой синтаксис
+## Реализованный синтаксис
 
 ```yesh
-service api
-
-service.status api
-service.restart api
-service.wait api running within 30s
-journal api since 15m lines 100
+service status api.service
+service restart api.service until active within 30s
+service wait api.service until active within 30s
+journal api.service since 15m lines 100
 service status user api.service
 journal user api.service since 15m lines 100
 ```
+
+Короткие формы `service api`, `service.status api`, `service.restart api` и
+`service.wait api running within 30s` — пока только эскизы дизайна и не входят
+в поддерживаемый синтаксис. Выше показан текущий интерфейс.
 
 `service status`, `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION` и
@@ -110,10 +112,10 @@ journal api.service since 15m lines 100
 
 ## Карта примеров и fixture
 
-| Нюанс | Runnable-пример | Что доказывает fixture |
+| Нюанс | Пример | Что доказывает fixture |
 | --- | --- | --- |
 | точная unit и фиксированные поля | `examples/service-status.yesh` | allowlist, canonical Id, отсутствие изменения |
-| restart не равен readiness | `examples/service-restart.yesh` | отказ postcondition останавливает скрипт |
+| restart не равен readiness | `examples/service-restart.yesh` (fixture-backed) | отказ postcondition останавливает скрипт |
 | конечный polling | `examples/service-wait.yesh` | переход в active, timeout, быстрый failed-state |
 | ограниченный journal | `examples/service-journal.yesh` | JSON, ошибка stderr, успешный пустой результат |
 
@@ -153,14 +155,18 @@ service через `systemd-run`. Текущий MVP этого не обеща�
 планом `argv`, что и внешние команды, а не текстовыми макросами. Так `--plan`
 и диагностика сохранят одну семантику.
 
-Сначала каждая операция должна раскладываться в обычные команды:
+Текущая граница subprocess — обычные команды, которые можно увидеть в плане:
 
 ```text
-systemctl is-active api
-systemctl restart api
-systemctl is-active --quiet api
-journalctl -u api --since 15m -n 100 --no-pager
+systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState api.service
+systemctl restart api.service
+journalctl --no-pager --output=json --unit api.service --since -15m --lines 100
 ```
+
+`service restart` выполняет вторую команду, а затем снова читает первый снимок
+для проверки postcondition. Точные argv и профиль manager остаются видны в
+`--plan`; это граница текущей реализации, а не обещание навсегда оставить все
+будущие операции systemd на subprocess.
 
 ## Защита от ошибок
 

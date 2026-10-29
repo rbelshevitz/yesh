@@ -182,14 +182,17 @@ Regex matching, arbitrary field selection and process control are not part
 of this first snapshot interface.
 .SS systemd service status and restart (Linux)
 .nf
-service status nginx.service
-service status user nginx.service
-service restart nginx.service until active within 30s
-service wait nginx.service until active within 30s
-journal user nginx.service since 15m lines 20
+service status systemd-journald.service
+service restart yesh-codex-fixture.service until active within 10s
+service wait systemd-journald.service until active within 30s
+journal systemd-journald.service since 15m lines 20
 .fi
 .PP
-The status operation queries one full unit name through a fixed
+The restart line is a disposable-fixture example; inspect it with
+--plan or run it only after creating that fixture. It is not a request to
+restart a production service.
+.PP
+The status operation queries one exact unit name through a fixed
 systemctl show property list. Restart runs systemctl restart and then
 checks the exact Id and requested ActiveState within one finite timeout.
 Wait performs an immediate read followed by bounded polling until the same

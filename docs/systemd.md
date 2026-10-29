@@ -8,17 +8,20 @@ systemd language. yesh should make common questions short — “is this exact
 unit healthy?”, “did my restart finish?”, “show the last bounded logs?” — while
 keeping the unit name, manager, timeout, and mutation visible in the script.
 
-## Target syntax
+## Implemented syntax
 
 ```yesh
-service api
-service.status api
-service.restart api
-service.wait api running within 30s
-journal api since 15m lines 100
+service status api.service
+service restart api.service until active within 30s
+service wait api.service until active within 30s
+journal api.service since 15m lines 100
 service status user api.service
 journal user api.service since 15m lines 100
 ```
+
+The shorter forms `service api`, `service.status api`, `service.restart api`,
+and `service.wait api running within 30s` are design sketches, not accepted
+syntax. The documented forms above are the current interface.
 
 `service status`, `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION`, and
@@ -126,14 +129,18 @@ These operations should be typed runtime commands with the same transparent
 `argv` plan as external commands, rather than textual macros. That keeps
 `--plan`, diagnostics, and future native D-Bus support on one path.
 
-Initially each operation should lower to ordinary commands:
+The current subprocess boundary is ordinary, inspectable commands:
 
 ```text
-systemctl is-active api
-systemctl restart api
-systemctl is-active --quiet api
-journalctl -u api --since 15m -n 100 --no-pager
+systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState api.service
+systemctl restart api.service
+journalctl --no-pager --output=json --unit api.service --since -15m --lines 100
 ```
+
+`service restart` runs the second command and then reads the first snapshot
+again to verify its postcondition. The exact argv and manager profile remain
+visible in `--plan`; this is an implementation boundary, not a promise that
+all future systemd operations will remain subprocess-based.
 
 ## Safety rules
 
@@ -168,10 +175,10 @@ read-only fleet report.
 
 ## Example and fixture map
 
-| Nuisance | Runnable example | Fixture evidence |
+| Concern | Example | Fixture evidence |
 | --- | --- | --- |
 | exact unit and fixed fields | `examples/service-status.yesh` | allowlist, canonical-id check, no mutation |
-| restart is not readiness | `examples/service-restart.yesh` | inactive postcondition stops the script |
+| restart is not readiness | `examples/service-restart.yesh` (fixture-backed) | inactive postcondition stops the script |
 | bounded polling | `examples/service-wait.yesh` | transition to active, timeout, failed-state fast error |
 | bounded journal output | `examples/service-journal.yesh` | JSON validation, stderr failure, empty output success |
 

@@ -371,10 +371,12 @@ fixture через `trap` и проверяет также три отрицат
 `service-status.yesh` и `service-wait.yesh` подтвердили
 `systemd-journald.service` как `loaded/active/running`, а
 `service-journal.yesh` корректно завершился с пустым журналом. Для
-`service-restart.yesh` выполнен только `--plan`; реальный restart службы не
-проводился. Manager на стенде сообщил `degraded`, поэтому это проверка
+`service-restart.yesh` выполнен только с `--plan`; реальный перезапуск
+production-службы не проводился. В его команде указано имя disposable-unit из fixture; fixture
+создаёт и удаляет этот unit в `/run`. Manager на стенде сообщил `degraded`,
+поэтому это проверка
 конкретного доступного systemd/journal, а не утверждение, что вся машина
-здоровa.
+здорова.
 
 Различие отказов намеренное: неактивная служба после успешного `systemctl
 restart` — ошибка yesh; пустой journal-запрос успешен и означает отсутствие

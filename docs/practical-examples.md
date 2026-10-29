@@ -169,7 +169,9 @@ An opt-in run was also completed on a separate Linux test host with systemd
 252: `service-status.yesh` and `service-wait.yesh` confirmed
 `systemd-journald.service` as `loaded/active/running`, while
 `service-journal.yesh` correctly returned an empty successful result.
-`service-restart.yesh` was run only with `--plan`; no real restart was made.
+`service-restart.yesh` was run only with `--plan`; no real production restart
+was made. Its direct command names the disposable unit used by the fixture;
+the fixture script creates and removes that unit in `/run`.
 The manager reported `degraded`, so this proves the available systemd/journal
 path, not overall host health.
 
