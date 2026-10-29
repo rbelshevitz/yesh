@@ -1,6 +1,7 @@
 # Environment-dependent example: replace web-1/web-2 and provide SSH trust/credentials.
 # Check hosts through the user's normal SSH config or agent.
 # No private keys or passwords are stored in this script.
+
 port = 22
 ssh_options = [-p, $port, -o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
 hosts = [web-1, web-2]

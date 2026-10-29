@@ -105,6 +105,28 @@ func TestLinuxServiceRestartChecksPostcondition(t *testing.T) {
 	}
 }
 
+func TestLinuxServiceRestartAllowsEmptyOptionalFieldsAndWaits(t *testing.T) {
+	dir := t.TempDir()
+	systemctl := filepath.Join(dir, "systemctl")
+	script := "#!/bin/sh\nif [ \"$1\" = restart ]; then exit 0; fi\ncount=0\nif [ -f \"$WAIT_COUNT\" ]; then read count < \"$WAIT_COUNT\"; fi\ncount=$((count + 1))\nprintf '%s' \"$count\" > \"$WAIT_COUNT\"\nstate=activating\nif [ \"$count\" -ge 3 ]; then state=active; fi\nprintf '%s\\n' 'Id=api.service' 'LoadState=loaded' \"ActiveState=$state\" 'SubState=running' 'Result=' 'ExecMainCode=' 'ExecMainStatus=' 'ActiveEnterTimestampMonotonic='\n"
+	if err := os.WriteFile(systemctl, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("WAIT_COUNT", filepath.Join(dir, "count"))
+	r := &runtime{values: map[string]value{}, filename: "service.yesh"}
+	items, err := parse("service restart api.service until active within 1s\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.execute(items); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(filepath.Join(dir, "count")); err != nil || string(got) != "3" {
+		t.Fatalf("restart status polls = %q, error = %v", got, err)
+	}
+}
+
 func TestLinuxServiceRestartFailureIncludesSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	systemctl := filepath.Join(dir, "systemctl")

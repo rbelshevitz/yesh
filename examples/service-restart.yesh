@@ -14,13 +14,13 @@
 #
 # `systemctl restart` only tells us that systemd accepted and completed the
 # restart job. The yesh operation therefore requires a postcondition and
-# reads the unit again before reporting success. The restart diagnostic also
+# polls the unit before reporting success. The restart diagnostic also
 # records Result, ExecMainCode, ExecMainStatus and the monotonic active-entry
 # timestamp; those fields explain a failure but do not prove application
 # readiness.
 #
-# `within 30s` is one finite client budget for both restart and verification.
-# It is deliberately not `systemctl --wait`: --wait can wait for a
+# `within 30s` is one finite client budget for restart and postcondition
+# polling. It is deliberately not `systemctl --wait`: --wait can wait for a
 # long-lived service to terminate rather than confirm that it is active.
 #
 # The unit name is explicit. A name without `.service`, paths,
@@ -33,4 +33,5 @@
 #     test "$(systemctl show -p ActiveState --value yesh-codex-fixture.service)" = active
 # The yesh form keeps argv boundaries, timeout and the postcondition visible.
 # It does not add `sudo`, enable the unit, or repair a failed service.
+
 service restart yesh-codex-fixture.service until active within 10s

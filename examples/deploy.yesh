@@ -5,6 +5,7 @@
 host = web-1
 release = build/current/
 # The address is one complete value: there is no substitution inside host:path.
+
 target = web-1:/srv/app/
 
 echo "deploying" $release "to" $host

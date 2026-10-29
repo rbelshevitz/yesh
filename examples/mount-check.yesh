@@ -1,6 +1,7 @@
 # Environment-dependent example: replace /backup with a mounted path.
 # Verify that the expected backup mount is present.
 # This is a read-only check; it does not mount or unmount anything.
+
 mountpoint = /backup
 
 if findmnt --target $mountpoint:

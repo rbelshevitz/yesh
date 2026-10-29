@@ -13,6 +13,7 @@
 # This wrapper does not parse or rewrite rsnapshot.conf. In particular, review
 # rsync_long_args, sync_first, retain, no_create_root, lockfile, backup_script,
 # and remote SSH entries in `rsnapshot -t` before creating the confirmation.
+
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
 root = environment YESH_RSNAPSHOT_ROOT

@@ -1,6 +1,7 @@
 # Environment-dependent example: replace /backup with an existing mounted path.
 # Read-only report for the filesystem behind a path.
 # No mount, unmount, partitioning, formatting, or device changes are made.
+
 mountpoint = /backup
 
 if findmnt --target $mountpoint:

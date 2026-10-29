@@ -1,5 +1,6 @@
 # Run from a working directory containing source/.
 # Publish the archive only after every stage succeeds.
+
 source = "source"
 partial = "backup.tar.gz.partial"
 archive = "backup.tar.gz"

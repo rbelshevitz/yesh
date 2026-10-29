@@ -1,5 +1,6 @@
 # Copy into an existing local directory. Extra files are not deleted.
 # The exists check does not replace checking that the backup device is mounted.
+
 source = "source/"
 target = "target/"
 if exists $target:

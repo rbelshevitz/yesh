@@ -1,6 +1,7 @@
 # Environment-dependent example: requires a mounted target and YESH_BACKUP_SOURCE.
 # Copy a backup only to the expected filesystem.
 # Set YESH_BACKUP_SOURCE to a verified UUID=... or PARTUUID=... value.
+
 source = "source/"
 target = "target/"
 mountpoint = $target

@@ -99,6 +99,10 @@ func (r *runtime) restartService(manager, unit, expectedState string, timeout ti
 	if err != nil {
 		return fmt.Errorf("service restart %q postcondition: %w", unit, err)
 	}
+	status, err = waitForRestartedService(ctx, manager, unit, expectedState, status)
+	if err != nil {
+		return err
+	}
 	if status.ID != unit || status.ActiveState != expectedState {
 		return fmt.Errorf("service restart %q postcondition failed: id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s", unit, status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
 	}
@@ -107,6 +111,41 @@ func (r *runtime) restartService(manager, unit, expectedState string, timeout ti
 	}
 	fmt.Fprintf(os.Stdout, "SERVICE_RESTART id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s\n", status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
 	return nil
+}
+
+func waitForRestartedService(ctx context.Context, manager, unit, expectedState string, last serviceStatus) (serviceStatus, error) {
+	if last.ID != unit {
+		return serviceStatus{}, fmt.Errorf("service restart %q: systemctl returned canonical unit %q; aliases are not supported", unit, last.ID)
+	}
+	if err := waitStateError(unit, last); err != nil {
+		return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
+	}
+	if last.ID == unit && last.ActiveState == expectedState {
+		return last, nil
+	}
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return serviceStatus{}, fmt.Errorf("service restart %q timed out: last active_state=%s sub_state=%s", unit, last.ActiveState, last.SubState)
+		case <-ticker.C:
+			var err error
+			last, err = queryServiceRestartStatusContext(ctx, manager, unit)
+			if err != nil {
+				return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
+			}
+			if err := waitStateError(unit, last); err != nil {
+				return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
+			}
+			if last.ID != unit {
+				return serviceStatus{}, fmt.Errorf("service restart %q: systemctl returned canonical unit %q; aliases are not supported", unit, last.ID)
+			}
+			if last.ActiveState == expectedState {
+				return last, nil
+			}
+		}
+	}
 }
 
 func (r *runtime) waitForService(manager, unit, expectedState string, timeout time.Duration) (serviceStatus, error) {

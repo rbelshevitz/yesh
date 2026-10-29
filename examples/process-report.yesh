@@ -1,5 +1,6 @@
 # Environment-dependent example: reports processes visible in this Linux host.
 # Show a bounded process report without killing or modifying processes.
+
 ps -eo pid=,ppid=,user=,rss=,stat=,comm= | head -n 25
 
 services = [sshd, nginx]

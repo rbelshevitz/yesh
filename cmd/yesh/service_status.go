@@ -118,7 +118,7 @@ func parseServiceStatus(data []byte) (serviceStatus, error) {
 	seen := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
 		key, value, ok := strings.Cut(line, "=")
-		if !ok || value == "" {
+		if !ok {
 			return serviceStatus{}, fmt.Errorf("invalid systemctl show field %q", line)
 		}
 		if seen[key] {

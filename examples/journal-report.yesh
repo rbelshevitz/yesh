@@ -1,4 +1,5 @@
 # Environment-dependent example: requires journalctl access and sshd.service.
 # Print a bounded service journal report without following the journal.
+
 service = sshd.service
 journalctl --no-pager --unit $service --lines 80

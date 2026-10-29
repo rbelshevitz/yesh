@@ -27,12 +27,16 @@ journal user api.service since 15m lines 100
 `service status`, `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION` и
 ограниченный `journal UNIT since DURATION lines N` уже реализованы. Restart
-использует единый конечный бюджет клиента, затем заново читает состояние
-точной unit; `systemctl --wait` не используется, потому что для долгоживущей
-службы он может ждать её завершения. Journal выдаёт JSON Lines, ограничен
+использует единый конечный бюджет клиента и опрашивает состояние точной unit
+до postcondition или deadline; `systemctl --wait` не используется, потому что
+для долгоживущей службы он может ждать её завершения. Journal выдаёт JSON Lines, ограничен
 четырьмя MiB и отклоняет диагностику в stderr, чтобы предупреждение о правах
 или частичный результат не выглядели успехом. Cursor/boot-фильтры и follow
 пока остаются целевым дизайном; bounded `wait` уже реализован.
+
+`DURATION` пока использует форму Go duration, принятую yesh: например,
+`300ms`, `2s`, `15m` или `1h30m`. Полный синтаксис `systemd.time` намеренно
+не принимается.
 
 Перед unit можно указать manager: `system` или `user`. Если профиль опущен,
 используется системный manager для совместимости со старым синтаксисом.

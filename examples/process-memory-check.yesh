@@ -1,5 +1,6 @@
 # Environment-dependent example: checks processes visible in this Linux host.
 # Fail if all nginx processes together exceed the RSS budget.
+
 nginx = processes where name is "nginx"
 
 if memory $nginx rss at_most 512MiB:

@@ -5,10 +5,14 @@ on:
     paths-ignore:
       - '**/*.md'
       - '**/*.png'
+      - 'examples/**'
+      - 'man/**'
   pull_request:
     paths-ignore:
       - '**/*.md'
       - '**/*.png'
+      - 'examples/**'
+      - 'man/**'
 
 permissions:
   contents: read

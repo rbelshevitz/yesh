@@ -26,12 +26,16 @@ syntax. The documented forms above are the current interface.
 `service status`, `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION`, and
 bounded `journal UNIT since DURATION lines N` are implemented. Restart uses
-one finite client budget and then queries the exact unit again; it does not use
-`systemctl --wait`, which can wait for a long-lived service to terminate.
-Journal output is JSON Lines, capped at four MiB, and rejects diagnostics on
-stderr so a partial or permission-warning result is not presented as success.
-Cursor/boot filters and follow mode remain design targets; bounded `wait` is
-implemented.
+one finite client budget, then polls the exact unit until the required
+postcondition or the deadline; it does not use `systemctl --wait`, which can
+wait for a long-lived service to terminate. Journal output is JSON Lines,
+capped at four MiB, and rejects diagnostics on stderr so a partial or
+permission-warning result is not presented as success. Cursor/boot filters and
+follow mode remain design targets; bounded `wait` is implemented.
+
+`DURATION` currently uses the Go duration form accepted by yesh, such as
+`300ms`, `2s`, `15m`, or `1h30m`; it is intentionally narrower than the full
+`systemd.time` syntax.
 
 An optional manager profile, `system` or `user`, may precede the unit. Omitting
 it preserves the older syntax and selects the system manager. The `user`
@@ -137,10 +141,10 @@ systemctl restart api.service
 journalctl --no-pager --output=json --unit api.service --since -15m --lines 100
 ```
 
-`service restart` runs the second command and then reads the first snapshot
-again to verify its postcondition. The exact argv and manager profile remain
-visible in `--plan`; this is an implementation boundary, not a promise that
-all future systemd operations will remain subprocess-based.
+`service restart` runs the second command and polls the restart snapshot until
+the postcondition or the finite deadline. The exact argv and manager profile
+remain visible in `--plan`; this is an implementation boundary, not a promise
+that all future systemd operations will remain subprocess-based.
 
 ## Safety rules
 

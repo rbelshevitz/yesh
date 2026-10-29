@@ -1,6 +1,7 @@
 # Environment-dependent example: replace the UUID and provide the matching mount.
 # Read-only Linux preflight: replace the UUID before running.
 # The directory must itself be mounted from this unique device as ext4.
+
 backup = device by uuid "replace-with-real-uuid"
 inspect $backup
 require mounted /mnt/backup from $backup filesystem "ext4"
