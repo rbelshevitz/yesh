@@ -4,6 +4,10 @@ yesh is intended for small Linux administration scripts: checking services,
 deploying a release, checking hosts, or making a backup. A reader should know
 Linux commands without having to remember Bash's historical edge cases.
 
+yesh is a language and interpreter for Linux automation, not an interactive
+shell. It borrows the natural command-oriented shape of Linux scripts, but it does not
+aim to interpret Bash syntax or provide a shell prompt.
+
 The main test is:
 
 > Can a reader understand a script from top to bottom without mentally

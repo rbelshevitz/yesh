@@ -132,6 +132,31 @@ exit code 1 и остановил скрипт до следующей кома�
 sandbox. Systemd transient units, cgroup delegation/limits, TTY/PTY,
 tmux/screen lifecycle и реальные устройства остаются отдельными проверками.
 
+## Подтверждение пользователем в отдельной WSL2-машине, 2026-10-29
+
+- Ubuntu 24.04.4 LTS, WSL2 kernel `6.18.54.1-microsoft-standard-WSL2`,
+  Go 1.27.3;
+- PID 1 — `systemd`, cgroup v2 доступна для записи, `/proc/self/fd`
+  доступен для чтения; `systemctl is-system-running` вернул `degraded`,
+  но запрос версии systemd и чтение journal прошли;
+- доступны `rsync`, `rsnapshot`, `pv`, `systemctl`, `journalctl`, `kmod`,
+  `udevadm`, `tmux`, `lsinitramfs`, `cpio`, `zstd`; после проверки установлен
+  также `screen`;
+- полный набор тестов, race-набор, `go vet` и сборка прошли;
+- четыре fuzz-проверки (`PipelinePreflight`, `LiteralArgumentRoundTrip`,
+  `ConditionQuotedData`, `FstabMountIdentity`) прошли с конечным временем;
+- практические тесты backup, rsync, rsnapshot, storage и initramfs прошли;
+- `TestPOSIXStickyForeignEntries` запущен от root и прошёл для операций
+  `remove` и `rename`.
+- реальный пример `service status systemd-resolved.service` вернул
+  `load_state=loaded active_state=active sub_state=running`, а `--plan`
+  показал только `systemctl show` с allowlist свойств и не запускал команду.
+
+Это подтверждение относится к данной WSL2-машине. `degraded` не объявляется
+ошибкой yesh: причины состояния видны в journal и требуют отдельного решения
+на уровне конфигурации машины. Реальные mount/umount, загрузка модулей,
+делегирование cgroup и transient systemd units этим прогоном не проверялись.
+
 ## Последняя полная проверка, 2026-10-29
 
 - Rocky Linux 9.8, kernel `5.14.0-687.59.1.el9_8.x86_64`, Go 1.27.3;

@@ -1,7 +1,8 @@
 # yesh quickstart
 
-yesh is a small Go-based shell for readable system-administration and
-operational scripts.
+yesh is a small Go-based language and interpreter for readable
+system-administration and operational scripts. It is not an interactive shell
+and does not aim to be Bash-compatible.
 
 > **Bash without the historical syntax complexity.**
 
@@ -77,7 +78,7 @@ for service in $services:
 the language as arguments; a string remains one argument. There is no implicit
 word splitting that can turn spaces inside a value into extra arguments.
 
-### Commands remain Unix commands
+### Commands remain Linux commands
 
 ```yesh
 ps -eo pid=,ppid=,user=,rss=,stat=,comm= | sort -k 4,4nr
@@ -121,6 +122,27 @@ Build the interpreter from the repository root:
 go build -trimpath -o yesh ./cmd/yesh
 ```
 
+To run a script as a Linux executable, install the interpreter and use a
+shebang with its absolute path:
+
+```text
+#!/usr/local/bin/yesh
+
+echo "hello from yesh"
+```
+
+Then make the file executable:
+
+```text
+chmod +x examples/hello.yesh
+./examples/hello.yesh
+```
+
+`#!/usr/bin/env yesh` is also suitable when `yesh` is intentionally installed
+in the user's `PATH`. For systemd units, prefer an explicit command such as
+`ExecStart=/usr/local/bin/yesh /opt/ops/job.yesh`; systemd does not provide the
+same interactive shell environment as a login session.
+
 Run a self-contained example that does not need systemd or installed services:
 
 ```text
@@ -143,8 +165,8 @@ does not run the script.
 
 ## The boundary
 
-yesh is a small language for Unix automation, not Python with a command
-shortcut. It deliberately keeps its language surface small:
+yesh is a small language for Linux automation, not a shell and not Python with a
+command shortcut. It deliberately keeps its language surface small:
 
 - use Unix tools such as `grep`, `sed`, `awk`, `ssh`, `systemctl`, and `rsync`;
 - use yesh for readable control flow, typed strings/lists, direct arguments,
