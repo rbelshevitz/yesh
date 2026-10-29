@@ -118,7 +118,7 @@ func waitForRestartedService(ctx context.Context, manager, unit, expectedState s
 		return serviceStatus{}, fmt.Errorf("service restart %q: systemctl returned canonical unit %q; aliases are not supported", unit, last.ID)
 	}
 	if err := waitStateError(unit, last); err != nil {
-		return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
+		return serviceStatus{}, fmt.Errorf("service restart %q postcondition failed: %w", unit, err)
 	}
 	if last.ID == unit && last.ActiveState == expectedState {
 		return last, nil
@@ -136,7 +136,7 @@ func waitForRestartedService(ctx context.Context, manager, unit, expectedState s
 				return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
 			}
 			if err := waitStateError(unit, last); err != nil {
-				return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
+				return serviceStatus{}, fmt.Errorf("service restart %q postcondition failed: %w", unit, err)
 			}
 			if last.ID != unit {
 				return serviceStatus{}, fmt.Errorf("service restart %q: systemctl returned canonical unit %q; aliases are not supported", unit, last.ID)
