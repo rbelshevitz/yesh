@@ -105,13 +105,15 @@ Real remote changes and restore tests belong in a dedicated test VM.
   mount, identity, and free-space checks; no implicit `--delete`;
 - [x] safe rsync validation on a dedicated ext4 loopback image (positive copy
   and wrong-UUID rejection); real block-partition/PARTUUID validation remains;
-- [ ] rsnapshot `configtest`, locking, mount checks, retention, free-space
-  checks, and hard-link snapshot safety;
+- [x] rsnapshot `configtest`, lock conflict handling, retention, and hard-link
+  snapshot safety are covered by the local example and integration tests;
+- [ ] rsnapshot mount/source and free-space checks before rotation;
 - [ ] `pv` with progress separated from binary data and all pipeline stages
   checked for completion;
 - [ ] a shared plan/report showing hosts, paths, commands, volume, and changes;
-- [ ] tests for host-key failure, timeout, broken transfer, full disk,
-  unmounted backup disk, locks, reruns, and restore verification.
+- [x] tests for broken transfer, lock conflict, reruns, and restore verification;
+- [ ] tests for host-key-specific failure, transfer timeout, full disk, and an
+  unmounted backup disk.
 
 The Linux read-only storage interface is implemented:
 
@@ -139,9 +141,9 @@ from ordinary mounts; uniqueness covers only available device metadata.
 Built-in mount/unmount remain planned. The next storage step is to define the
 readonly-mount contract and a dedicated test environment.
 
-- [ ] Re-run the full Linux/POSIX/storage/fstab suite on ordinary Linux (not
-  WSL) with Go 1.27, including race, vet, and build; preserve the first full
-  `--- FAIL` block before classifying an environment-dependent failure.
+- [x] Re-run the full Linux/POSIX/storage/fstab suite on ordinary Linux (not
+  WSL) with Go 1.27, including race, vet, and build; the Rocky Linux 9.8 run
+  used Go 1.27.3 and passed. Repeat after runtime changes.
 
 The first Real-World Examples in this slice are the runnable
 `examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current

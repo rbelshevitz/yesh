@@ -97,7 +97,7 @@ umask 077 и установка/снятие sticky-bit в собственны�
 подтверждены отдельным прогоном. Это не повтор общего прогона под
 детектором гонок; его показатели выше остаются прежними.
 
-## Проверенное окружение, 2026-10-27
+## Историческое WSL-окружение, 2026-10-27
 
 - Ubuntu 24.04.4 LTS, WSL2 kernel `6.18.54.1-microsoft-standard-WSL2`.
 - `/proc`, `/proc/self/fd`, `/sys/module` доступны для чтения.
@@ -131,3 +131,14 @@ exit code 1 и остановил скрипт до следующей кома�
 Эти проверки подтверждают Linux process groups и сигналы в данном WSL
 sandbox. Systemd transient units, cgroup delegation/limits, TTY/PTY,
 tmux/screen lifecycle и реальные устройства остаются отдельными проверками.
+
+## Последняя полная проверка, 2026-10-29
+
+- Rocky Linux 9.8, kernel `5.14.0-687.59.1.el9_8.x86_64`, Go 1.27.3;
+- `rsnapshot 1.5.1`, `rsync` и `pv` установлены;
+- прошли `go test ./...`, `go vet ./...`, `go test -race ./...` и
+  `go build ./...`;
+- `TestPOSIXPracticalRsnapshotRotation` выполнен с настоящим rsnapshot и
+  проверил две ротации, восстановление, hard links и освобождение lock;
+- отрицательные проверки ошибки конфигурации и конфликта lock используют fake
+  rsnapshot, чтобы детерминированно проверить контракт yesh.
