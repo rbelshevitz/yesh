@@ -71,3 +71,21 @@ previous snapshot, retention, and destructive actions in `--plan`. It must not
 invent a second backup engine, re-export the utilities' growing option sets,
 or silently change rsync/rsnapshot semantics. Utility-specific flags stay
 ordinary explicit argv arguments.
+
+## Utility practices to preserve
+
+- Run `rsync --link-dest` into a new empty snapshot directory. The previous
+  snapshot is a basis, not the destination to update.
+- Keep partial files in a private destination-side directory; never use a
+  shared world-writable `/tmp` partial directory.
+- Treat rsync exit codes as data. In particular, 23/24 mean partial or vanished
+  input, and 30/35 indicate timeouts; none may publish a successful snapshot.
+- Keep `--delete` explicit. Snapshot creation into a new directory normally
+  does not need it; retention deletion is a separate, planned operation.
+- For rsnapshot, run `configtest` and its test mode before rotation, and set
+  `no_create_root=1` when a removable backup mount must never fall back to a
+  local directory.
+
+References: the [rsync manual](https://rsync.samba.org/ftp/rsync/rsync.1),
+[rsnapshot HOWTO](https://rsnapshot.org/rsnapshot/docs/docbook/rest.html), and
+[rsnapshot FAQ](https://rsnapshot.org/faq.html).

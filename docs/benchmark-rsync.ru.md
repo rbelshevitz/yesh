@@ -71,3 +71,21 @@ target, previous snapshot, retention и destructive actions. Нельзя соз
 второй backup-engine, переизобретать растущий набор ключей утилит или молча
 менять семантику rsync/rsnapshot. Специфические ключи утилит остаются обычными
 явными argv-аргументами.
+
+## Практики самих утилит
+
+- `rsync --link-dest` запускать в новом пустом snapshot-каталоге. Предыдущий
+  snapshot — basis, а не каталог, который нужно обновлять.
+- Partial-файлы хранить в закрытом каталоге на destination; не использовать
+  общий доступный `/tmp`.
+- Считать коды rsync данными. 23/24 означают partial/vanished input, 30/35 —
+  timeout; ни один из них не должен публиковать успешный snapshot.
+- `--delete` всегда указывать явно. При создании нового snapshot обычно он не
+  нужен; удаление старых версий retention — отдельная операция в плане.
+- Для rsnapshot перед ротацией запускать `configtest` и test mode; при
+  съёмном backup mount задавать `no_create_root=1`, чтобы сбой mount не писал
+  в локальный `/mnt`.
+
+Источники: [руководство rsync](https://rsync.samba.org/ftp/rsync/rsync.1),
+[rsnapshot HOWTO](https://rsnapshot.org/rsnapshot/docs/docbook/rest.html) и
+[FAQ rsnapshot](https://rsnapshot.org/faq.html).
