@@ -193,6 +193,10 @@ set. The test copies one unique file and verifies its SHA-256 through SSH.
 - [ ] bounded file search and safe, planned atomic replacement;
 - [x] read-only exact-name process snapshots with bounded `/proc` scanning and
   fixed-field `show` output; signals and broader filters remain;
+- [x] verified the snapshot against a real Rocky Linux nginx service: five
+  processes, master UID 0, workers UID 979, `/system.slice/nginx.service`, and
+  RSS total/max/average; the captured result is recorded in
+  `docs/practical-examples.md`;
 - [ ] typed process and systemd diagnostics beyond this read-only slice;
 - [ ] read-only systemd service status from stable `systemctl show` fields and
   bounded `journalctl` output;
@@ -205,6 +209,11 @@ set. The test copies one unique file and verifies its SHA-256 through SSH.
 - [ ] state files and resumable long-running jobs only after safe cancellation
   and ownership boundaries are established;
 - [ ] full isolation for untrusted scripts through operating-system controls.
+
+The process boundary is intentional: yesh currently reads a bounded `/proc`
+snapshot and aggregates RSS, while its runtime manages its own child processes.
+It does not stop nginx or other foreign processes, expose a general `kill` or
+`pkill` operation, mutate cgroups, or claim systemd service control yet.
 
 ## Networking and CIDR
 
