@@ -161,10 +161,12 @@ Storage security decisions for the next slice:
   used Go 1.27.3 and passed. Repeat after runtime changes.
 
 The first Real-World Examples in this slice are the runnable
-`examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their current
-validation uses fake SSH/SCP tools and a local source fixture. A local loopback
-SSH/SCP transfer was also completed manually and verified byte-for-byte; a
-copy to a separate remote machine or a restore workflow is not claimed yet.
+`examples/ssh-health.yesh` and `examples/scp-copy.yesh` pair. Their automated
+validation uses fake SSH/SCP tools for argv and failure handling. A real
+read-only SSH connection using the same policy and a real SCP copy through
+yesh to a separate host were also completed with key authentication and
+byte-for-byte checksum verification;
+remote restore and partial-result recovery are not claimed yet.
 
 ## Language and runtime backlog
 
