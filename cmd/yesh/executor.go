@@ -65,6 +65,22 @@ func (r *runtime) execute(items []statement) error {
 			if err := writeProcessSummary(os.Stdout, v.processes, s.metric); err != nil {
 				return fmt.Errorf("%s:%d: summarize: %w", r.filename, s.line, err)
 			}
+		case serviceStatusStmt:
+			if err := r.executeServiceStatus(s); err != nil {
+				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
+			}
+		case serviceRestartStmt:
+			if err := r.executeServiceRestart(s); err != nil {
+				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
+			}
+		case serviceWaitStmt:
+			if err := r.executeServiceWait(s); err != nil {
+				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
+			}
+		case journalStmt:
+			if err := r.executeJournal(s); err != nil {
+				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
+			}
 		case commandStmt:
 			if err := r.run(s.text, s.line, true); err != nil {
 				return err

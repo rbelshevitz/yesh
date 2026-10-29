@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type line struct {
@@ -48,6 +50,47 @@ type summarizeStmt struct {
 }
 
 func (summarizeStmt) stmt() {}
+
+type serviceStatusStmt struct {
+	line    int
+	manager string
+	unit    commandToken
+}
+
+func (serviceStatusStmt) stmt() {}
+
+type serviceRestartStmt struct {
+	line          int
+	manager       string
+	unit          commandToken
+	expectedState string
+	timeout       time.Duration
+	timeoutText   string
+}
+
+func (serviceRestartStmt) stmt() {}
+
+type serviceWaitStmt struct {
+	line          int
+	manager       string
+	unit          commandToken
+	expectedState string
+	timeout       time.Duration
+	timeoutText   string
+}
+
+func (serviceWaitStmt) stmt() {}
+
+type journalStmt struct {
+	line      int
+	manager   string
+	unit      commandToken
+	since     time.Duration
+	sinceText string
+	lines     int
+}
+
+func (journalStmt) stmt() {}
 
 type exitStmt struct {
 	line int
@@ -272,6 +315,61 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 			index++
 			continue
 		}
+		if text == "service" || strings.HasPrefix(text, "service ") {
+			tokens, err := words(text)
+			manager, offset, ok := systemdManager(tokens, 2)
+			if err == nil && ok && len(tokens) == offset+5 && builtinKeyword(tokens[0], "service") &&
+				builtinKeyword(tokens[1], "wait") && !tokens[offset].operator &&
+				builtinKeyword(tokens[offset+1], "until") && !tokens[offset+2].operator &&
+				builtinKeyword(tokens[offset+3], "within") && !tokens[offset+4].operator {
+				duration, durationErr := time.ParseDuration(tokens[offset+4].text)
+				if durationErr != nil || duration <= 0 {
+					return nil, index, p.err(l.number, "service wait timeout must be a positive duration")
+				}
+				result = append(result, serviceWaitStmt{line: l.number, manager: manager, unit: tokens[offset], expectedState: tokens[offset+2].text,
+					timeout: duration, timeoutText: tokens[offset+4].text})
+				index++
+				continue
+			}
+			if err == nil && ok && len(tokens) == offset+5 && builtinKeyword(tokens[0], "service") &&
+				builtinKeyword(tokens[1], "restart") && !tokens[offset].operator &&
+				builtinKeyword(tokens[offset+1], "until") && !tokens[offset+2].operator &&
+				builtinKeyword(tokens[offset+3], "within") && !tokens[offset+4].operator {
+				duration, durationErr := time.ParseDuration(tokens[offset+4].text)
+				if durationErr != nil || duration <= 0 {
+					return nil, index, p.err(l.number, "service restart timeout must be a positive duration")
+				}
+				result = append(result, serviceRestartStmt{line: l.number, manager: manager, unit: tokens[offset], expectedState: tokens[offset+2].text,
+					timeout: duration, timeoutText: tokens[offset+4].text})
+				index++
+				continue
+			}
+			manager, offset, ok = systemdManager(tokens, 2)
+			if err != nil || !ok || len(tokens) != offset+1 || !builtinKeyword(tokens[0], "service") ||
+				!builtinKeyword(tokens[1], "status") || tokens[offset].operator {
+				return nil, index, p.err(l.number, "expected: service status unit")
+			}
+			result = append(result, serviceStatusStmt{line: l.number, manager: manager, unit: tokens[offset]})
+			index++
+			continue
+		}
+		if text == "journal" || strings.HasPrefix(text, "journal ") {
+			tokens, err := words(text)
+			manager, offset, ok := systemdManager(tokens, 1)
+			if err == nil && ok && len(tokens) == offset+5 && builtinKeyword(tokens[0], "journal") &&
+				!tokens[offset].operator && builtinKeyword(tokens[offset+1], "since") && !tokens[offset+2].operator &&
+				builtinKeyword(tokens[offset+3], "lines") && !tokens[offset+4].operator {
+				since, sinceErr := time.ParseDuration(tokens[offset+2].text)
+				lines, linesErr := strconv.Atoi(tokens[offset+4].text)
+				if sinceErr != nil || since <= 0 || linesErr != nil || lines <= 0 || lines > 10000 {
+					return nil, index, p.err(l.number, "journal requires a positive duration and 1..10000 lines")
+				}
+				result = append(result, journalStmt{line: l.number, manager: manager, unit: tokens[offset], since: since, sinceText: tokens[offset+2].text, lines: lines})
+				index++
+				continue
+			}
+			return nil, index, p.err(l.number, "expected: journal unit since duration lines count")
+		}
 		if name, value, ok := assignment(text); ok {
 			result = append(result, assignStmt{l.number, name, value})
 			index++
@@ -281,6 +379,23 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 		index++
 	}
 	return result, index, nil
+}
+
+// systemdManager accepts an optional profile before the operation's unit.
+// Keeping the omitted form as "system" preserves existing scripts while the
+// explicit form makes the manager choice visible in review and in --plan.
+func systemdManager(tokens []commandToken, unitOffset int) (string, int, bool) {
+	if len(tokens) > unitOffset && builtinKeyword(tokens[unitOffset], "system") {
+		return "system", unitOffset + 1, true
+	}
+	if len(tokens) > unitOffset && builtinKeyword(tokens[unitOffset], "user") {
+		return "user", unitOffset + 1, true
+	}
+	return "system", unitOffset, true
+}
+
+func builtinKeyword(t commandToken, word string) bool {
+	return !t.literal && !t.operator && t.text == word
 }
 
 func (p parser) child(index, indent int) ([]statement, int, error) {

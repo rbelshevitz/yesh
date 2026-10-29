@@ -1,6 +1,6 @@
 # yesh roadmap
 
-yesh is an experimental, readable Unix shell for system administration and
+yesh is an experimental, readable Unix automation language for system administration and
 operational automation.
 
 The project priority is:
@@ -214,6 +214,38 @@ The first executable slice is now covered by
 publication, changed-file verification, and `--link-dest` inode reuse. The
 full negative matrix, explicit retention, and restore comparison remain open.
 
+### Next WSL2 run: incremental rsync benchmark
+
+Use only a disposable fixture under `t.TempDir()` or `/tmp`; never touch real
+mounts, `/etc/fstab`, remote hosts, or production paths. Do not add a
+`snapshot` DSL or mirror rsync semantics in yesh.
+
+- [ ] Record yesh/rsync versions, filesystem type and mount flags, exact argv,
+  and exit codes.
+- [ ] Build a fixture with spaces in names, binary data, symlink, hard link,
+  changed/new/deleted files.
+- [ ] Run the first backup into an empty staging directory and publish only
+  after rsync succeeds.
+- [ ] Run the second backup with explicit `--link-dest`; verify tree contents,
+  checksums, and inode reuse for unchanged data.
+- [ ] Restore the second snapshot into a new directory with rsync and compare
+  the tree, file types, checksums, and expected links.
+- [ ] Exercise partial rsync failure: no staging directory becomes published,
+  no ready snapshot appears, and the lock is released.
+- [ ] Exercise missing source, held lock, and rerun; failures must not report
+  success or remove the previous snapshot.
+- [ ] Add an explicit retention profile: keep the latest N completed snapshots
+  and remove an old one only after the new snapshot is published successfully.
+- [ ] Verify `--plan`: no rsync, redirect open, or filesystem mutation occurs;
+  the report exposes source, destination, lock, retention, and expanded argv.
+- [ ] Update `docs/practical-examples.md`, a runnable `.yesh` example, and
+  `cmd/yesh/practical_posix_test.go`; record expected failure and no-change
+  assertions for every negative case.
+
+Close this slice only when backup/restore, hard-link reuse, retention, partial
+failure, missing source, lock conflict, rerun, and plan pass with finite time on
+one WSL2 machine; a ready name must never point to a partial result.
+
 The product target is a thin backup facade, not a hidden backup engine:
 `rsync`/`rsnapshot` remain visible, while yesh makes preflight, lock,
 publication, retention, restore, and `--plan` explicit and reviewable.
@@ -300,9 +332,15 @@ set. The test copies one unique file and verifies its SHA-256 through SSH.
   processes, master UID 0, workers UID 979, `/system.slice/nginx.service`, and
   RSS total/max/average; the captured result is recorded in
   `docs/practical-examples.md`;
-- [ ] typed process and systemd diagnostics beyond this read-only slice;
-- [ ] read-only systemd service status from stable `systemctl show` fields and
-  bounded `journalctl` output;
+- [ ] typed process diagnostics beyond this read-only slice;
+- [x] read-only exact-unit systemd status from an allowlisted `systemctl show`
+  snapshot, with explicit system/user manager selection and plan output;
+- [x] bounded `journalctl` unit query with JSON validation, output limits,
+  stderr diagnostics and explicit empty-result semantics;
+- [x] bounded `service wait` and restart with an `active` postcondition,
+  canonical-id checks, timeout diagnostics and restart snapshot fields;
+- [ ] distinguish `oneshot` completion from `active`, queued-job semantics and
+  application readiness probes; do not claim that manager state is readiness;
 - [ ] model `LoadState=masked` as an actionable service state: report it in
   status, fail `start/restart/ensure active` clearly, and never auto-unmask;
   test an explicit unmask operation separately if it is added later;
