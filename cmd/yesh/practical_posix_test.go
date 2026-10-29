@@ -341,6 +341,41 @@ func TestPOSIXPracticalSSHHealthFailureStopsLoop(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalSCPFailureDoesNotPublish(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	scp := "#!/bin/sh\nprintf '%s\\000' scp \"$@\" >> \"$TRACE_FILE\"\nexit 23\n"
+	writeTestFile(t, filepath.Join(bin, "scp"), []byte(scp), 0700)
+	writeTestFile(t, filepath.Join(dir, "backup.tar.gz"), []byte("fixture\n"), 0600)
+	script := filepath.Join(dir, "copy.yesh")
+	source := readTestFile(t, practicalExample(t, "scp-copy.yesh"))
+	writeTestFile(t, script, append(source, []byte("\ntouch published\n")...), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("SCP failure: code=%v output=%q", err, out)
+	}
+	want := []string{
+		"scp", "-P", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "--", "backup.tar.gz", "user@backup-1:/srv/incoming/backup.tar.gz",
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("SCP failure argv: %q want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("script continued after failed SCP: %v", err)
+	}
+}
+
 func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "bin")
