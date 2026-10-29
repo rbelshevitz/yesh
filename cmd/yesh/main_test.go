@@ -30,6 +30,19 @@ func TestParserRejectsLockWithoutPathOrBody(t *testing.T) {
 	}
 }
 
+func TestParserAcceptsRetentionPlan(t *testing.T) {
+	items, err := parse("rsync retention plan in $root keep $keep\n", "test.yesh")
+	if err != nil {
+		t.Fatalf("parse retention plan: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items=%#v", items)
+	}
+	if _, ok := items[0].(retentionPlanStmt); !ok {
+		t.Fatalf("expected retention plan statement, got %#v", items[0])
+	}
+}
+
 func TestParserAcceptsPublish(t *testing.T) {
 	items, err := parse("publish \"temporary tree\" to current\n", "test.yesh")
 	if err != nil {

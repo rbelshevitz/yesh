@@ -28,6 +28,17 @@ func TestParserAcceptsServiceRestartWithPostcondition(t *testing.T) {
 	}
 }
 
+func TestParserAcceptsServiceStartWithPostcondition(t *testing.T) {
+	items, err := parse("service start nginx.service until active within 2s\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, ok := items[0].(serviceRestartStmt)
+	if !ok || stmt.action != "start" || stmt.expectedState != "active" || stmt.timeoutText != "2s" {
+		t.Fatalf("unexpected start statement: %#v", items[0])
+	}
+}
+
 func TestParserAcceptsServiceWaitWithPostcondition(t *testing.T) {
 	items, err := parse("service wait user api.service until active within 2s\n", "service.yesh")
 	if err != nil {

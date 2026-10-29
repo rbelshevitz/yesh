@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -170,6 +171,40 @@ func (r *runtime) execute(items []statement) error {
 			}
 			if err := os.Rename(source[0], dest[0]); err != nil {
 				return fmt.Errorf("%s:%d: publish %q to %q: %w", r.filename, s.line, source[0], dest[0], err)
+			}
+		case retentionPlanStmt:
+			root, err := r.expandWord(s.root, s.line)
+			if err != nil {
+				return err
+			}
+			keepText, err := r.expandWord(s.keep, s.line)
+			if err != nil {
+				return err
+			}
+			if len(root) != 1 || root[0] == "" || len(keepText) != 1 {
+				return fmt.Errorf("%s:%d: retention plan expects one root and keep count", r.filename, s.line)
+			}
+			keep, err := strconv.Atoi(keepText[0])
+			if err != nil {
+				return fmt.Errorf("%s:%d: retention keep must be a decimal count", r.filename, s.line)
+			}
+			snapshots, err := retentionSnapshotEntries(root[0])
+			if err != nil {
+				return fmt.Errorf("%s:%d: retention plan: %w", r.filename, s.line, err)
+			}
+			keepNames := make([]string, 0, len(snapshots))
+			pruneNames := make([]string, 0, len(snapshots))
+			for index, snapshot := range snapshots {
+				if index < keep {
+					keepNames = append(keepNames, snapshot.Name)
+				} else {
+					pruneNames = append(pruneNames, snapshot.Name)
+				}
+			}
+			if r.plan {
+				fmt.Fprintf(os.Stdout, "PLAN retention keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
+			} else {
+				fmt.Fprintf(os.Stdout, "RETENTION_PLAN keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
 			}
 		}
 	}

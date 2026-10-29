@@ -62,6 +62,7 @@ func (serviceStatusStmt) stmt() {}
 type serviceRestartStmt struct {
 	line          int
 	manager       string
+	action        string
 	unit          commandToken
 	expectedState string
 	timeout       time.Duration
@@ -129,6 +130,13 @@ type publishStmt struct {
 }
 
 func (publishStmt) stmt() {}
+
+type retentionPlanStmt struct {
+	line       int
+	root, keep commandToken
+}
+
+func (retentionPlanStmt) stmt() {}
 
 type parser struct {
 	lines    []line
@@ -199,6 +207,21 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 				return nil, index, p.err(l.number, "expected: publish source to destination")
 			}
 			result = append(result, publishStmt{line: l.number, source: tokens[1], dest: tokens[3]})
+			index++
+			continue
+		}
+		if strings.HasPrefix(text, "rsync retention ") {
+			tokens, err := words(text)
+			if err != nil {
+				return nil, index, p.err(l.number, err.Error())
+			}
+			if len(tokens) != 7 || tokens[0].operator || tokens[0].text != "rsync" ||
+				tokens[1].operator || tokens[1].text != "retention" || tokens[2].operator || tokens[2].text != "plan" ||
+				tokens[3].operator || tokens[3].text != "in" || tokens[4].operator || tokens[5].operator ||
+				tokens[5].text != "keep" || tokens[6].operator {
+				return nil, index, p.err(l.number, "expected: rsync retention plan in root keep count")
+			}
+			result = append(result, retentionPlanStmt{line: l.number, root: tokens[4], keep: tokens[6]})
 			index++
 			continue
 		}
@@ -332,14 +355,14 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 				continue
 			}
 			if err == nil && ok && len(tokens) == offset+5 && builtinKeyword(tokens[0], "service") &&
-				builtinKeyword(tokens[1], "restart") && !tokens[offset].operator &&
+				(builtinKeyword(tokens[1], "start") || builtinKeyword(tokens[1], "restart")) && !tokens[offset].operator &&
 				builtinKeyword(tokens[offset+1], "until") && !tokens[offset+2].operator &&
 				builtinKeyword(tokens[offset+3], "within") && !tokens[offset+4].operator {
 				duration, durationErr := time.ParseDuration(tokens[offset+4].text)
 				if durationErr != nil || duration <= 0 {
-					return nil, index, p.err(l.number, "service restart timeout must be a positive duration")
+					return nil, index, p.err(l.number, "service "+tokens[1].text+" timeout must be a positive duration")
 				}
-				result = append(result, serviceRestartStmt{line: l.number, manager: manager, unit: tokens[offset], expectedState: tokens[offset+2].text,
+				result = append(result, serviceRestartStmt{line: l.number, manager: manager, action: tokens[1].text, unit: tokens[offset], expectedState: tokens[offset+2].text,
 					timeout: duration, timeoutText: tokens[offset+4].text})
 				index++
 				continue

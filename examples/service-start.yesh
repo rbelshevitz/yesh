@@ -1,0 +1,16 @@
+# A fixture-backed example of starting one exact systemd unit.
+#
+# This changes system state. Run it only with the disposable unit created by
+# scripts/yesh-fixture-test.sh, or inspect it first with:
+#
+#   ./yesh --plan examples/service-start.yesh
+#
+# `active` is a systemd manager state, not application readiness. A real
+# deployment may need a separate port, socket, HTTP, or domain-specific check.
+# The finite budget covers both `systemctl start` and the postcondition poll.
+#
+# Bash equivalent:
+#   systemctl start yesh-codex-fixture.service && \
+#     test "$(systemctl show -p ActiveState --value yesh-codex-fixture.service)" = active
+
+service start yesh-codex-fixture.service until active within 10s

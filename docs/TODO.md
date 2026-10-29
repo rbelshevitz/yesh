@@ -216,8 +216,10 @@ Real remote changes and restore tests belong in a dedicated test VM.
   outside production paths.
 
 The main verified example is incremental rsync backup with a retention preview.
-Physical retention application remains open: it needs a separate contract and
-test for moving old snapshots into quarantine, rather than another wrapper
+Physical retention application remains open. The next milestone is a separate
+operation that rechecks the root under the lock and moves old snapshots into a
+same-filesystem quarantine; the first version must not physically delete
+anything. It needs positive and negative tests rather than another wrapper
 around one `rsync` invocation. See [the corpus catalog](bash-corpus.md).
 
 Backup direction: make `rsync` and `rsnapshot` materially easier to operate
@@ -228,6 +230,20 @@ source/destination, lock, `--link-dest`, and potential deletions; after a
 failure it must be clear what was published, what stayed unchanged, and
 whether retry is safe. For rsnapshot, yesh validates `configtest`, test mode,
 mount, and lock, but does not reimplement its rotation engine.
+
+### Next milestone: quarantine old snapshots
+
+- [ ] Define an explicit operation form and the roles of the root, keep count,
+  and quarantine directory; do not accept a free-form deletion path.
+- [ ] Rebuild the candidate list under the lock and exclude current, previous,
+  temporary directories, the lock, symlinks, and unknown names again before
+  moving anything.
+- [ ] Move candidates only with an atomic same-filesystem rename; a
+  cross-filesystem condition must stop the operation.
+- [ ] Do not physically delete quarantine contents in the first version; a
+  retry must be safe and must not merge directories.
+- [ ] Add `--plan`, a positive test, changed-state failure, lock conflict,
+  symlink, invalid-name, and rerun cases.
 
 The success criterion for this workflow is operational, not cosmetic: an
 operator who knows rsync but not yesh can predict copies and retention moves

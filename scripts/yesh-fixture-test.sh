@@ -25,6 +25,8 @@ if test ! -x "$yesh_bin"; then
   exit 2
 fi
 
+tmp_dir=$(mktemp -d /tmp/yesh-fixture.XXXXXX)
+
 for file in $files; do
   if test -e "$file"; then
     echo "error: refusing to overwrite existing file: $file" >&2
@@ -36,8 +38,11 @@ cleanup() {
   systemctl stop $units >/dev/null 2>&1 || true
   rm -f $files
   systemctl daemon-reload >/dev/null
+  rm -rf -- "$tmp_dir"
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 cat >"$unit_dir/$normal" <<'UNIT'
 [Unit]
@@ -77,41 +82,44 @@ ExecStart=/bin/sh -c 'exit 23'
 UNIT
 
 systemctl daemon-reload
-systemctl start "$normal"
+
+echo '--- start: expected success ---'
+echo 'service start yesh-codex-fixture.service until active within 10s' >"$tmp_dir/start.yesh"
+"$yesh_bin" "$tmp_dir/start.yesh"
 
 echo '--- status: expected success ---'
-printf '%s\n' 'service status yesh-codex-fixture.service' >/tmp/yesh-fixture-status.yesh
-"$yesh_bin" /tmp/yesh-fixture-status.yesh
+printf '%s\n' 'service status yesh-codex-fixture.service' >"$tmp_dir/status.yesh"
+"$yesh_bin" "$tmp_dir/status.yesh"
 
 echo '--- wait: expected success ---'
-printf '%s\n' 'service wait yesh-codex-fixture.service until active within 10s' >/tmp/yesh-fixture-wait.yesh
-"$yesh_bin" /tmp/yesh-fixture-wait.yesh
+printf '%s\n' 'service wait yesh-codex-fixture.service until active within 10s' >"$tmp_dir/wait.yesh"
+"$yesh_bin" "$tmp_dir/wait.yesh"
 
 echo '--- restart: expected success ---'
-printf '%s\n' 'service restart yesh-codex-fixture.service until active within 10s' >/tmp/yesh-fixture-restart.yesh
-"$yesh_bin" /tmp/yesh-fixture-restart.yesh
+printf '%s\n' 'service restart yesh-codex-fixture.service until active within 10s' >"$tmp_dir/restart.yesh"
+"$yesh_bin" "$tmp_dir/restart.yesh"
 
 echo '--- oneshot without RemainAfterExit: expected failure ---'
-printf '%s\n' 'service restart yesh-codex-fixture-oneshot.service until active within 5s' >/tmp/yesh-fixture-oneshot.yesh
+printf '%s\n' 'service restart yesh-codex-fixture-oneshot.service until active within 5s' >"$tmp_dir/oneshot.yesh"
 set +e
-"$yesh_bin" /tmp/yesh-fixture-oneshot.yesh
+"$yesh_bin" "$tmp_dir/oneshot.yesh"
 oneshot_status=$?
 set -u
 printf 'ONESHOT_EXIT=%s\n' "$oneshot_status"
 
 echo '--- activating timeout: expected failure ---'
-printf '%s\n' 'service wait yesh-codex-fixture-slow.service until active within 2s' >/tmp/yesh-fixture-slow.yesh
+printf '%s\n' 'service wait yesh-codex-fixture-slow.service until active within 2s' >"$tmp_dir/slow.yesh"
 systemctl start --no-block "$slow"
 set +e
-"$yesh_bin" /tmp/yesh-fixture-slow.yesh
+"$yesh_bin" "$tmp_dir/slow.yesh"
 slow_status=$?
 set -u
 printf 'SLOW_EXIT=%s\n' "$slow_status"
 
 echo '--- failed restart with diagnostic snapshot: expected failure ---'
-printf '%s\n' 'service restart yesh-codex-fixture-fail.service until active within 5s' >/tmp/yesh-fixture-fail.yesh
+printf '%s\n' 'service restart yesh-codex-fixture-fail.service until active within 5s' >"$tmp_dir/fail.yesh"
 set +e
-fail_output=$("$yesh_bin" /tmp/yesh-fixture-fail.yesh 2>&1)
+fail_output=$("$yesh_bin" "$tmp_dir/fail.yesh" 2>&1)
 fail_status=$?
 set -u
 printf '%s\n' "$fail_output"

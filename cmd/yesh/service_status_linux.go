@@ -67,7 +67,7 @@ func queryServiceRestartStatusContext(ctx context.Context, manager, unit string)
 	return parseServiceStatus(out.Bytes())
 }
 
-func (r *runtime) restartService(manager, unit, expectedState string, timeout time.Duration) error {
+func (r *runtime) transitionService(manager, action, unit, expectedState string, timeout time.Duration) error {
 	parent := r.ctx
 	if parent == nil {
 		parent = context.Background()
@@ -76,49 +76,52 @@ func (r *runtime) restartService(manager, unit, expectedState string, timeout ti
 	defer cancel()
 	before, err := queryServiceRestartStatusContext(ctx, manager, unit)
 	if err != nil {
-		return fmt.Errorf("service restart %q precondition: %w", unit, err)
+		return fmt.Errorf("service %s %q precondition: %w", action, unit, err)
 	}
-	argv := systemctlArgv(manager, "restart", unit)
+	argv := systemctlArgv(manager, action, unit)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	var diagnostic storageOutput
 	cmd.Stderr = &diagnostic
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return fmt.Errorf("service restart %q: %w", unit, ctx.Err())
+			return fmt.Errorf("service %s %q: %w", action, unit, ctx.Err())
 		}
 		message := strings.TrimSpace(diagnostic.String())
 		if message == "" {
 			message = err.Error()
 		}
 		if failed, snapshotErr := queryServiceRestartStatusContext(ctx, manager, unit); snapshotErr == nil && failed.ID == unit {
-			return fmt.Errorf("service restart %q failed: %s; result=%s exec_main_code=%s exec_main_status=%s active_state=%s sub_state=%s", unit, message, failed.Result, failed.ExecMainCode, failed.ExecMainStatus, failed.ActiveState, failed.SubState)
+			return fmt.Errorf("service %s %q failed: %s; result=%s exec_main_code=%s exec_main_status=%s active_state=%s sub_state=%s", action, unit, message, failed.Result, failed.ExecMainCode, failed.ExecMainStatus, failed.ActiveState, failed.SubState)
 		}
-		return fmt.Errorf("service restart %q failed: %s", unit, message)
+		return fmt.Errorf("service %s %q failed: %s", action, unit, message)
 	}
 	status, err := queryServiceRestartStatusContext(ctx, manager, unit)
 	if err != nil {
-		return fmt.Errorf("service restart %q postcondition: %w", unit, err)
+		return fmt.Errorf("service %s %q postcondition: %w", action, unit, err)
 	}
-	status, err = waitForRestartedService(ctx, manager, unit, expectedState, status)
+	status, err = waitForTransitionService(ctx, manager, action, unit, expectedState, status)
 	if err != nil {
 		return err
 	}
 	if status.ID != unit || status.ActiveState != expectedState {
-		return fmt.Errorf("service restart %q postcondition failed: id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s", unit, status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
+		return fmt.Errorf("service %s %q postcondition failed: id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s", action, unit, status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
 	}
-	if before.ActiveEnterTimestampMonotonic != "" && status.ActiveEnterTimestampMonotonic != "" && before.ActiveEnterTimestampMonotonic == status.ActiveEnterTimestampMonotonic {
-		fmt.Fprintf(os.Stderr, "yesh: service restart %q warning: ActiveEnterTimestampMonotonic did not change (%s)\n", unit, status.ActiveEnterTimestampMonotonic)
+	if action == "restart" && before.ActiveEnterTimestampMonotonic != "" && status.ActiveEnterTimestampMonotonic != "" && before.ActiveEnterTimestampMonotonic == status.ActiveEnterTimestampMonotonic {
+		fmt.Fprintf(os.Stderr, "yesh: service %s %q warning: ActiveEnterTimestampMonotonic did not change (%s)\n", action, unit, status.ActiveEnterTimestampMonotonic)
 	}
-	fmt.Fprintf(os.Stdout, "SERVICE_RESTART id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s\n", status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
+	fmt.Fprintf(os.Stdout, "SERVICE_%s id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s\n", strings.ToUpper(action), status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
 	return nil
 }
 
-func waitForRestartedService(ctx context.Context, manager, unit, expectedState string, last serviceStatus) (serviceStatus, error) {
+func waitForTransitionService(ctx context.Context, manager, action, unit, expectedState string, last serviceStatus) (serviceStatus, error) {
 	if last.ID != unit {
-		return serviceStatus{}, fmt.Errorf("service restart %q: systemctl returned canonical unit %q; aliases are not supported", unit, last.ID)
+		return serviceStatus{}, fmt.Errorf("service %s %q: systemctl returned canonical unit %q; aliases are not supported", action, unit, last.ID)
 	}
 	if err := waitStateError(unit, last); err != nil {
-		return serviceStatus{}, fmt.Errorf("service restart %q postcondition failed: %w", unit, err)
+		return serviceStatus{}, fmt.Errorf("service %s %q postcondition failed: %w", action, unit, err)
+	}
+	if last.ActiveState == "inactive" && last.SubState == "dead" {
+		return serviceStatus{}, fmt.Errorf("service %s %q postcondition failed: cannot reach active: load_state=%s active_state=%s sub_state=%s", action, unit, last.LoadState, last.ActiveState, last.SubState)
 	}
 	if last.ID == unit && last.ActiveState == expectedState {
 		return last, nil
@@ -128,18 +131,21 @@ func waitForRestartedService(ctx context.Context, manager, unit, expectedState s
 	for {
 		select {
 		case <-ctx.Done():
-			return serviceStatus{}, fmt.Errorf("service restart %q timed out: last active_state=%s sub_state=%s", unit, last.ActiveState, last.SubState)
+			return serviceStatus{}, fmt.Errorf("service %s %q timed out: last active_state=%s sub_state=%s", action, unit, last.ActiveState, last.SubState)
 		case <-ticker.C:
 			var err error
 			last, err = queryServiceRestartStatusContext(ctx, manager, unit)
 			if err != nil {
-				return serviceStatus{}, fmt.Errorf("service restart %q postcondition: %w", unit, err)
+				return serviceStatus{}, fmt.Errorf("service %s %q postcondition: %w", action, unit, err)
 			}
 			if err := waitStateError(unit, last); err != nil {
-				return serviceStatus{}, fmt.Errorf("service restart %q postcondition failed: %w", unit, err)
+				return serviceStatus{}, fmt.Errorf("service %s %q postcondition failed: %w", action, unit, err)
+			}
+			if last.ActiveState == "inactive" && last.SubState == "dead" {
+				return serviceStatus{}, fmt.Errorf("service %s %q postcondition failed: cannot reach active: load_state=%s active_state=%s sub_state=%s", action, unit, last.LoadState, last.ActiveState, last.SubState)
 			}
 			if last.ID != unit {
-				return serviceStatus{}, fmt.Errorf("service restart %q: systemctl returned canonical unit %q; aliases are not supported", unit, last.ID)
+				return serviceStatus{}, fmt.Errorf("service %s %q: systemctl returned canonical unit %q; aliases are not supported", action, unit, last.ID)
 			}
 			if last.ActiveState == expectedState {
 				return last, nil

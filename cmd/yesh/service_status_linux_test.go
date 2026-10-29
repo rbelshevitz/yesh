@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLinuxServiceStatusUsesAllowlistedSnapshot(t *testing.T) {
@@ -102,6 +103,47 @@ func TestLinuxServiceRestartChecksPostcondition(t *testing.T) {
 	}
 	if err := r.execute(items); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLinuxServiceStartChecksPostcondition(t *testing.T) {
+	dir := t.TempDir()
+	systemctl := filepath.Join(dir, "systemctl")
+	script := "#!/bin/sh\nif [ \"$1\" = start ]; then exit 0; fi\nprintf '%s\\n' 'Id=api.service' 'LoadState=loaded' 'ActiveState=active' 'SubState=running'\n"
+	if err := os.WriteFile(systemctl, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	r := &runtime{values: map[string]value{}, filename: "service.yesh"}
+	items, err := parse("service start api.service until active within 2s\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.execute(items); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLinuxServiceTransitionRejectsTerminalInactiveOneshot(t *testing.T) {
+	dir := t.TempDir()
+	systemctl := filepath.Join(dir, "systemctl")
+	script := "#!/bin/sh\nif [ \"$1\" = start ]; then exit 0; fi\nprintf '%s\\n' 'Id=api.service' 'LoadState=loaded' 'ActiveState=inactive' 'SubState=dead'\n"
+	if err := os.WriteFile(systemctl, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	r := &runtime{values: map[string]value{}, filename: "service.yesh"}
+	items, err := parse("service start api.service until active within 2s\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	err = r.execute(items)
+	if err == nil || !strings.Contains(err.Error(), "cannot reach active") {
+		t.Fatalf("unexpected terminal inactive error: %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("terminal inactive state waited too long: %s", elapsed)
 	}
 }
 

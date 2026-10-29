@@ -52,20 +52,20 @@ func (r *runtime) executeServiceRestart(s serviceRestartStmt) error {
 		return err
 	}
 	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
-		return fmt.Errorf("service restart expects one non-empty unit name")
+		return fmt.Errorf("service %s expects one non-empty unit name", s.action)
 	}
 	if err := validateUnitName(v.scalar); err != nil {
 		return err
 	}
 	if s.expectedState != "active" {
-		return fmt.Errorf("service restart currently supports only postcondition active")
+		return fmt.Errorf("service %s currently supports only postcondition active", s.action)
 	}
-	argv := systemctlArgv(s.manager, "restart", v.scalar)
+	argv := systemctlArgv(s.manager, s.action, v.scalar)
 	if r.plan {
 		fmt.Fprintf(os.Stdout, "PLAN %q until %s within %s\n", argv, s.expectedState, s.timeoutText)
 		return nil
 	}
-	return r.restartService(s.manager, v.scalar, s.expectedState, s.timeout)
+	return r.transitionService(s.manager, s.action, v.scalar, s.expectedState, s.timeout)
 }
 
 func (r *runtime) executeServiceWait(s serviceWaitStmt) error {

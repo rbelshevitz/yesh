@@ -100,3 +100,16 @@ guarantee; fsync of files and directories remains an explicit future policy.
 
 Missing files and denial while inspecting a parent directory are different
 `stat` results; the runtime does not hide that distinction.
+
+### Retention preview
+
+```yesh
+rsync retention plan in $root keep $keep
+```
+
+This is a read-only preview. It lists only real directories named
+`snapshot.<number>` older than the newest `keep` entries; staging names and
+symlinks are rejected. The report labels the newest entries `KEEP` and the
+older entries `PRUNE`; the latter is only a report label. The count must be
+between 1 and 10000. The operation never removes or renames anything, even
+outside `--plan`.

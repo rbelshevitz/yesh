@@ -1,11 +1,15 @@
-# Environment-dependent example: reports processes visible in this Linux host.
-# Show a bounded process report without killing or modifying processes.
+# Environment-dependent example: reports selected service processes visible in
+# this Linux host. The process sets are typed values, not parsed stdout from
+# ps, pgrep, or awk; show and summarize read the same bounded snapshot.
+#
+# Bash would need separate commands, quoting, and text parsing to produce a
+# similar report. yesh keeps process identity, fields, and RSS arithmetic
+# explicit. The example is read-only: it does not signal or modify processes.
 
-ps -eo pid=,ppid=,user=,rss=,stat=,comm= | head -n 25
+sshd = processes where name is "sshd"
+show $sshd fields pid ppid uid state rss cgroup
+summarize $sshd memory rss
 
-services = [sshd, nginx]
-for service in $services:
-    if pgrep -x $service:
-        echo $service "is running"
-    else:
-        echo $service "is not running"
+nginx = processes where name is "nginx"
+show $nginx fields pid ppid uid state rss cgroup
+summarize $nginx memory rss

@@ -92,6 +92,24 @@ publish temporary to current
 publish uses a same-filesystem rename and fails on a cross-filesystem move;
 it does not silently copy. It provides namespace atomicity, not crash
 durability without explicit fsync policy.
+.SS retention plan
+.EX
+rsync retention plan in $root keep $keep
+.EE
+.PP
+This read-only operation lists completed snapshot directories older than the
+newest keep entries. A candidate must be a real directory named
+.B snapshot.<number>;
+staging names and symlinks are not accepted. The keep count must be between 1
+and 10000. The report labels newest entries
+.B KEEP
+and older entries
+.B PRUNE;
+the latter is only a report label. The operation never removes or renames anything, including in
+normal execution; it is a preview primitive. Use the CLI
+.B --plan
+mode when the surrounding script must also avoid external commands and other
+filesystem changes.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"

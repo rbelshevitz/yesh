@@ -13,6 +13,7 @@
 
 ```yesh
 service status api.service
+service start api.service until active within 30s
 service restart api.service until active within 30s
 service wait api.service until active within 30s
 journal api.service since 15m lines 100
@@ -24,7 +25,8 @@ journal user api.service since 15m lines 100
 `service.wait api running within 30s` — пока только эскизы дизайна и не входят
 в поддерживаемый синтаксис. Выше показан текущий интерфейс.
 
-`service status`, `service restart UNIT until active within DURATION`,
+`service status`, `service start UNIT until active within DURATION`,
+`service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION` и
 ограниченный `journal UNIT since DURATION lines N` уже реализованы. Restart
 использует единый конечный бюджет клиента и опрашивает состояние точной unit
@@ -48,7 +50,9 @@ journal user api.service since 15m lines 100
 последний `ActiveState`/`SubState`. Это состояние manager, а не readiness
 приложения. Для `Type=oneshot` postcondition `active` имеет ожидаемый смысл
 только при `RemainAfterExit=yes`; без него успешный oneshot обычно становится
-`inactive/dead`, и yesh не угадывает это как успех.
+`inactive/dead`, и yesh не угадывает это как успех. После `start` или `restart`
+такое terminal-состояние сразу считается невозможным postcondition, без
+ожидания всего timeout.
 Состояния `failed`, `not-found` и `masked` сообщаются сразу, без ожидания
 всего timeout; переходные `inactive`, `activating` и `deactivating` могут
 измениться внешним актором и поэтому опрашиваются.
@@ -97,6 +101,7 @@ journal user api.service since 15m lines 100
 
 ```yesh
 service status api.service
+service start api.service until active within 30s
 service restart api.service until active within 30s
 service wait api.service until active within 30s
 journal api.service since 15m lines 100
@@ -146,13 +151,13 @@ journal api.service since 15m lines 100
 ## Текущая граница и следующий поиск
 
 В MVP уже реализованы read-only `service status`, bounded `service wait`,
-restart с postcondition и bounded JSON journal. Они используют фиксированный
+start и restart с postcondition и bounded JSON journal. Они используют фиксированный
 allowlist `systemctl show`, точную identity unit, профиль system/user, конечные
 сроки и прозрачный argv в `--plan`.
 
-Отдельно остаются: start/stop/reload, семантика завершения `oneshot`, queued
-job и readiness после restart, cursor/boot и allowlist полей journal, политика
-ротации/cursor, follow/streaming и backend transient
+Отдельно остаются: stop/reload, queued job и readiness после start/restart,
+cursor/boot и allowlist полей journal, политика ротации/cursor, follow/streaming
+и backend transient
 service через `systemd-run`. Текущий MVP этого не обещает.
 
 Эти операции должны быть типизированными командами runtime с тем же прозрачным
