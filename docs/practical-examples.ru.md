@@ -325,12 +325,13 @@ else:
 
 Полный пример — [process-memory-check.yesh](../examples/process-memory-check.yesh).
 
-На Rocky Linux 9.8 все три process-примера были запущены напрямую. В этой
-среде `nginx` и `sshd` отсутствовали: снимок корректно вернул пустой набор,
-`process-memory-check` завершился успешно для нулевого RSS, а отчёт показал
-доступные процессы через `ps` и отрицательные результаты `pgrep`. Отдельные
-тесты с fixture-процессами проверяют точное имя, поля снимка, RSS-агрегацию и
-границы `/proc`; сценарий с реальным nginx остаётся стендовым.
+На Rocky Linux 9.8 все три process-примера были запущены напрямую. В sandbox
+nginx отсутствовал, но на host Rocky yesh увидел пять процессов nginx в
+`/system.slice/nginx.service`: `PROCESS_COUNT=5`, `RSS_TOTAL=15.46MiB`
+(`16211968` байт), `RSS_MAX=3.37MiB` и `RSS_AVERAGE=3.09MiB`. Это также
+подтвердило чтение UID, состояния и systemd cgroup. Отдельные тесты с
+fixture-процессами проверяют точное имя, поля снимка, RSS-агрегацию и границы
+`/proc`.
 
 ## Процессы, службы и deploy
 
