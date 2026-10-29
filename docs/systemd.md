@@ -34,6 +34,25 @@ journalctl -u api --since 15m -n 100 --no-pager
 - unbounded journal streaming requires an explicit `follow` mode;
 - `follow` is outside the MVP until cancellation and TTY closure are modeled.
 
+## Masked units are a state, not a parser error
+
+`LoadState=masked` is a valid and important observation. A status/preflight
+operation must report it rather than trying to repair it. A requested
+`start`, `restart`, or `ensure active` should fail with an actionable message:
+the unit is masked and requires an explicit operator decision. yesh must never
+implicitly run `systemctl unmask` as part of start/restart.
+
+If unmasking is eventually supported, it must be a separate explicit mutation:
+
+```text
+systemctl unmask nginx.service
+systemctl start nginx.service
+```
+
+The plan must show both operations, and the postcondition must verify the unit
+state. A masked unit can still be inspected, logged, and included in a
+read-only fleet report.
+
 ## Open design question
 
 Should `service.*` and `journal` be typed built-in operations or safe macros over

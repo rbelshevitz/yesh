@@ -303,6 +303,9 @@ set. The test copies one unique file and verifies its SHA-256 through SSH.
 - [ ] typed process and systemd diagnostics beyond this read-only slice;
 - [ ] read-only systemd service status from stable `systemctl show` fields and
   bounded `journalctl` output;
+- [ ] model `LoadState=masked` as an actionable service state: report it in
+  status, fail `start/restart/ensure active` clearly, and never auto-unmask;
+  test an explicit unmask operation separately if it is added later;
 - [x] typed read-only device resolution, fstab snapshots and exact active-mount
   checks, including binding one fstab entry to its UUID/PARTUUID device;
 - [ ] effective mount-option and specialized filesystem diagnostics beyond
