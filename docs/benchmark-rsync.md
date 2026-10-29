@@ -54,3 +54,12 @@ external helper is used, its exact argv and failure behavior must be tested.
 
 Success means a reviewer can explain the state transitions and failure paths
 more quickly than in the Bash baseline. A shorter script alone is not success.
+
+## Product target
+
+The useful result is a thin, explicit backup facade: fewer quoting, lock,
+publication, and retention mistakes while `rsync`/`rsnapshot` remain visible
+and independently documented. A future helper may package the repeated
+preflight and state transitions, but it must still expose source, target,
+previous snapshot, retention, and destructive actions in `--plan`. It must not
+invent a second backup engine or silently change rsync semantics.

@@ -149,6 +149,10 @@ is intentionally still open: the adaptation must cover lock/state handling,
 preview, partial failure, rerun behavior, and restore verification rather than
 just wrap one `rsync` invocation. See [the corpus catalog](bash-corpus.md).
 
+The product target is a thin backup facade, not a hidden backup engine:
+`rsync`/`rsnapshot` remain visible, while yesh makes preflight, lock,
+publication, retention, restore, and `--plan` explicit and reviewable.
+
 The Linux read-only storage interface is implemented:
 
 - `device by uuid|partuuid identity` resolves one device from available lsblk metadata;
