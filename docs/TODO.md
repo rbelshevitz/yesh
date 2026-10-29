@@ -66,7 +66,10 @@ This is the current practical result, not a promise about future syntax:
   descriptor cleanup, and guarded redirections;
 - administration: readable mount/UUID/PARTUUID/free-space checks, SSH/SCP,
   rsync without implicit `--delete`, and read-only process snapshots with RSS
-  summaries without hand-parsing `ps` or `awk`.
+  summaries without hand-parsing `ps` or `awk`;
+- bounded systemd service state/restart/wait operations and bounded JSON
+  journal queries with explicit manager, timeout, identity, and diagnostic
+  boundaries.
 
 The practical claim is deliberately limited: yesh already makes these scripts
 easier to read and review, but does not yet claim built-in CIDR/net-tools,
@@ -357,7 +360,8 @@ set. The test copies one unique file and verifies its SHA-256 through SSH.
 The process boundary is intentional: yesh currently reads a bounded `/proc`
 snapshot and aggregates RSS, while its runtime manages its own child processes.
 It does not stop nginx or other foreign processes, expose a general `kill` or
-`pkill` operation, mutate cgroups, or claim systemd service control yet.
+`pkill` operation, mutate cgroups, or claim full systemd service control yet;
+the bounded typed systemd operations are listed above.
 
 ## Networking and CIDR
 

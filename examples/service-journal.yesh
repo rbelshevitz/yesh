@@ -19,5 +19,5 @@
 # Bash equivalent (with easy-to-miss safety details):
 #   journalctl --no-pager --output=json --unit systemd-journald.service \
 #     --since=-15m --lines=80
-# yesh makes the bounded contract part of the statement and its plan.
+# yesh makes the bounds part of the statement and its plan.
 journal systemd-journald.service since 15m lines 80

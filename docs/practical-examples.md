@@ -8,7 +8,7 @@ The scenarios are exercised by `cmd/yesh/practical_posix_test.go` and
 `cmd/yesh/initrd_linux_test.go`. Tests use temporary directories, do not touch
 production services, and do not require a real remote SSH host.
 
-## Exit-code contract
+## Exit-code rules
 
 The following convention belongs to the practical examples, not to the yesh
 language itself:
@@ -144,7 +144,7 @@ bounded `/proc`.
 commands and stops after an inactive service. The fixtures verify argv, order,
 and that later commands do not run. This does not test a real systemd bus.
 
-The typed examples make the higher-value contracts explicit:
+The typed examples make the stronger guarantees explicit:
 [service-status.yesh](../examples/service-status.yesh) reads a fixed property
 allowlist, [service-restart.yesh](../examples/service-restart.yesh) verifies
 the exact returned unit and `ActiveState` after restart,

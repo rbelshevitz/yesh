@@ -87,8 +87,11 @@ Go — единственная целевая реализация runtime; yes
 
 Go-runtime находится в `cmd/yesh`. Поддерживаются простые присваивания, списки,
 `if`, `for`, команды, пайпы/редиректы, остановка при ошибке и базовые safety
-ограничения. Read-only storage/fstab и process snapshots уже имеют интерфейсы;
-mount/umount, управление systemd и чужими PID не считать реализованными.
+ограничения. Read-only storage/fstab, process snapshots и typed systemd/journal
+operations (`service status`, bounded `wait`, restart with a postcondition,
+and bounded JSON journal) уже имеют интерфейсы; mount/umount, start/stop/reload
+как отдельные операции, cgroup management и управление чужими PID не считать
+реализованными.
 Linux `with lock path:` уже реализован как неблокирующий advisory-lock с
 освобождением на всех путях выхода. Текущий практический фокус — disposable
 backup/rsync benchmark на Linux.
@@ -96,8 +99,9 @@ backup/rsync benchmark на Linux.
 
 Проверки Linux/POSIX подтверждают runtime-поведение только в доступном
 окружении; Windows-тесты подтверждают переносимую часть parser/runtime и не
-доказывают сигналы, TTY, устройства или systemd. Реальный mount, systemd,
-SSH и загрузочные сценарии требуют отдельного окружения.
+доказывают сигналы, TTY, устройства или systemd. Typed systemd operations
+требуют Linux manager/journal для host-level проверки; реальный mount, SSH и
+загрузочные сценарии требуют отдельного окружения.
 
 Новые встроенные операции не добавлять ради полноты shell. Сначала закрывать
 корпус backup/rsync на disposable fixture; затем повторять только те проблемы,
@@ -194,8 +198,9 @@ SSH и загрузочные сценарии требуют отдельног
 - `TestLinuxPracticalInitrdModuleManifest` проверяет настоящие newc/gzip/zstd
   и lsinitramfs на искусственном образе. `.ko` в нём — фиктивные данные.
   Это не проверка привязки устройства, загрузки модуля или успешной загрузки ОС.
-- Управление systemd/cgroup, реальный SSH, TTY/PTY и загрузочные испытания
-  требуют отдельного окружения. Кросскомпиляция не заменяет выполнение на ОС.
+- Более широкое управление systemd/cgroup, реальный SSH, TTY/PTY и загрузочные
+  испытания требуют отдельного окружения. Кросскомпиляция не заменяет
+  выполнение на ОС.
 - Если требуемый Go недоступен, не понижать версию проекта в `go.mod`.
   Временный modfile допустим для ограниченной проверки с явным указанием,
   что требуемый toolchain не проверен. Кэши по-прежнему только в workspace.
