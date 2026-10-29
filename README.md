@@ -136,6 +136,7 @@ redirect safety rules.
 See [execution safety](SAFETY.md) for the security boundary and operational
 rules; this is not a sandbox for untrusted scripts.
 The core design notes are [control flow](docs/control-flow.md),
+[design principles](DESIGN.md),
 [storage design](docs/storage.md), [remote operations](docs/remote-ops.md),
 [processes and text](docs/processes-and-text.md), and
 [systemd integration](docs/systemd.md).

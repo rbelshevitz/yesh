@@ -11,6 +11,26 @@ yesh предназначен для небольших операционных
 
 > Можно ли понять чужой скрипт сверху вниз, не мысленно исполняя Bash?
 
+## Три правила языка
+
+yesh не должен требовать от автора постоянной защиты от самого языка.
+
+1. **Одна конструкция — одна семантика.** Поведение не меняется из-за
+   синтаксического контекста или случайного способа записи.
+2. **Никаких неявных преобразований.** Строка остаётся строкой, список —
+   списком, а аргумент команды — одним аргументом. Значения не превращаются
+   в код и не проходят неявный word splitting.
+3. **Ошибки явны и предсказуемы.** Автору не нужно помнить исключения из
+   `set -e` или выяснять, какая стадия pipeline случайно определила итоговый
+   код возврата.
+
+yesh не обязан воспроизводить все возможности Bash. Многие из них являются
+историческими компромиссами, а не хорошими основаниями для нового языка.
+
+Хороший yesh-скрипт должен оставаться понятным через полгода: автор открывает
+его и сразу видит намерение, не вспоминая набор хитростей, необходимых для
+того, чтобы скрипт когда-то заработал.
+
 ## Базовый пример
 
 ```yesh
@@ -18,8 +38,8 @@ hosts = [web-1, web-2]
 service = nginx
 
 for host in $hosts:
-    echo "checking host" host
-    ssh host systemctl is-active service
+    echo "checking host" $host
+    ssh $host systemctl is-active $service
 ```
 
 Здесь `hosts` — список, `service` — строка, а `ssh` и `systemctl` — обычные
@@ -41,11 +61,11 @@ for host in $hosts:
 services = [api, worker]
 
 for service in $services:
-    systemctl restart service
-    if systemctl is-active service:
-        echo service "is running"
+    systemctl restart $service
+    if systemctl is-active $service:
+        echo $service "is running"
     else:
-        echo service "failed to start"
+        echo $service "failed to start"
         exit 1
 ```
 
@@ -92,7 +112,7 @@ yesh не хранит SSH-приватные ключи и пароли в ис
 
 ```yesh
 host = web-1
-ssh host systemctl restart api
+ssh $host systemctl restart api
 ```
 
 Ключи остаются в `ssh-agent` или выбираются через обычный `~/.ssh/config`.
