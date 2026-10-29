@@ -112,6 +112,17 @@ yesh is a language sketch focused on readable system-administration and
 operational scripts.
 The examples and design documents are the source of truth for its semantics.
 
+### Where yesh fits beside Ansible
+
+yesh is not a replacement for Ansible. Ansible is an orchestration system with
+inventory, modules, roles, and a desired-state model for many hosts. yesh is a
+small Unix automation language for transparent local scripts, runbooks,
+preflight checks, and command-level steps inside larger automation.
+It keeps `ssh`, `rsync`, `systemctl`, and other tools visible instead of hiding
+them behind a new module model. Use Ansible for fleet orchestration and
+idempotent desired state; use yesh when a Bash-like Unix workflow needs clearer
+syntax, explicit arguments, and reviewable execution.
+
 ## Core execution model
 
 Values keep their type: a string stays one argument and a list expands to
