@@ -5,8 +5,7 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A readable, safety-first Unix shell for system administration and operational
-automation.
+A readable, safety-first language for Unix automation and preflight checks.
 
 [Русская версия README](README.ru.md)
 
