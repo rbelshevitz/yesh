@@ -1,3 +1,4 @@
+# Environment-dependent example: reads the host's /etc/fstab.
 # Read configuration through libmount without resolving devices or mounting.
 # Parser warnings stop the script; inspection hides option values.
 mounts = fstab "/etc/fstab"

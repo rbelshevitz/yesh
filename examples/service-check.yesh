@@ -1,3 +1,4 @@
+# Environment-dependent example: requires systemd access and nginx/sshd units.
 # Check access to systemd, then confirm each service is active.
 # Replace the service names with units installed on your machine.
 

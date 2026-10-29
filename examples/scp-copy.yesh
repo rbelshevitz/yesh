@@ -1,3 +1,4 @@
+# Environment-dependent example: requires SSH config/agent, host-key trust, and a remote target.
 # Copy one backup artifact through the user's normal SSH config or agent.
 # No private keys, passwords, or passphrases are stored in this script.
 port = 22

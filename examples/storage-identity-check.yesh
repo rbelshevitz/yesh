@@ -1,3 +1,4 @@
+# Environment-dependent example: replace /backup and the placeholder UUID/PARTUUID.
 # Require the backup path to be mounted from one exact filesystem identity.
 # Use either UUID=... or PARTUUID=...; this script never mounts anything.
 mountpoint = /backup

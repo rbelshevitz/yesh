@@ -1,3 +1,5 @@
+# Environment-dependent example: requires SSH access to web-1 and rsync.
+# Replace the host, paths, and service name before running.
 # Minimal deployment example.
 
 host = web-1

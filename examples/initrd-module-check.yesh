@@ -1,3 +1,4 @@
+# Fixture-dependent example: requires the prepared test-initrd.img fixture.
 # Check an exact path in a prepared test initramfs.
 # This checks the manifest, not driver compatibility or loading.
 image = "test-initrd.img"

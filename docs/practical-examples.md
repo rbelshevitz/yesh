@@ -146,6 +146,19 @@ and that later commands do not run. This does not test a real systemd bus.
 
 ## Dependencies and practical test run
 
+The example files are executable, but not all are turnkey on an arbitrary
+host. Files whose header says **environment-dependent** need the stated local
+service, mount, process, SSH, or configuration. Files marked
+**fixture-dependent** expect the test fixture described in this document.
+Replace placeholders before using them against a real system; `web-1`,
+`/backup`, and example UUIDs are not live values.
+
+| Group | Examples | Required context |
+| --- | --- | --- |
+| Self-contained/fixture-tested | `hello`, `backup`, `config-apply`, `rsync-*`, `initrd-module-check` | temporary files or the documented fixture |
+| Host read-only checks | `process-*`, `mount-check`, `storage-*`, `fstab-*`, `journal-report`, `service-check` | Linux `/proc`, mount/fstab, journal/systemd, or a real mounted path |
+| Remote/configured | `ssh-health`, `scp-copy`, `deploy`, `rsnapshot-local` | SSH trust/agent, remote target, or prepared config |
+
 The practical Linux suite uses ordinary tools including `tar`, `gzip`, `grep`,
 `install`, `mv`, `findmnt`, `rsync`, `pv`, and `rsnapshot`. Linux CI installs
 the optional packages explicitly and marks scenarios as skipped when a tool is
