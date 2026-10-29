@@ -309,6 +309,38 @@ func TestPOSIXPracticalSSHHealthAndSCPArguments(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalSSHHealthFailureStopsLoop(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	ssh := "#!/bin/sh\nprintf '%s\\000' ssh \"$@\" >> \"$TRACE_FILE\"\nexit 255\n"
+	writeTestFile(t, filepath.Join(bin, "ssh"), []byte(ssh), 0700)
+	script := practicalExample(t, "ssh-health.yesh")
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte("web-1 health check failed")) {
+		t.Fatalf("SSH failure: code=%v output=%q", err, out)
+	}
+	want := []string{
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-1", "hostname",
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("SSH failure argv: %q want %q", got, want)
+	}
+	if bytes.Contains(readTestFile(t, trace), []byte("web-2")) {
+		t.Fatal("health check continued to the next host after failure")
+	}
+}
+
 func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "bin")
