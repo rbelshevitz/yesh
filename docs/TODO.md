@@ -90,10 +90,15 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [ ] typed remote-node description with explicit host, user, and port;
 - [x] basic read-only SSH health and SCP argument-vector examples with explicit
   port, timeout, batch mode, and host-key policy;
-- [ ] use the system SSH client, agent, and config without reading or storing
-  private keys, passwords, or passphrases;
+- [ ] use the system SSH client, inherited `SSH_AUTH_SOCK`, OpenSSH config and
+  `known_hosts` without reading or storing private keys, passwords, or
+  passphrases; test `BatchMode=yes` and no interactive prompt;
 - [ ] explicit host-key policy; never silently allow
   `StrictHostKeyChecking=no`;
+- [ ] allow only explicitly selected host-key bootstrap policy; default
+  unattended runs to pre-provisioned `known_hosts` and strict verification;
+- [ ] when an agent has multiple identities, document/test explicit
+  `IdentitiesOnly` selection rather than probing every key;
 - [ ] no hidden shell code on the remote host;
 - [ ] SCP transfers with source/destination validation and partial-result
   reporting;
@@ -140,6 +145,16 @@ by this mount requirement. Whole-filesystem bind mounts cannot be distinguished
 from ordinary mounts; uniqueness covers only available device metadata.
 Built-in mount/unmount remain planned. The next storage step is to define the
 readonly-mount contract and a dedicated test environment.
+
+Storage security decisions for the next slice:
+
+- [ ] keep local UUID/PARTUUID checks separate from network-mount diagnostics;
+- [ ] treat `credentials=` as a reference to an external file, never as a
+  value to load into yesh; require a regular file, restricted ownership/mode,
+  and redact the path/value in reports;
+- [ ] reject inline `password=` and never write credentials to `/etc/fstab`;
+- [ ] test readonly mount checks, effective options, write access, and free
+  space in a privileged Linux environment before adding mount/unmount actions.
 
 - [x] Re-run the full Linux/POSIX/storage/fstab suite on ordinary Linux (not
   WSL) with Go 1.27, including race, vet, and build; the Rocky Linux 9.8 run
