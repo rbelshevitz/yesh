@@ -52,6 +52,12 @@ API, or rollback/defer construct. Do not add a builtin for one failure until
 the same missing capability appears in a second corpus workflow. If an
 external helper is used, its exact argv and failure behavior must be tested.
 
+The current language-design hypothesis is deliberately narrower than a
+`snapshot` DSL: if the benchmark confirms the gap, consider only generic
+cross-workflow primitives such as a scoped exclusive lock and an atomic
+publish/rename operation. Both must have explicit failure semantics and be
+useful outside backup (for example cron jobs and configuration publication).
+
 Success means a reviewer can explain the state transitions and failure paths
 more quickly than in the Bash baseline. A shorter script alone is not success.
 

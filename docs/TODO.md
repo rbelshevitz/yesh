@@ -153,6 +153,10 @@ The product target is a thin backup facade, not a hidden backup engine:
 `rsync`/`rsnapshot` remain visible, while yesh makes preflight, lock,
 publication, retention, restore, and `--plan` explicit and reviewable.
 
+Do not add a backup-specific `snapshot` DSL before the benchmark. The first
+language candidates, only if confirmed by at least two workflows, are generic
+scoped locking and atomic publication of a completed temporary result.
+
 The Linux read-only storage interface is implemented:
 
 - `device by uuid|partuuid identity` resolves one device from available lsblk metadata;
