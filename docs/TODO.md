@@ -89,11 +89,15 @@ evidence for a new language feature.
 - [ ] Select and sanitize backup/rsync, systemd/journal, storage, SSH/SCP,
   and network-check scripts; do not import disabled host-key checks, hidden
   `sudo`, or destructive defaults.
-- [ ] Adapt an initial set without extending the language: service check,
-  read-only storage preflight, backup preview, and SSH health check.
-- [ ] Record every mismatch with Bash as either an unreadable construct,
+- [x] Adapt an initial set without extending the language: service check,
+  read-only storage preflight, backup preview, and SSH health check. These are
+  independent examples under `examples/`, with fixture-backed tests in
+  `cmd/yesh/practical_posix_test.go`.
+- [x] Record the first mismatches with Bash as either an unreadable construct,
   splitting/quoting risk, hidden pipeline failure, or missing safe yesh
-  expressiveness.
+  expressiveness in [practical examples](practical-examples.md) and the
+  design/safety notes. This is an initial inventory, not a claim that the
+  20–30-script corpus is complete.
 - [ ] Consider a new built-in only after the same justified problem occurs in
   at least two corpus scenarios.
 
@@ -139,6 +143,11 @@ Real remote changes and restore tests belong in a dedicated test VM.
 - [x] tests for broken transfer, lock conflict, reruns, and restore verification;
 - [ ] tests for host-key-specific failure, transfer timeout, full disk, and an
   unmounted backup disk.
+
+The first full benchmark case is incremental rsync backup with retention. It
+is intentionally still open: the adaptation must cover lock/state handling,
+preview, partial failure, rerun behavior, and restore verification rather than
+just wrap one `rsync` invocation. See [the corpus catalog](bash-corpus.md).
 
 The Linux read-only storage interface is implemented:
 
