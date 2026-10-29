@@ -89,6 +89,9 @@ boundary and operational rules.
 - [ ] Expand fuzzing to lexer/parser, value expansion, redirects, and runtime
   cancellation; keep existing identity fuzz cases.
 - [ ] Add `govulncheck` and dependency scanning to CI.
+- [ ] Add repeat-run allocation/heap profiling for parser, runtime, process
+  snapshots, and cancellation paths; monitor child-tool memory separately via
+  cgroups/systemd limits.
 - [ ] Write a threat model and release security checklist.
 - [ ] Run privileged loopback/storage checks only in a disposable VM or
   dedicated Rocky host; never use production disks or the real `/etc/fstab`.

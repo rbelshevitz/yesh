@@ -155,6 +155,9 @@ argv предотвращает повторный разбор команд she
 - [ ] Расширить fuzzing на lexer/parser, раскрытие значений, redirects и
   отмену runtime; сохранить существующие fuzz-тесты identity.
 - [ ] Добавить `govulncheck` и проверку зависимостей в CI.
+- [ ] Добавить repeat-run allocation/heap profiling для parser, runtime,
+  process snapshots и cancellation; память дочерних утилит отдельно
+  ограничивать через cgroups/systemd.
 - [ ] Написать threat model и release security checklist.
 - [ ] Выполнять privileged loopback/storage только в disposable VM или на
   отдельном Rocky-хосте; не использовать production-диски и настоящий `/etc/fstab`.

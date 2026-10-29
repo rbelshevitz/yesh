@@ -4,9 +4,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
+
+const maxScriptBytes = 4 << 20
 
 func main() {
 	os.Exit(runCLI())
@@ -24,9 +27,23 @@ func runCLI() int {
 		return 2
 	}
 	script := flags.Arg(0)
-	data, err := os.ReadFile(script)
+	file, err := os.Open(script)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxScriptBytes+1))
+	closeErr := file.Close()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if closeErr != nil {
+		fmt.Fprintln(os.Stderr, closeErr)
+		return 1
+	}
+	if len(data) > maxScriptBytes {
+		fmt.Fprintf(os.Stderr, "yesh: script exceeds %d bytes\n", maxScriptBytes)
 		return 1
 	}
 	items, err := parse(string(data), script)

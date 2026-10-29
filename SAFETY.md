@@ -18,6 +18,9 @@ fail before a child process is started whenever possible.
   read/truncate aliasing are rejected.
 - `--plan` displays expanded argv without starting external commands or opening
   redirect files.
+- Script source is capped at 4 MiB before parsing; bounded loops, process
+  snapshots, regexes, and Linux storage-query output provide additional
+  resource limits.
 
 These are language and runtime guarantees, not a sandbox.
 

@@ -88,6 +88,22 @@ func TestPOSIXCLIStdinAndStderr(t *testing.T) {
 	}
 }
 
+func TestPOSIXCLIScriptSizeLimit(t *testing.T) {
+	script := filepath.Join(t.TempDir(), "oversized.yesh")
+	writeTestFile(t, script, bytes.Repeat([]byte{'#'}, maxScriptBytes+1), 0600)
+	out, err := posixCLI(t, context.Background(), script).CombinedOutput()
+	if err == nil {
+		t.Fatal("oversized script unexpectedly succeeded")
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("oversized script exit=%v output=%q", err, out)
+	}
+	if !bytes.Contains(out, []byte("script exceeds")) {
+		t.Fatalf("oversized script diagnostic=%q", out)
+	}
+}
+
 func TestPOSIXCLIExitAndStop(t *testing.T) {
 	for _, tc := range []struct {
 		name, source string
