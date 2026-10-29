@@ -622,7 +622,8 @@ func TestPOSIXPracticalIncrementalRsyncRoundTrip(t *testing.T) {
 	if got := string(readTestFile(t, filepath.Join(second, "changed.txt"))); got != "version two, changed size\n" {
 		t.Fatalf("rerun changed published data: %q", got)
 	}
-	// A missing source must fail before taking the old published snapshot away.
+	// A missing source is reported by rsync. It must fail before taking the old
+	// published snapshot away; yesh cannot inspect a remote source with exists.
 	missing := practicalCommand(t, dir, practicalExample(t, "rsync-incremental.yesh"))
 	missing.Env = append(os.Environ(),
 		"YESH_TEST_CLI=1",
@@ -635,7 +636,7 @@ func TestPOSIXPracticalIncrementalRsyncRoundTrip(t *testing.T) {
 	)
 	if out, err := missing.CombinedOutput(); err == nil {
 		t.Fatalf("missing source unexpectedly succeeded: %s", out)
-	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 {
+	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() == 0 {
 		t.Fatalf("missing source exit=%v output=%q", err, out)
 	}
 	if _, err := os.Stat(filepath.Join(root, "snapshot.2")); !os.IsNotExist(err) {
