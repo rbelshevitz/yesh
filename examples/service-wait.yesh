@@ -1,0 +1,29 @@
+# Wait for one exact unit to become active, without restarting it.
+# Run this on a Linux host with systemd and replace the unit if necessary.
+#
+# This operation is read-only: it repeatedly asks `systemctl show` for the
+# fixed fields Id, LoadState, ActiveState and SubState. It does not call
+# start, restart, enable, daemon-reload or sudo. A failed or not-found unit
+# is reported as an error; yesh does not try to repair it.
+#
+# `within 30s` is a hard client deadline. The first state check happens
+# immediately, then checks are bounded and spaced apart; an inactive,
+# activating or deactivating service is not reported as success. At timeout
+# the last observed ActiveState and SubState are included in the error.
+# `failed`, `not-found` and `masked` are reported immediately instead of
+# burning the whole timeout: without another explicit actor they cannot become
+# the requested postcondition merely by waiting.
+#
+# This checks systemd's state, not application readiness. For HTTP, a socket,
+# migrations or another domain-specific condition, add a separate explicit
+# yesh command after this statement. For Type=oneshot, active is meaningful
+# only when the unit uses RemainAfterExit=yes; otherwise a successful oneshot
+# commonly returns to inactive/dead and this postcondition is intentionally
+# not guessed by yesh.
+#
+# Bash comparison (with the usual polling, quoting and timeout details left
+# to the author):
+#   systemctl is-active --quiet api.service
+# A loop around that command still needs a deadline and diagnostics. The yesh
+# form makes the unit, postcondition and deadline visible to code review.
+service wait systemd-journald.service until active within 30s

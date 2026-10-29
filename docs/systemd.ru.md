@@ -3,6 +3,12 @@
 Цель — не заменить `systemctl` и `journalctl`, а убрать повторяющийся
 административный шум и сделать опасные операции заметными при чтении.
 
+Полезная граница — небольшой типизированный адаптер над systemd, а не второй
+язык конфигурации systemd. yesh должен коротко выражать частые вопросы:
+«этот точный unit исправен?», «перезапуск завершился?», «покажи последние
+ограниченные записи журнала?» — сохраняя в скрипте имя unit, manager, timeout и
+изменяющее действие.
+
 ## Целевой синтаксис
 
 ```yesh
@@ -12,7 +18,140 @@ service.status api
 service.restart api
 service.wait api running within 30s
 journal api since 15m lines 100
+service status user api.service
+journal user api.service since 15m lines 100
 ```
+
+`service status`, `service restart UNIT until active within DURATION`,
+`service wait UNIT until active within DURATION` и
+ограниченный `journal UNIT since DURATION lines N` уже реализованы. Restart
+использует единый конечный бюджет клиента, затем заново читает состояние
+точной unit; `systemctl --wait` не используется, потому что для долгоживущей
+службы он может ждать её завершения. Journal выдаёт JSON Lines, ограничен
+четырьмя MiB и отклоняет диагностику в stderr, чтобы предупреждение о правах
+или частичный результат не выглядели успехом. Cursor/boot-фильтры и follow
+пока остаются целевым дизайном; bounded `wait` уже реализован.
+
+Перед unit можно указать manager: `system` или `user`. Если профиль опущен,
+используется системный manager для совместимости со старым синтаксисом.
+Профиль `user` добавляет `--user` и для `systemctl`, и для `journalctl`;
+это не означает наличие persistent user journal или достаточных прав чтения.
+
+`service wait` ничего не запускает и не перезапускает: он сразу читает
+состояние, затем опрашивает его до конечного срока. При timeout выводится
+последний `ActiveState`/`SubState`. Это состояние manager, а не readiness
+приложения. Для `Type=oneshot` postcondition `active` имеет ожидаемый смысл
+только при `RemainAfterExit=yes`; без него успешный oneshot обычно становится
+`inactive/dead`, и yesh не угадывает это как успех.
+Состояния `failed`, `not-found` и `masked` сообщаются сразу, без ожидания
+всего timeout; переходные `inactive`, `activating` и `deactivating` могут
+измениться внешним актором и поэтому опрашиваются.
+
+## Что именно упрощается
+
+Упрощайзер должен убирать только повторение и опасные значения по умолчанию:
+
+| Повторяющаяся работа с systemd | Упрощение в yesh |
+| --- | --- |
+| `systemctl show` и ручной список свойств | один ограниченный снимок службы с именованными полями |
+| start/restart и отдельный цикл опроса | одно действие с обязательным postcondition и timeout |
+| разбор текста `systemctl status` | структурированное состояние по allowlist свойств |
+| `journalctl` с pager и неограниченным выводом | ограниченные записи, явный интервал, без pager |
+| разный вызов system/user manager | явный выбор manager в операции |
+
+Адаптер не должен скрывать `sudo`, выбор unit, изменения или ошибки. Он не
+принимает glob и не действует молча на нескольких unit. `daemon-reload`,
+`reload`, `restart`, `enable`, `disable`, `mask` и `unmask` — разные операции и
+должны оставаться разными в yesh.
+
+## Опасные нюансы systemd
+
+Это границы дизайна, а не мелкие детали реализации:
+
+- Alias — допустимая явная цель systemd, но `systemctl show` может вернуть
+  canonical `Id`. Текущий MVP явно отклоняет такой mismatch и сообщает, что
+  aliases не поддержаны; принятие alias требует отдельной политики identity.
+- `foo@.service` — template, а `foo@blue.service` — конкретный instance.
+  Первый отклоняется как цель, а concrete instance остаётся явным именем.
+- `Type=oneshot` без `RemainAfterExit=yes` после успешного завершения переходит
+  в inactive/dead. Поэтому `active` не означает успех для любого типа unit.
+- `systemctl restart` ждёт job manager, если не указан `--no-block`, но это не
+  доказательство готовности приложения. После него могут потребоваться
+  `Result`, exit status процесса, readiness probe или предметный postcondition.
+- `--system` и `--user` обращаются к разным manager. Доступ к journal также
+  зависит от прав, а `--user` ограничен при отключённом persistent journal.
+- `journalctl --unit=foo.slice` включает записи дочерних unit. Это нельзя
+  описывать как фильтр одной службы.
+- Пустой journal — нормальный результат. Его нужно отличать от отказа доступа,
+  недоступного manager, ротации старых записей и повреждённого/частичного JSON.
+
+## Минимальный полезный интерфейс
+
+Первый слой должен быть небольшим:
+
+```yesh
+service status api.service
+service restart api.service until active within 30s
+service wait api.service until active within 30s
+journal api.service since 15m lines 100
+```
+
+`service status` должен различать как минимум `active`, `inactive`, `failed`,
+`activating`, `deactivating`, `masked`, `not-found`, недоступный manager и
+отказ в доступе. `service restart` должен сообщать и результат команды, и
+проверенное итоговое состояние. Успешный возврат клиента `systemctl` сам по
+себе не доказывает, что служба достигла нужного состояния.
+
+Грамматика этих четырёх форм уже проверяется parser/runtime-тестами. Важнее
+семантическое правило:
+каждая изменяющая операция со службой имеет явное postcondition либо явно
+возвращает только результат manager; timeout никогда не выдаётся за доказанную
+остановку.
+
+## Карта примеров и fixture
+
+| Нюанс | Runnable-пример | Что доказывает fixture |
+| --- | --- | --- |
+| точная unit и фиксированные поля | `examples/service-status.yesh` | allowlist, canonical Id, отсутствие изменения |
+| restart не равен readiness | `examples/service-restart.yesh` | отказ postcondition останавливает скрипт |
+| конечный polling | `examples/service-wait.yesh` | переход в active, timeout, быстрый failed-state |
+| ограниченный journal | `examples/service-journal.yesh` | JSON, ошибка stderr, успешный пустой результат |
+
+Для проверки настоящего systemd есть отдельный opt-in-скрипт
+[`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh). Он создаёт
+уникальные временные юниты только в `/run/systemd/system`, проверяет реальные
+`status`, `restart` и `wait`, отдельно подтверждает `oneshot` без
+`RemainAfterExit` и timeout во время `activating`, а затем удаляет только свои
+файлы через `trap`. Скрипт требует интерактивный `sudo` и не должен запускаться
+на production-службах.
+
+Примеры намеренно подробно прокомментированы. У каждого есть Bash-сравнение,
+а practical fixture запускает сам файл с fake `systemctl`/`journalctl` и
+проверяет argv, вывод, порядок, остановку после ошибки и `--plan` без
+обращения к настоящему manager.
+
+## Masked unit — это состояние, а не ошибка parser-а
+
+`LoadState=masked` — допустимое наблюдение. `service status` его показывает,
+а `service wait` сразу завершается ошибкой и не тратит весь timeout. yesh не
+добавляет скрытый `systemctl unmask`; если unmask появится, это должна быть
+отдельная явная изменяющая операция.
+
+## Текущая граница и следующий поиск
+
+В MVP уже реализованы read-only `service status`, bounded `service wait`,
+restart с postcondition и bounded JSON journal. Они используют фиксированный
+allowlist `systemctl show`, точную identity unit, профиль system/user, конечные
+сроки и прозрачный argv в `--plan`.
+
+Отдельно остаются: start/stop/reload, семантика завершения `oneshot`, queued
+job и readiness после restart, cursor/boot и allowlist полей journal, политика
+ротации/cursor, follow/streaming и backend transient
+service через `systemd-run`. Текущий MVP этого не обещает.
+
+Эти операции должны быть типизированными командами runtime с тем же прозрачным
+планом `argv`, что и внешние команды, а не текстовыми макросами. Так `--plan`
+и диагностика сохранят одну семантику.
 
 Сначала каждая операция должна раскладываться в обычные команды:
 
@@ -35,8 +174,9 @@ journalctl -u api --since 15m -n 100 --no-pager
 - не читать бесконечный journal-поток без явного `follow`-режима;
 - `follow` в MVP запрещён, пока нет отдельной модели отмены и закрытия TTY.
 
-## Открытый вопрос
+## Принятое решение
 
-Нужно решить, будут ли `service.*` и `journal` встроенными типизированными
-операциями или только безопасными макросами над `systemctl`/`journalctl`.
-Для MVP предпочтительна внутренняя команда с тем же прозрачным планом argv.
+`service` и `journal` — встроенные типизированные операции, а не текстовые
+макросы над `systemctl` и `journalctl`. Позднее transport можно заменить на
+native D-Bus, но identity, состояния, timeout, диагностика и postcondition
+должны остаться наблюдаемыми и эквивалентными.

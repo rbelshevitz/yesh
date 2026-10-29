@@ -184,6 +184,30 @@ else:
 не считает RSS показателем PSS.
 Регулярные выражения, произвольный выбор полей и управление процессами
 в этот первый интерфейс снимка не входят.
+.SS Состояние и restart службы systemd (Linux)
+.nf
+service status nginx.service
+service status user nginx.service
+service restart nginx.service until active within 30s
+service wait nginx.service until active within 30s
+journal user nginx.service since 15m lines 20
+.fi
+.PP
+Операция status читает одну полную unit через фиксированный список свойств
+systemctl show. Restart вызывает systemctl restart, затем в одном конечном
+бюджете проверяет точный Id и требуемый ActiveState. Wait сначала читает
+состояние, затем опрашивает его до postcondition или конечного срока; службу
+он не запускает и не перезапускает. systemctl --wait и
+автоматический sudo не используются; timeout клиента не доказывает отмену
+операции внутри systemd.
+.PP
+Имена без суффикса, пути, glob, template без instance и shell-операторы
+отклоняются. Alias отклоняется до определения явной canonical identity.
+Перед unit можно указать профиль `system` или `user`; если он опущен,
+выбирается системный manager. Профиль `user` добавляет `--user` к systemctl
+или journalctl. Адаптеры служб и journal работают только в Linux. Пустой
+journal — успешный пустой результат; диагностика, плохой JSON, недоступный
+bus и отказ доступа считаются ошибкой.
 .SS Чтение хранилищ (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"

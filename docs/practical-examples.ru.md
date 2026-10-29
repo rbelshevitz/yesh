@@ -345,6 +345,42 @@ fixture-процессами проверяют точное имя, поля с
 Это проверяет безопасную передачу аргументов, порядок вызовов и остановку
 после неактивной службы. Это не проверка настоящего SSH или systemd bus.
 
+Типизированные примеры делают более важные гарантии явными:
+[service-status.yesh](../examples/service-status.yesh) читает фиксированный
+allowlist свойств, [service-restart.yesh](../examples/service-restart.yesh)
+после restart проверяет точный возвращённый unit и `ActiveState`, а
+[service-wait.yesh](../examples/service-wait.yesh) без изменения службы
+опрашивает состояние до конечного timeout и сообщает последнее состояние при
+отказе, а
+[service-journal.yesh](../examples/service-journal.yesh) ограничивает интервал,
+число записей и объём вывода, требуя корректный JSON и чистый stderr.
+Fixture-тест проверяет точный argv, успешные status/restart/wait, отказ
+postcondition и timeout wait, JSON-журнал и `--plan` без внешнего вызова.
+Настоящие systemd bus и journal
+этим fixture не подтверждаются и требуют отдельного opt-in запуска на host.
+
+Для такого запуска подготовлен
+сценарий [`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh).
+Он использует только уникальные временные имена в `/run/systemd/system`,
+сначала отказывается перезаписывать существующий файл, автоматически удаляет
+fixture через `trap` и проверяет также три отрицательных случая: `oneshot`
+без `RemainAfterExit`, timeout в состоянии `activating` и аварийный restart с
+`Result=exit-code`/ненулевым `ExecMainStatus`.
+
+Отдельно выполнен opt-in прогон на отдельном Linux стенде с systemd 252:
+`service-status.yesh` и `service-wait.yesh` подтвердили
+`systemd-journald.service` как `loaded/active/running`, а
+`service-journal.yesh` корректно завершился с пустым журналом. Для
+`service-restart.yesh` выполнен только `--plan`; реальный restart службы не
+проводился. Manager на стенде сообщил `degraded`, поэтому это проверка
+конкретного доступного systemd/journal, а не утверждение, что вся машина
+здоровa.
+
+Различие отказов намеренное: неактивная служба после успешного `systemctl
+restart` — ошибка yesh; пустой journal-запрос успешен и означает отсутствие
+подходящих записей; непустая диагностика или неверный JSON — ошибка, а не
+частичный отчёт.
+
 [ssh-health.yesh](../examples/ssh-health.yesh) проверяет список узлов через
 `ssh` с явными настройками порта, `BatchMode` и timeout, собранными в одном
 списке argv. В тесте подменённая `ssh` фиксирует
@@ -360,7 +396,7 @@ argv и порядок `hostname`/`uptime`; реальные ключи и па�
 SSH/SCP с ключевой авторизацией: `--plan` показал `scp` с раскрытыми argv,
 команда завершилась успешно, а `cmp` подтвердил совпадение исходного и
 полученного файла. Затем тот же SCP-сценарий был выполнен на отдельную машину
-`max@192.168.111.113` в `/tmp/yesh-test/`, а SHA-256 исходного и удалённого
+отдельный Rocky Linux тестовый узел в `/tmp/yesh-test/`, а SHA-256 исходного и удалённого
 `go.mod` совпал. Это подтверждает реальную передачу через SSH, но не заменяет
 тест восстановления из backup или обработки частично записанного результата.
 

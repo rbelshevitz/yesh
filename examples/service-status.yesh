@@ -1,0 +1,17 @@
+# Read-only systemd status for one exact unit.
+# Run this on a Linux host with systemd; replace the full unit when needed.
+#
+# The runtime asks only for Id, LoadState, ActiveState and SubState through
+# `systemctl show`; it does not parse localized/colorized `systemctl status`
+# output and it never changes the unit. Masked, failed and not-found states
+# remain observations and are not repaired implicitly.
+#
+# This is the system manager because no `user` profile is written. The full
+# `.service` suffix is intentional: an alias or a template is not silently
+# converted into another unit. A canonical-Id mismatch is an error.
+#
+# Bash comparison:
+#   systemctl show --no-pager \
+#     --property=Id,LoadState,ActiveState,SubState systemd.service
+# The yesh form validates the unit and the returned Id before printing it.
+service status systemd-journald.service

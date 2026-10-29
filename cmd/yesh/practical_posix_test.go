@@ -410,6 +410,99 @@ func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalTypedSystemdExamples(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	systemctl := "#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nif [ \"$1\" = restart ]; then printf '%s' 300 > \"$TIMESTAMP_FILE\"; exit 0; fi\nunit=\"$4\"\nts=200\nif [ -f \"$TIMESTAMP_FILE\" ]; then read ts < \"$TIMESTAMP_FILE\"; fi\nprintf '%s\\n' \"Id=$unit\" 'LoadState=loaded' 'ActiveState=active' 'SubState=running' 'Result=success' 'ExecMainCode=0' 'ExecMainStatus=0' \"ActiveEnterTimestampMonotonic=$ts\"\n"
+	journalctl := "#!/bin/sh\nprintf 'journalctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nprintf '%s\\n' '{\"MESSAGE\":\"resolver ready\"}'\n"
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte(systemctl), 0700)
+	writeTestFile(t, filepath.Join(bin, "journalctl"), []byte(journalctl), 0700)
+	env := []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"), "TRACE_FILE=" + trace, "TIMESTAMP_FILE=" + filepath.Join(dir, "timestamp")}
+
+	cmd := practicalCommand(t, dir, practicalExample(t, "service-status.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err := cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_STATUS id=systemd-journald.service load_state=loaded active_state=active sub_state=running")) {
+		t.Fatalf("typed status: %v %s", err, out)
+	}
+
+	cmd = practicalCommand(t, dir, practicalExample(t, "service-restart.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_RESTART id=systemd-resolved.service active_state=active sub_state=running result=success exec_main_code=0 exec_main_status=0 active_enter_timestamp_monotonic=300")) {
+		t.Fatalf("typed restart: %v %s", err, out)
+	}
+
+	cmd = practicalCommand(t, dir, practicalExample(t, "service-journal.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte(`"MESSAGE":"resolver ready"`)) {
+		t.Fatalf("typed journal: %v %s", err, out)
+	}
+
+	cmd = practicalCommand(t, dir, practicalExample(t, "service-wait.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_WAIT id=systemd-journald.service active_state=active sub_state=running")) {
+		t.Fatalf("typed wait: %v %s", err, out)
+	}
+	traceText := string(readTestFile(t, trace))
+	for _, want := range []string{
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState systemd-journald.service",
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ActiveEnterTimestampMonotonic systemd-resolved.service",
+		"systemctl restart systemd-resolved.service",
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState systemd-journald.service",
+		"journalctl --no-pager --output=json --unit systemd-journald.service --since -15m --lines 80",
+	} {
+		if !strings.Contains(traceText, want) {
+			t.Fatalf("missing exact systemd argv %q in trace %q", want, traceText)
+		}
+	}
+}
+
+func TestPOSIXPracticalTypedSystemdFailureAndPlan(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte("#!/bin/sh\nif [ \"$1\" = restart ]; then exit 0; fi\nprintf '%s\\n' \"Id=$4\" 'LoadState=loaded' 'ActiveState=failed' 'SubState=failed'\n"), 0700)
+	script := filepath.Join(dir, "failure.yesh")
+	writeTestFile(t, script, []byte("service restart systemd-resolved.service until active within 2s\ntouch after\n"), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte("postcondition failed")) {
+		t.Fatalf("postcondition failure: %v %s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "after")); !os.IsNotExist(err) {
+		t.Fatalf("script continued after failed postcondition: %v", err)
+	}
+	waitCmd := practicalCommand(t, dir, practicalExample(t, "service-wait.yesh"))
+	waitCmd.Env = append(waitCmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err = waitCmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte("active_state=failed")) {
+		t.Fatalf("wait failure: %v %s", err, out)
+	}
+
+	planDir := t.TempDir()
+	plan := filepath.Join(planDir, "plan.yesh")
+	writeTestFile(t, plan, []byte("service status systemd-journald.service\nservice restart systemd-resolved.service until active within 2s\nservice wait systemd-resolved.service until active within 2s\njournal systemd-journald.service since 15m lines 2\n"), 0600)
+	planCmd := posixCLI(t, context.Background(), "--plan", plan)
+	planCmd.Env = append(planCmd.Env, "PATH="+filepath.Join(planDir, "empty-bin"), "TRACE_FILE="+filepath.Join(planDir, "trace"))
+	out, err = planCmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte(`PLAN ["systemctl" "show" "--no-pager" "--property=Id,LoadState,ActiveState,SubState" "systemd-journald.service"]`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "restart" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "show" "--no-pager" "--property=Id,LoadState,ActiveState,SubState" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["journalctl" "--no-pager" "--output=json" "--unit" "systemd-journald.service" "--since" "-15m" "--lines" "2"]`)) {
+		t.Fatalf("typed plan: %v %s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(planDir, "trace")); !os.IsNotExist(err) {
+		t.Fatalf("plan ran an external systemd command: %v", err)
+	}
+}
+
 func TestPOSIXPracticalRsyncPreviewAndCopy(t *testing.T) {
 	practicalDependencies(t, "rsync", "findmnt", "df")
 	dir := t.TempDir()

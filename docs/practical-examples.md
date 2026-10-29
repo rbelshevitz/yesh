@@ -144,6 +144,40 @@ bounded `/proc`.
 commands and stops after an inactive service. The fixtures verify argv, order,
 and that later commands do not run. This does not test a real systemd bus.
 
+The typed examples make the higher-value contracts explicit:
+[service-status.yesh](../examples/service-status.yesh) reads a fixed property
+allowlist, [service-restart.yesh](../examples/service-restart.yesh) verifies
+the exact returned unit and `ActiveState` after restart,
+[service-wait.yesh](../examples/service-wait.yesh) polls without changing the
+unit until a finite deadline and reports the last state on timeout, and
+[service-journal.yesh](../examples/service-journal.yesh) bounds time, record
+count and output size while requiring valid JSON and clean stderr. Their
+fixture test covers exact argv, successful status/restart/wait, wait timeout,
+failed postcondition, JSON journal output, and `--plan` with no external
+invocation. A real systemd
+bus or journal is still an opt-in host check, not proven by the fixture.
+
+For that check, use
+[`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh). It uses
+unique temporary names only in `/run/systemd/system`, refuses to overwrite an
+existing file, removes the fixture through `trap`, and also checks three
+negative cases: `oneshot` without `RemainAfterExit`, a timeout while the unit
+is `activating`, and a failed restart with `Result=exit-code` and a non-zero
+`ExecMainStatus`.
+
+An opt-in run was also completed on a separate Linux test host with systemd
+252: `service-status.yesh` and `service-wait.yesh` confirmed
+`systemd-journald.service` as `loaded/active/running`, while
+`service-journal.yesh` correctly returned an empty successful result.
+`service-restart.yesh` was run only with `--plan`; no real restart was made.
+The manager reported `degraded`, so this proves the available systemd/journal
+path, not overall host health.
+
+The important failure distinction is deliberate: an inactive service after a
+successful `systemctl restart` is a failed yesh operation; an empty journal
+query is successful and means that no matching records were returned; a
+non-empty diagnostic or invalid JSON is an error rather than a partial report.
+
 ## Dependencies and practical test run
 
 The example files are executable, but not all are turnkey on an arbitrary

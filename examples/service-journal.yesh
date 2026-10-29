@@ -1,0 +1,23 @@
+# Environment-dependent: requires journal access and systemd-journald.service.
+#
+# Read at most 80 records from the last 15 minutes. yesh always disables the
+# pager, uses machine-readable JSON Lines, caps output at 4 MiB, validates
+# every record, and treats stderr diagnostics as failure. Empty output is a
+# successful query: it means no matching records were available in that
+# interval, not that the journal was silently ignored.
+#
+# There is no `follow`: this is a finite report suitable for CI and cron.
+# The exact unit is required; journalctl patterns and multiple units are not
+# accepted by this typed operation.
+#
+# `--unit` has systemd's unit semantics: a slice query includes records from
+# child units. This example selects one concrete service instead. Access
+# denial, an unavailable journal/bus, stderr diagnostics or malformed JSON are
+# errors; only an empty stdout result is the normal "no matching records"
+# result.
+#
+# Bash equivalent (with easy-to-miss safety details):
+#   journalctl --no-pager --output=json --unit systemd-journald.service \
+#     --since=-15m --lines=80
+# yesh makes the bounded contract part of the statement and its plan.
+journal systemd-journald.service since 15m lines 80

@@ -1,6 +1,6 @@
 .TH YESH 1 "2026-10-27" "yesh experimental" "User Commands"
 .SH NAME
-yesh \- readable Unix automation with bounded process pipelines
+yesh \- readable Linux automation with bounded process pipelines
 .SH SYNOPSIS
 .B yesh
 .RB [ \-\-plan ]
@@ -180,6 +180,31 @@ The condition sums RSS for that set. It does not rescan for a different set
 and does not treat RSS as PSS.
 Regex matching, arbitrary field selection and process control are not part
 of this first snapshot interface.
+.SS systemd service status and restart (Linux)
+.nf
+service status nginx.service
+service status user nginx.service
+service restart nginx.service until active within 30s
+service wait nginx.service until active within 30s
+journal user nginx.service since 15m lines 20
+.fi
+.PP
+The status operation queries one full unit name through a fixed
+systemctl show property list. Restart runs systemctl restart and then
+checks the exact Id and requested ActiveState within one finite timeout.
+Wait performs an immediate read followed by bounded polling until the same
+postcondition or deadline; it does not start or restart the unit.
+It does not use systemctl --wait, does not add sudo, and does not imply
+that a client timeout cancelled an operation inside systemd.
+.PP
+Unit names without a suffix, paths, globs, template units without an instance,
+and shell operators are rejected. Aliases are rejected until canonical unit
+identity can be reported explicitly.
+An optional system or user manager profile may precede the unit. The omitted
+profile means the system manager; the user profile adds --user to systemctl
+or journalctl. The service and journal adapters are Linux-only. Empty journal
+output is a successful empty result; diagnostics, invalid JSON, unavailable
+bus, and permission failures are errors.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"
