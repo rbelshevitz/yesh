@@ -156,6 +156,8 @@ publication, retention, restore, and `--plan` explicit and reviewable.
 Do not add a backup-specific `snapshot` DSL before the benchmark. The first
 language candidates, only if confirmed by at least two workflows, are generic
 scoped locking and atomic publication of a completed temporary result.
+Do not mirror `rsync` or `rsnapshot` option sets: utility-specific flags remain
+explicit command arguments and their semantics stay owned by those utilities.
 
 The Linux read-only storage interface is implemented:
 

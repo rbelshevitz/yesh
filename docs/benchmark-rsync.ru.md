@@ -68,4 +68,6 @@ lock, публикации и retention, при этом `rsync`/`rsnapshot` о�
 отдельно документированными. Будущий helper может упаковать повторяющиеся
 preflight и переходы состояния, но обязан показывать в `--plan` source,
 target, previous snapshot, retention и destructive actions. Нельзя создавать
-второй backup-engine или молча менять семантику rsync.
+второй backup-engine, переизобретать растущий набор ключей утилит или молча
+менять семантику rsync/rsnapshot. Специфические ключи утилит остаются обычными
+явными argv-аргументами.

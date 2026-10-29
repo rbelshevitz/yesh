@@ -68,4 +68,6 @@ publication, and retention mistakes while `rsync`/`rsnapshot` remain visible
 and independently documented. A future helper may package the repeated
 preflight and state transitions, but it must still expose source, target,
 previous snapshot, retention, and destructive actions in `--plan`. It must not
-invent a second backup engine or silently change rsync semantics.
+invent a second backup engine, re-export the utilities' growing option sets,
+or silently change rsync/rsnapshot semantics. Utility-specific flags stay
+ordinary explicit argv arguments.
