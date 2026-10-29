@@ -44,8 +44,9 @@ wrong:
 - **Quoting and word-splitting traps.** In Bash, an unquoted expansion can be
   split into words or interpreted as a glob. In yesh, a string remains one
   argument and a list is expanded only as a list.
-- **Variables that disappear into punctuation.** yesh uses names directly in
-  value positions, without requiring `$` or layers of `${...}` syntax.
+- **Ambiguous variable references.** yesh uses one explicit `$name` form for
+  variable expansion; bare words remain literal, and there is no second
+  `${...}` spelling to remember.
 - **Errors hidden behind boilerplate.** A yesh command failure is an error by
   default; scripts do not need `set -euo pipefail` just to state their basic
   failure policy.
@@ -152,7 +153,7 @@ Russian project documents and the Russian manual are linked from
 SHell**. It was originally developed by [Brian Fox](https://www.gnu.org/people/people.en.html)
 and is currently maintained by Chet Ramey.
 
-yesh is an independent implementation written in Go, with its own smaller
-syntax around familiar POSIX/Linux commands. It takes inspiration from
-POSIX/Linux shell workflows, not from copying or embedding Bash source code. Its purpose is to
-make everyday administration scripts easier to read and safer to review.
+yesh is an independent implementation written in Go, with a smaller syntax
+around familiar POSIX/Linux commands. It takes inspiration from POSIX/Linux
+shell workflows, not from copying or embedding Bash source code. Its purpose
+is to make everyday administration scripts easier to read and safer to review.
