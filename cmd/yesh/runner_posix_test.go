@@ -198,6 +198,15 @@ func TestPOSIXPipelineFailureEveryStage(t *testing.T) {
 	}
 }
 
+func TestPOSIXPipelineFailureReportsStageAndExitCode(t *testing.T) {
+	good := posixFixture(t, "cat")
+	bad := posixFixture(t, "exit 7")
+	err := runPOSIX(t, posixRuntime(), good+" < /dev/null | "+bad+" | "+good+" > /dev/null", true)
+	if !strings.Contains(err.Error(), "pipeline stage 2/3") || !strings.Contains(err.Error(), "exit code 7") {
+		t.Fatalf("pipeline failure lost stage or exit code: %v", err)
+	}
+}
+
 func TestPOSIXFailureStopsHungPeer(t *testing.T) {
 	hang := posixFixture(t, `trap '' TERM; while :; do :; done`)
 	fail := posixFixture(t, "exit 9")

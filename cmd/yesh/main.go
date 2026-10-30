@@ -47,15 +47,20 @@ func runCLI() int {
 		return 1
 	}
 	items, err := parse(string(data), script)
+	executionStarted := false
 	if err == nil {
 		ctx, stop := commandContext()
 		defer stop()
+		executionStarted = true
 		err = (&runtime{ctx: ctx, values: map[string]value{}, filename: script, plan: *plan}).execute(items)
 	}
 	if err != nil {
 		var exit scriptExit
 		if errors.As(err, &exit) {
 			return exit.code
+		}
+		if executionStarted && !*plan {
+			fmt.Fprintln(os.Stderr, "yesh: execution stopped; earlier actions may have completed, the current action may be partial, and no rollback was performed")
 		}
 		fmt.Fprintln(os.Stderr, "yesh:", err)
 		return 1

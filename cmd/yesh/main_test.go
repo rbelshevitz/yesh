@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParserRejectsWhile(t *testing.T) {
 	_, err := parse("while true:\n    echo loop\n", "test.yesh")
@@ -75,6 +78,20 @@ func TestRuntimeRejectsUnsafeCommandForms(t *testing.T) {
 		if err := r.run(command, 1, true); err == nil {
 			t.Errorf("expected %q to be rejected", command)
 		}
+	}
+}
+
+func TestRuntimeCommandFailureIncludesExitCode(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	err := r.run("false", 4, true)
+	if err == nil || !strings.Contains(err.Error(), "exit code 1") || !strings.Contains(err.Error(), "false") {
+		t.Fatalf("command failure lost its cause: %v", err)
+	}
+}
+
+func TestParserRejectsCommandSyntaxBeforeExecution(t *testing.T) {
+	if _, err := parse("echo before\ncat \"unterminated\n", "syntax.yesh"); err == nil || !strings.Contains(err.Error(), "unterminated") {
+		t.Fatalf("syntax error was not reported during parsing: %v", err)
 	}
 }
 

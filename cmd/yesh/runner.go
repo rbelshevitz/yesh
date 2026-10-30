@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,11 @@ type stage struct {
 	argv          []string
 	input, output string
 	append        bool
+}
+
+type stageResult struct {
+	index int
+	err   error
 }
 
 const maxPipelineStages = 32
@@ -133,6 +139,78 @@ func (r *runtime) parseCommand(text string, line int) ([]stage, error) {
 	return stages, nil
 }
 
+// validateCommandSyntax checks the parts of a command that do not depend on
+// runtime values. Expansion and executable/path checks remain deferred until
+// the statement's branch is actually executed.
+func validateCommandSyntax(text, filename string, line int) error {
+	tokens, err := words(text)
+	if err != nil {
+		return fmt.Errorf("%s:%d: %w", filename, line, err)
+	}
+	if err := validateWords(tokens, filename, line); err != nil {
+		return err
+	}
+	type syntaxStage struct {
+		hasCommand    bool
+		input, output bool
+	}
+	var stages []syntaxStage
+	current := syntaxStage{}
+	flush := func() error {
+		if !current.hasCommand {
+			return fmt.Errorf("%s:%d: empty pipeline stage", filename, line)
+		}
+		stages = append(stages, current)
+		current = syntaxStage{}
+		return nil
+	}
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if token.operator && token.text == "|" {
+			if err := flush(); err != nil {
+				return err
+			}
+			continue
+		}
+		if token.operator && (token.text == "<" || token.text == ">" || token.text == ">>") {
+			if i+1 >= len(tokens) || tokens[i+1].operator {
+				return fmt.Errorf("%s:%d: redirection needs a file", filename, line)
+			}
+			if token.text == "<" {
+				if current.input {
+					return fmt.Errorf("%s:%d: repeated input redirection", filename, line)
+				}
+				current.input = true
+			} else {
+				if current.output {
+					return fmt.Errorf("%s:%d: repeated output redirection", filename, line)
+				}
+				current.output = true
+			}
+			i++
+			continue
+		}
+		if !token.operator {
+			current.hasCommand = true
+		}
+	}
+	if err := flush(); err != nil {
+		return err
+	}
+	if len(stages) > maxPipelineStages {
+		return fmt.Errorf("%s:%d: pipeline exceeds %d stages", filename, line, maxPipelineStages)
+	}
+	for i, stage := range stages {
+		if i != 0 && stage.input {
+			return fmt.Errorf("%s:%d: input redirection is only allowed on first stage", filename, line)
+		}
+		if i != len(stages)-1 && stage.output {
+			return fmt.Errorf("%s:%d: output redirection is only allowed on last stage", filename, line)
+		}
+	}
+	return nil
+}
+
 func closeFiles(files ...[]*os.File) {
 	for _, group := range files {
 		for _, f := range group {
@@ -214,7 +292,7 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 			return nil
 		case "false":
 			if fatal {
-				return fmt.Errorf("%s:%d: command failed: false", r.filename, line)
+				return fmt.Errorf("%s:%d: command failed (%s): false", r.filename, line, commandFailureDetail(statusError{code: 1}))
 			}
 			return statusError{code: 1}
 		}
@@ -330,25 +408,81 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 	closeFiles(pipeFiles)
 	pipeFiles = nil
 
-	results := make(chan error, len(cmds))
-	for _, cmd := range cmds {
-		go func(cmd *exec.Cmd) { results <- cmd.Wait() }(cmd)
+	results := make(chan stageResult, len(cmds))
+	for index, cmd := range cmds {
+		go func(index int, cmd *exec.Cmd) { results <- stageResult{index: index, err: cmd.Wait()} }(index, cmd)
 	}
-	var last error
+	allResults := make([]stageResult, 0, len(cmds))
+	failureFound := false
 	for range cmds {
-		if e := <-results; e != nil && last == nil {
-			last = e
+		result := <-results
+		allResults = append(allResults, result)
+		if result.err != nil && !failureFound && shouldCancelPipeline(result.err) {
+			failureFound = true
 			cancel()
 		}
 	}
+	failure := selectStageFailure(allResults)
 	if ctx.Err() != nil {
 		_ = group.kill()
 	}
 	if deadline.Err() != nil {
 		return fmt.Errorf("%s:%d: command interrupted: %w", r.filename, line, deadline.Err())
 	}
-	if last != nil && fatal {
-		return fmt.Errorf("%s:%d: command failed: %s", r.filename, line, text)
+	if failure.err != nil && fatal {
+		return fmt.Errorf("%s:%d: command failed at pipeline stage %d/%d (%s): %s", r.filename, line, failure.index+1, len(stages), commandFailureDetail(failure.err), text)
 	}
-	return last
+	return failure.err
+}
+
+func selectStageFailure(results []stageResult) stageResult {
+	selected := stageResult{index: -1}
+	for _, result := range results {
+		if result.err == nil {
+			continue
+		}
+		if selected.err == nil || stageFailureRank(result.err) < stageFailureRank(selected.err) ||
+			(stageFailureRank(result.err) == stageFailureRank(selected.err) && result.index < selected.index) {
+			selected = result
+		}
+	}
+	return selected
+}
+
+func shouldCancelPipeline(err error) bool {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ProcessState.Exited()
+	}
+	return !isContextCancellation(err)
+}
+
+func stageFailureRank(err error) int {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ProcessState.Exited() {
+		return 0
+	}
+	if isContextCancellation(err) {
+		return 2
+	}
+	return 1
+}
+
+func isContextCancellation(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func commandFailureDetail(err error) string {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if code := exitErr.ExitCode(); code >= 0 {
+			return fmt.Sprintf("exit code %d", code)
+		}
+		return "process terminated without an exit code"
+	}
+	var status statusError
+	if errors.As(err, &status) {
+		return fmt.Sprintf("exit code %d", status.code)
+	}
+	return err.Error()
 }

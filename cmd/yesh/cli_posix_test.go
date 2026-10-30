@@ -145,6 +145,16 @@ func TestPOSIXCLIExitAndStop(t *testing.T) {
 	}
 }
 
+func TestPOSIXCLIExecutionFailureWarnsAboutState(t *testing.T) {
+	script := filepath.Join(t.TempDir(), "failure.yesh")
+	writeTestFile(t, script, []byte("false\n"), 0600)
+	out, err := posixCLI(t, context.Background(), script).CombinedOutput()
+	if err == nil || !bytes.Contains(out, []byte("execution stopped; earlier actions may have completed")) ||
+		!bytes.Contains(out, []byte("no rollback was performed")) || !bytes.Contains(out, []byte("exit code 1")) {
+		t.Fatalf("execution failure warning missing: %v %s", err, out)
+	}
+}
+
 func TestPOSIXCLIPlanExpandedArguments(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "marker")

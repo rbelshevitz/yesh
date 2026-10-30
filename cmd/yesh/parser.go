@@ -276,6 +276,11 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 			if err != nil {
 				return nil, index, p.err(l.number, err.Error())
 			}
+			if condition.kind == commandCondition {
+				if err := validateCommandSyntax(condition.text, p.filename, l.number); err != nil {
+					return nil, index, err
+				}
+			}
 			var other []statement
 			if next < len(p.lines) && p.lines[next].indent == indent && p.lines[next].text == "else:" {
 				other, next, err = p.child(next, indent)
@@ -386,6 +391,9 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 			result = append(result, assignStmt{l.number, name, value})
 			index++
 			continue
+		}
+		if err := validateCommandSyntax(text, p.filename, l.number); err != nil {
+			return nil, index, err
 		}
 		result = append(result, commandStmt{l.number, text})
 		index++
