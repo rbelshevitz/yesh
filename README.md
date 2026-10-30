@@ -12,7 +12,8 @@ A readable, safety-first language for Linux automation and preflight checks.
 yesh is an experiment: POSIX commands and external Linux administration tools
 remain visible commands, while the language around them is intentionally small
 and readable. yesh is a language and interpreter for Linux automation, not an
-interactive shell or a Bash-compatible replacement.
+interactive shell or a Bash-compatible replacement. A yesh script describes a
+sequence of actions, their arguments, and what to do when one of them fails.
 
 > **Development status:** yesh is under active development and is not yet ready
 > to serve as a production safety boundary. The measures listed in
@@ -163,7 +164,7 @@ GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go build -trimpath ./cmd/yesh
 ```
 
 These checks support a bounded operational claim: yesh's own execution model
-and the tested workflow contracts behave predictably in the stated
+and the tested workflows behave predictably in the stated
 environment. They are not a claim of universal correctness, crash durability,
 security isolation, or safe execution of arbitrary external programs.
 

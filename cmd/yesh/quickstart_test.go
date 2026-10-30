@@ -73,3 +73,15 @@ func TestSyntaxGuideExamplesParse(t *testing.T) {
 		}
 	}
 }
+
+func TestEnglishSyntaxGuideExamplesParse(t *testing.T) {
+	blocks := yeshBlocks(t, "syntax-guide.md")
+	if len(blocks) != 17 {
+		t.Fatalf("English syntax guide examples changed; update coverage: %d", len(blocks))
+	}
+	for i, source := range blocks {
+		if _, err := parse(source+"\n", "syntax-guide.md"); err != nil {
+			t.Fatalf("block %d: %v", i+1, err)
+		}
+	}
+}
