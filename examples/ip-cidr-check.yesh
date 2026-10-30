@@ -1,0 +1,10 @@
+# Typed IP/CIDR preflight. This is arithmetic and validation only: it never
+# changes addresses, routes, interfaces, or firewall state.
+
+network = cidr 192.0.2.0/24
+address = ip 192.0.2.42
+
+if contains $network $address:
+    echo "address belongs to network"
+else:
+    echo "address is outside network"

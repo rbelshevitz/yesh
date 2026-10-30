@@ -1,0 +1,4 @@
+# Read-only ARP/IPv6-neighbour report in JSON. A missing neighbour is an
+# observation, not proof that the host is unreachable.
+
+ip -j neigh show

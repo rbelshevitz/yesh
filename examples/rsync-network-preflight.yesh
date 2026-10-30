@@ -1,0 +1,45 @@
+# Read-only network preflight before a remote rsync pull.
+# The values are explicit environment inputs; yesh does not concatenate a
+# command string or add a hidden shell. The remote source must be a normal
+# rsync/SSH source such as backup.example:/srv/data/.
+#
+# Required environment:
+#   YESH_RSYNC_DNS_NAME       hostname for DNS and route diagnostics
+#   YESH_RSYNC_ROUTE_TARGET   resolved IP address for `ip route get`
+#   YESH_RSYNC_HOST           SSH host, usually user@hostname
+#   YESH_RSYNC_REMOTE_PATH    absolute remote directory checked by SSH
+#   YESH_RSYNC_SOURCE         rsync source, including its trailing slash
+#   YESH_RSYNC_TARGET         disposable local dry-run target
+#
+# Bash comparison:
+#   getent ahosts "$DNS_NAME"
+#   ip route get "$ROUTE_TARGET"
+#   ssh ... "$HOST" test -d -- "$REMOTE_PATH"
+#   rsync -a --dry-run --itemize-changes -e "$SSH_COMMAND" \
+#     -- "$SOURCE" "$TARGET"
+# The yesh form keeps each argv visible in --plan and does not add deletion
+# behavior implicitly.
+
+dns_name = environment YESH_RSYNC_DNS_NAME
+route_target = environment YESH_RSYNC_ROUTE_TARGET
+host = environment YESH_RSYNC_HOST
+remote_path = environment YESH_RSYNC_REMOTE_PATH
+source = environment YESH_RSYNC_SOURCE
+target = environment YESH_RSYNC_TARGET
+
+ssh_options = [-o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
+ssh_command = "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes"
+
+if getent ahosts $dns_name:
+    if ip route get $route_target:
+        if ssh $ssh_options $host test -d $remote_path:
+            rsync -a --dry-run --itemize-changes -e $ssh_command -- $source $target
+        else:
+            echo "remote source path check failed"
+            exit 5
+    else:
+        echo "route check failed"
+        exit 4
+else:
+    echo "DNS check failed"
+    exit 3

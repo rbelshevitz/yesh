@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -137,7 +138,7 @@ func (r *runtime) execute(items []statement) error {
 			if err != nil {
 				return err
 			}
-			if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.scalar == "" {
+			if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.scalar == "" {
 				return fmt.Errorf("%s:%d: with lock expects one non-empty path", r.filename, s.line)
 			}
 			if r.plan {
@@ -205,6 +206,52 @@ func (r *runtime) execute(items []statement) error {
 				fmt.Fprintf(os.Stdout, "PLAN retention keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
 			} else {
 				fmt.Fprintf(os.Stdout, "RETENTION_PLAN keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
+			}
+		case retentionQuarantineStmt:
+			root, err := r.expandWord(s.root, s.line)
+			if err != nil {
+				return err
+			}
+			keepText, err := r.expandWord(s.keep, s.line)
+			if err != nil {
+				return err
+			}
+			quarantine, err := r.expandWord(s.quarantine, s.line)
+			if err != nil {
+				return err
+			}
+			if len(root) != 1 || root[0] == "" || len(keepText) != 1 || len(quarantine) != 1 || quarantine[0] == "" {
+				return fmt.Errorf("%s:%d: retention quarantine expects root, keep count, and quarantine directory", r.filename, s.line)
+			}
+			keep, err := strconv.Atoi(keepText[0])
+			if err != nil {
+				return fmt.Errorf("%s:%d: retention keep must be a decimal count", r.filename, s.line)
+			}
+			candidates, err := retentionQuarantineCandidates(root[0], quarantine[0], keep)
+			if err != nil {
+				return fmt.Errorf("%s:%d: retention quarantine: %w", r.filename, s.line, err)
+			}
+			names := make([]string, 0, len(candidates))
+			for _, candidate := range candidates {
+				names = append(names, candidate.Name)
+			}
+			if r.plan {
+				fmt.Fprintf(os.Stdout, "PLAN retention quarantine keep %d MOVE %q TO %q\n", keep, names, quarantine[0])
+				continue
+			}
+			for _, candidate := range candidates {
+				destination := filepath.Join(quarantine[0], candidate.Name)
+				if _, err := os.Lstat(destination); err == nil {
+					return fmt.Errorf("%s:%d: retention quarantine destination already exists: %s", r.filename, s.line, destination)
+				} else if !os.IsNotExist(err) {
+					return fmt.Errorf("%s:%d: retention quarantine destination: %w", r.filename, s.line, err)
+				}
+			}
+			for _, candidate := range candidates {
+				destination := filepath.Join(quarantine[0], candidate.Name)
+				if err := os.Rename(candidate.Path, destination); err != nil {
+					return fmt.Errorf("%s:%d: retention quarantine rename %q to %q: %w", r.filename, s.line, candidate.Path, destination, err)
+				}
 			}
 		}
 	}

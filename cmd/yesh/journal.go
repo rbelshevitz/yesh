@@ -10,7 +10,7 @@ func (r *runtime) executeJournal(s journalStmt) error {
 	if err != nil {
 		return err
 	}
-	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
+	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("journal expects one non-empty unit name")
 	}
 	if err := validateUnitName(v.scalar); err != nil {

@@ -1,0 +1,37 @@
+# Upload one release to a remote staging path, publish it, and roll back.
+# Remote paths are complete values; rsync and ssh remain visible engines.
+#
+# Required environment: YESH_DEPLOY_HOST, YESH_DEPLOY_SOURCE,
+# YESH_DEPLOY_STAGE, YESH_DEPLOY_FINAL, YESH_DEPLOY_REMOTE_STAGE,
+# YESH_DEPLOY_REMOTE_FINAL, YESH_DEPLOY_REMOTE_FINAL_FILE,
+# YESH_DEPLOY_CURRENT_NEXT, YESH_DEPLOY_CURRENT,
+# YESH_DEPLOY_ROLLBACK_NEXT, and YESH_DEPLOY_PREVIOUS.
+
+host = environment YESH_DEPLOY_HOST
+source = environment YESH_DEPLOY_SOURCE
+stage = environment YESH_DEPLOY_STAGE
+final = environment YESH_DEPLOY_FINAL
+remote_stage = environment YESH_DEPLOY_REMOTE_STAGE
+remote_final = environment YESH_DEPLOY_REMOTE_FINAL
+remote_final_file = environment YESH_DEPLOY_REMOTE_FINAL_FILE
+current_next = environment YESH_DEPLOY_CURRENT_NEXT
+current = environment YESH_DEPLOY_CURRENT
+rollback_next = environment YESH_DEPLOY_ROLLBACK_NEXT
+previous = environment YESH_DEPLOY_PREVIOUS
+ssh_options = [-o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
+
+if exists $source:
+    rsync -az --delay-updates -- $source $stage
+    ssh $ssh_options $host test -d $remote_stage
+    ssh $ssh_options $host mv -- $remote_stage $remote_final
+    ssh $ssh_options $host ln -s -- $remote_final $current_next
+    ssh $ssh_options $host mv -T -- $current_next $current
+    ssh $ssh_options $host test -L $current
+    ssh $ssh_options $host readlink -- $current
+    ssh $ssh_options $host test -f $remote_final_file
+    ssh $ssh_options $host ln -s -- $previous $rollback_next
+    ssh $ssh_options $host mv -T -- $rollback_next $current
+    ssh $ssh_options $host readlink -- $current
+else:
+    echo "release source is missing"
+    exit 2

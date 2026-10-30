@@ -1,0 +1,44 @@
+# Network preflight followed by one remote rsync publication.
+# The source is remote, while the snapshot root is local. Every network
+# command is visible and read-only; only rsync writes to the private staging
+# directory. The completed tree becomes visible only through publish.
+
+dns_name = environment YESH_RSYNC_DNS_NAME
+route_target = environment YESH_RSYNC_ROUTE_TARGET
+host = environment YESH_RSYNC_HOST
+remote_path = environment YESH_RSYNC_REMOTE_PATH
+source = environment YESH_RSYNC_SOURCE
+ssh_command = "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes"
+
+root = environment YESH_RSYNC_ROOT
+current = environment YESH_RSYNC_CURRENT
+temporary = environment YESH_RSYNC_TEMPORARY
+lock = environment YESH_RSYNC_LOCK
+
+if getent ahosts $dns_name:
+    if ip route get $route_target:
+        if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes $host test -d $remote_path:
+            if exists $root:
+                if exists $current:
+                    echo "current snapshot already exists"
+                    exit 3
+                else:
+                    if exists $temporary:
+                        echo "temporary snapshot already exists"
+                        exit 4
+                    else:
+                        with lock $lock:
+                            rsync -a --fsync --delay-updates --timeout=30 -e $ssh_command -- $source $temporary
+                            publish $temporary to $current
+            else:
+                echo "snapshot root is missing"
+                exit 2
+        else:
+            echo "remote source path check failed"
+            exit 5
+    else:
+        echo "route check failed"
+        exit 6
+else:
+    echo "DNS check failed"
+    exit 7

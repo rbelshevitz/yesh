@@ -7,9 +7,9 @@
 # explicit. The example is read-only: it does not signal or modify processes.
 
 sshd = processes where name is "sshd"
-show $sshd fields pid ppid uid state rss cgroup
+show $sshd fields pid ppid uid state rss start_time cgroup
 summarize $sshd memory rss
 
 nginx = processes where name is "nginx"
-show $nginx fields pid ppid uid state rss cgroup
+show $nginx fields pid ppid uid state rss start_time cgroup
 summarize $nginx memory rss

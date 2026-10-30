@@ -116,11 +116,12 @@ func findProcessInfo(name string, limit int) ([]processInfo, error) {
 var processFields = map[string]bool{
 	"pid": true, "uid": true, "state": true, "rss": true,
 	"ppid": true, "pgid": true, "sid": true, "name": true, "cgroup": true,
+	"start_time": true,
 }
 
 func writeProcessTable(out io.Writer, processes []processInfo, fields []string) error {
 	if len(fields) == 0 {
-		fields = []string{"pid", "uid", "state", "rss", "ppid", "pgid", "sid", "name", "cgroup"}
+		fields = []string{"pid", "uid", "state", "rss", "ppid", "pgid", "sid", "name", "start_time", "cgroup"}
 	}
 	for _, field := range fields {
 		if !processFields[field] {
@@ -152,6 +153,8 @@ func writeProcessTable(out io.Writer, processes []processInfo, fields []string) 
 				values = append(values, process.name)
 			case "cgroup":
 				values = append(values, process.cgroup)
+			case "start_time":
+				values = append(values, fmt.Sprintf("%d", process.startTime))
 			}
 		}
 		if _, err := fmt.Fprintln(out, strings.Join(values, "\t")); err != nil {

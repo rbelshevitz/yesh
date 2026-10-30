@@ -1,6 +1,11 @@
 # CIDR в yesh
 
 CIDR — встроенный тип для сетевой автоматизации, а не строковая операция.
+
+В текущем runtime уже реализованы строгие значения `ip`, `cidr`, операции
+`masked` и условия `contains`/`overlaps`. Калькулятор границ, размеров и
+перебора ниже пока остаётся
+следующей частью интерфейса и не должен выдаваться за реализованный API.
 Правила основаны на [RFC 4632](https://www.rfc-editor.org/rfc/rfc4632),
 [RFC 4291](https://www.rfc-editor.org/rfc/rfc4291) и канонической текстовой
 форме IPv6 из [RFC 5952](https://www.rfc-editor.org/rfc/rfc5952).
@@ -11,7 +16,7 @@ CIDR — встроенный тип для сетевой автоматиза�
 network = cidr 192.0.2.17/24
 ip = ip 192.0.2.42
 
-if contains network ip:
+if contains $network $ip:
     echo ip "belongs to" network
 ```
 
@@ -47,6 +52,17 @@ IPv6 принимается в любой легальной форме RFC 4291
 
 ```yesh
 network = cidr 10.20.30.17/24
+
+canonical = masked $network
+
+if overlaps $canonical $network:
+    echo "prefixes overlap"
+
+first_address = first $network
+last_address = last $network
+
+if contains $network $first_address:
+    echo "first address is inside the prefix"
 
 show network
 show masked network       # 10.20.30.0/24
@@ -145,14 +161,16 @@ budget.
 
 ### Классификация
 
-Позже добавим безопасные предикаты без ручного сравнения строк:
+Реализованы безопасные предикаты без ручного сравнения строк:
 
 ```yesh
-if is link-local address:
+if is link-local $address:
     ...
-if is multicast address:
+if is multicast $address:
     ...
-if is global-unicast address:
+if is global-unicast $address:
+    ...
+if is loopback $address:
     ...
 ```
 
@@ -178,6 +196,39 @@ if is global-unicast address:
 
 Предикаты `is private`, `is global`, `is reserved` и `is special` должны
 опираться на версионируемые данные IANA, а не на короткий список в коде.
+
+## Read-only отчёт интерфейсов
+
+Для наблюдения интерфейсов и адресов yesh оставляет `ip` внешней командой:
+
+```yesh
+ip -j address show
+```
+
+`--plan` показывает этот вызов, а отказ доступа или отсутствие `ip` остаются
+ошибкой. Встроенных `add`, `change`, `replace` и `flush` для адресов нет.
+
+Таблица маршрутов также остаётся внешним read-only вызовом:
+
+```yesh
+ip -j route show
+```
+
+Она не смешивается с `ip route get`: первый вызов показывает наблюдаемую
+таблицу, второй проверяет выбор маршрута для конкретного адреса.
+
+Соседей и слушающие сокеты также можно читать без встроенного сетевого API:
+
+```yesh
+ip -j neigh show
+ss -H -n -l -t -u | head -n 200
+```
+
+Отсутствие записи соседа не означает недоступность узла. `ss` остаётся
+внешним отчётом: yesh ограничивает число строк, но не разбирает его колонки.
+Сведения о владельцах и PID могут требовать прав; для них оператор явно
+запускает весь скрипт через `sudo`. Скрытого повышения прав и автоматического
+повтора с `sudo` нет.
 Реестр special-purpose адресов прямо предупреждает, что принадлежность к нему
 не гарантирует routability в конкретном контексте. [IANA IPv4 registry](https://www.iana.org/assignments/iana-ipv4-special-registry),
 [IANA IPv6 registry](https://www.iana.org/assignments/iana-ipv6-special-registry)

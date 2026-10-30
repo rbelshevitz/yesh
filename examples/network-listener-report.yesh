@@ -1,0 +1,4 @@
+# Read-only bounded TCP/UDP listener report. ss output is kept as data; yesh
+# does not parse its human-oriented columns or offer socket-closing commands.
+
+ss -H -n -l -t -u | head -n 200

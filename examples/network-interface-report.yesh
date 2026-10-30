@@ -1,0 +1,9 @@
+# Read-only interface and address report.
+# JSON keeps the external output machine-readable; yesh does not parse or
+# rewrite it. Permission errors remain errors and no fallback is attempted.
+#
+# Bash comparison:
+#   ip -j address show
+# The yesh form makes the exact read-only argv visible in --plan.
+
+ip -j address show

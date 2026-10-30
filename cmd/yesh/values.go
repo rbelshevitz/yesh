@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
@@ -17,6 +18,8 @@ type value struct {
 	list        []string
 	isList      bool
 	regex       *regexp.Regexp
+	ip          *netip.Addr
+	cidr        *netip.Prefix
 	secret      bool
 	processes   []processInfo
 	isProcesses bool
@@ -45,7 +48,7 @@ type scriptExit struct{ code int }
 func (e scriptExit) Error() string { return fmt.Sprintf("script exited with status %d", e.code) }
 
 func exitCode(v value) (int, error) {
-	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.scalar == "" {
+	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.scalar == "" {
 		return 0, fmt.Errorf("exit expects a decimal code from 0 to 255")
 	}
 	for _, c := range v.scalar {
@@ -79,6 +82,52 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 	if strings.HasPrefix(raw, "device ") {
 		return r.evalDevice(raw, line)
 	}
+	if strings.HasPrefix(raw, "ip ") {
+		text := strings.TrimSpace(strings.TrimPrefix(raw, "ip "))
+		parsed, err := netip.ParseAddr(text)
+		if err != nil {
+			return value{}, fmt.Errorf("%s:%d: invalid IP address %q: %w", r.filename, line, text, err)
+		}
+		return value{ip: &parsed}, nil
+	}
+	if strings.HasPrefix(raw, "cidr ") {
+		text := strings.TrimSpace(strings.TrimPrefix(raw, "cidr "))
+		parsed, err := netip.ParsePrefix(text)
+		if err != nil {
+			return value{}, fmt.Errorf("%s:%d: invalid CIDR prefix %q: %w", r.filename, line, text, err)
+		}
+		return value{cidr: &parsed}, nil
+	}
+	if strings.HasPrefix(raw, "masked ") {
+		inner, err := r.eval(strings.TrimSpace(strings.TrimPrefix(raw, "masked ")), line)
+		if err != nil {
+			return value{}, err
+		}
+		if inner.cidr == nil {
+			return value{}, fmt.Errorf("%s:%d: masked expects a CIDR prefix", r.filename, line)
+		}
+		masked := inner.cidr.Masked()
+		return value{cidr: &masked}, nil
+	}
+	if strings.HasPrefix(raw, "first ") || strings.HasPrefix(raw, "last ") {
+		first := strings.HasPrefix(raw, "first ")
+		inner, err := r.eval(strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(raw, "first "), "last ")), line)
+		if err != nil {
+			return value{}, err
+		}
+		if inner.cidr == nil {
+			return value{}, fmt.Errorf("%s:%d: first/last expects a CIDR prefix", r.filename, line)
+		}
+		address := inner.cidr.Masked().Addr()
+		if !first {
+			var err error
+			address, err = lastPrefixAddress(*inner.cidr)
+			if err != nil {
+				return value{}, fmt.Errorf("%s:%d: last: %w", r.filename, line, err)
+			}
+		}
+		return value{ip: &address}, nil
+	}
 	if strings.HasPrefix(raw, "processes ") {
 		return r.evalProcessQuery(raw, line)
 	}
@@ -87,7 +136,7 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 		if err != nil {
 			return value{}, err
 		}
-		if pattern.fstab != nil || pattern.device != nil || pattern.isList || pattern.regex != nil {
+		if pattern.fstab != nil || pattern.device != nil || pattern.ip != nil || pattern.cidr != nil || pattern.isList || pattern.regex != nil {
 			return value{}, fmt.Errorf("%s:%d: regex pattern must be one string", r.filename, line)
 		}
 		if len(pattern.scalar) > maxRegexPattern {
@@ -128,7 +177,7 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 			if err != nil {
 				return value{}, err
 			}
-			if v.fstab != nil || v.device != nil || v.isList || v.regex != nil {
+			if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil {
 				return value{}, fmt.Errorf("%s:%d: nested lists are not supported", r.filename, line)
 			}
 			result = append(result, v.scalar)
@@ -149,6 +198,26 @@ func (r *runtime) eval(raw string, line int) (value, error) {
 		return value{}, fmt.Errorf("%s:%d: empty value", r.filename, line)
 	}
 	return value{scalar: raw}, nil
+}
+
+func lastPrefixAddress(prefix netip.Prefix) (netip.Addr, error) {
+	prefix = prefix.Masked()
+	if !prefix.IsValid() {
+		return netip.Addr{}, fmt.Errorf("invalid CIDR prefix")
+	}
+	bits := prefix.Bits()
+	if prefix.Addr().Is4() {
+		address := prefix.Addr().As4()
+		for bit := bits; bit < 32; bit++ {
+			address[bit/8] |= 1 << (7 - bit%8)
+		}
+		return netip.AddrFrom4(address), nil
+	}
+	address := prefix.Addr().As16()
+	for bit := bits; bit < 128; bit++ {
+		address[bit/8] |= 1 << (7 - bit%8)
+	}
+	return netip.AddrFrom16(address), nil
 }
 
 // Variables are explicit so adding an assignment cannot change the meaning of
@@ -228,7 +297,7 @@ func (r *runtime) expand(token string, line int) ([]string, error) {
 	if v.isList {
 		return v.list, nil
 	}
-	if v.fstab != nil || v.device != nil {
+	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil {
 		return nil, fmt.Errorf("%s:%d: device/fstab value cannot be used as a command argument", r.filename, line)
 	}
 	if v.regex != nil {

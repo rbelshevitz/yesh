@@ -13,7 +13,7 @@ for host in $hosts:
     rsync -az build/ host:/srv/api/
 ```
 
-`ssh`, `scp`, `rsync` и `mount` остаются Unix-командами. yesh не заменяет их
+`ssh`, `scp`, `rsync` и `mount` остаются внешними Linux-командами. yesh не заменяет их
 протоколы и не хранит ключи: OpenSSH agent, `~/.ssh/config`, `known_hosts`,
 ProxyJump и host-key policy остаются внешней конфигурацией.
 

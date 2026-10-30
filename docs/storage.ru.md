@@ -59,6 +59,18 @@ require mounted /mnt/backup from $backup filesystem "ext4"
 echo "backup preflight passed"
 ```
 
+Если следующий шаг должен писать на backup mount, режим можно потребовать
+явно:
+
+```yesh
+require mounted /mnt/backup from $backup filesystem "ext4" writable
+```
+
+Для read-only источника используется `readonly`. yesh повторно читает
+эффективные `VFS-OPTIONS` и `FS-OPTIONS` из kernel mount table через
+`findmnt --kernel`; запись, remount и изменение `/etc/fstab` не выполняются.
+Отсутствие требуемого `rw`/`ro` — ошибка до следующей команды.
+
 Для сравнения на Bash (yesh дополнительно отклоняет неоднозначную identity):
 
 ```bash
@@ -85,6 +97,11 @@ LABEL и RO из снимка lookup. Идентификаторы сравни�
 поддерева ФС. Bind mount всей ФС от обычного mount эта проверка не отличает.
 Это снимки состояния, а не блокировка от параллельного mount/device change
 и не доказательство права будущей записи.
+
+Busy-политика: yesh не должен автоматически применять `umount -l`, `umount -f`,
+`fuser -k` или сигналить чужим PID. Busy — объяснимый отказ с сохранением
+текущего mount; будущая операция сможет очищать только собственный mount после
+завершения своих процессов.
 
 Пример ошибки: `/mnt/backup` существует на корневой ФС, но не смонтирован
 отдельно, либо UUID/тип ФС не совпадает — скрипт завершается до backup.
@@ -198,3 +215,37 @@ Plan откладывает выбор записи, разрешение уст
 проверять только внешний обычный файл, владельца и строгий mode; читать,
 печатать или создавать этот файл нельзя. Inline `password=` остаётся ошибкой
 для любого будущего интерфейса записи fstab.
+
+## NFS: отдельная граница проверки
+
+NFS source имеет форму `server:/export`, а не block-device identity. Поэтому
+`require mounted ... from $device` для NFS не применяется: identity должна
+включать сервер, export, версию NFS и security flavor (`sec=`), а не UUID/PARTUUID.
+Для NFSv4 `fsroot` также может описывать поддерево псевдокорня, поэтому проверка
+`fsroot == "/"` из локального storage-среза не переносится на NFS.
+
+Безопасный read-only preflight должен отдельно показывать:
+
+- `SOURCE`, `FSTYPE`, `VFS-OPTIONS` и `FS-OPTIONS` из `findmnt --kernel`;
+- NFS version, `sec=`, `ro/rw`, `hard/soft`, `timeo` и `retrans`;
+- `_netdev`, `nofail`, `x-systemd.automount` и timeout systemd из fstab;
+- что проверка network/DNS/TCP и доступность export не доказывают корректность
+  данных на сервере.
+
+Не добавлять автоматически `soft`: NFS документация предупреждает о риске
+тихих ошибок и повреждения данных. Не переносить `bg` как бесконечное ожидание:
+systemd преобразует его в очень длинный retry-профиль; для runbook нужен явный
+bounded timeout или отдельный automount. `mount` может зависнуть внутри kernel
+I/O, поэтому timeout внешнего процесса не является гарантией отмены операции.
+
+## FUSE: отдельная граница проверки
+
+FUSE (`fuse.*`, например sshfs или rclone) — userspace filesystem, а не
+block-device mount. Identity должна включать фактический subtype/source и
+владельца userspace mount; одного `SOURCE` недостаточно. Нужно отдельно видеть
+эффективные `ro/rw`, `nodev/nosuid`, а также `allow_other`/`allow_root` и
+`user_id`/`group_id`: эти параметры меняют круг пользователей, которым видны
+данные. Проверка также должна отличать живой userspace daemon от оставшегося
+mountpoint и не посылать сигналы чужому процессу при busy unmount.
+
+Пока yesh не реализует FUSE/NFS-проверки и не поднимает userspace daemon.

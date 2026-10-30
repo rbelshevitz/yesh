@@ -1,0 +1,24 @@
+# Active local-L2 discovery. Run this whole script explicitly in a privileged
+# context
+# or with a pre-granted CAP_NET_RAW for arp-scan. yesh never elevates itself.
+#
+# Required environment:
+#   YESH_ARP_INTERFACE  exact interface, for example enp6s18
+#   YESH_ARP_NETWORK    explicit IPv4 CIDR, preferably one address as /32
+#   YESH_ARP_MAC        exact MAC to find
+
+interface = environment YESH_ARP_INTERFACE
+network = environment YESH_ARP_NETWORK
+mac = environment YESH_ARP_MAC
+arp_scan = environment YESH_ARP_SCAN
+target_ip = environment YESH_ARP_IP
+
+if exists $arp_scan:
+    if $arp_scan --interface $interface --numeric --quiet $network | grep -v '^Interface:' | grep -F -- $target_ip | grep -i -- $mac:
+        echo "MAC found"
+    else:
+        echo "MAC was not found in the local ARP scan"
+        exit 4
+else:
+    echo "missing external utility arp-scan; Debian/Ubuntu: apt install arp-scan; Rocky/Alma: dnf install arp-scan"
+    exit 127

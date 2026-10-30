@@ -1,0 +1,29 @@
+# RWE: Backup to a Verified Mounted Filesystem.
+# The fixture supplies a disposable mount, fstab snapshot, source and target.
+# yesh verifies the exact target before the visible rsync starts.
+
+mountpoint = environment YESH_RWE_MOUNTPOINT
+expected_source = environment YESH_RWE_SOURCE
+source = environment YESH_RWE_SOURCE_DIR
+target = environment YESH_RWE_TARGET
+
+if findmnt --kernel --source $expected_source --target $mountpoint --types ext4 --options rw:
+    findmnt --kernel --source $expected_source --target $mountpoint
+else:
+    echo "backup filesystem identity does not match"
+    exit 3
+
+if exists $source:
+    if exists $target:
+        if free_space $target at_least 20MiB:
+            rsync -a --itemize-changes -- $source $target
+        else:
+            echo "not enough free space"
+            exit 4
+    else:
+        echo "backup target is missing"
+        exit 2
+else:
+    echo "backup source is missing"
+    exit 2
+

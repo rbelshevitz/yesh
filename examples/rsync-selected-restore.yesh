@@ -1,0 +1,37 @@
+# Restore one explicitly selected completed snapshot into a new empty target.
+# rsync remains the visible restore engine; yesh guards the source and target.
+#
+# Required environment:
+#   YESH_RESTORE_SNAPSHOT  completed local snapshot directory
+#   YESH_RESTORE_SOURCE    same directory with a trailing slash for rsync
+#   YESH_RESTORE_TARGET    existing empty directory on the intended filesystem
+
+snapshot = environment YESH_RESTORE_SNAPSHOT
+source = environment YESH_RESTORE_SOURCE
+target = environment YESH_RESTORE_TARGET
+
+if exists $snapshot:
+    if test -d $snapshot:
+        if test -L $snapshot:
+            echo "restore source must not be a symlink"
+            exit 3
+        else:
+            if exists $target:
+                if findmnt --target $target:
+                    if find $target -mindepth 1 -maxdepth 1 -print -quit | grep -q .:
+                        echo "restore target is not empty"
+                        exit 4
+                    else:
+                        rsync -a -- $source $target
+                else:
+                    echo "restore target is not mounted"
+                    exit 5
+            else:
+                echo "restore target is missing"
+                exit 2
+    else:
+        echo "restore source is not a directory"
+        exit 3
+else:
+    echo "restore source is missing"
+    exit 2

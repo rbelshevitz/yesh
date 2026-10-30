@@ -1,0 +1,27 @@
+# One scheduled backup run. The outer wrapper supplies the outer lock and
+# timeout; yesh keeps an inner lock around the filesystem operation as well.
+# The scheduler table is not read or changed by this script.
+
+root = environment YESH_CRON_ROOT
+source = environment YESH_CRON_SOURCE
+temporary = environment YESH_CRON_TEMPORARY
+current = environment YESH_CRON_CURRENT
+result = environment YESH_CRON_RESULT
+result_partial = environment YESH_CRON_RESULT_PARTIAL
+lock = environment YESH_CRON_INNER_LOCK
+delay = environment YESH_CRON_DELAY
+
+if exists $root:
+    if exists $source:
+        with lock $lock:
+            printf '%s\n' run=started > $result_partial
+            sleep $delay
+            rsync -a --fsync --delay-updates --timeout=30 -- $source $temporary
+            publish $temporary to $current
+            publish $result_partial to $result
+    else:
+        echo "cron source is missing"
+        exit 2
+else:
+    echo "cron root is missing"
+    exit 3

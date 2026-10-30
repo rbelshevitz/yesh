@@ -138,6 +138,13 @@ type retentionPlanStmt struct {
 
 func (retentionPlanStmt) stmt() {}
 
+type retentionQuarantineStmt struct {
+	line                   int
+	root, keep, quarantine commandToken
+}
+
+func (retentionQuarantineStmt) stmt() {}
+
 type parser struct {
 	lines    []line
 	filename string
@@ -214,6 +221,16 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 			tokens, err := words(text)
 			if err != nil {
 				return nil, index, p.err(l.number, err.Error())
+			}
+			if len(tokens) == 9 && tokens[0].text == "rsync" && tokens[1].text == "retention" &&
+				tokens[2].text == "quarantine" && tokens[3].text == "in" &&
+				tokens[5].text == "keep" && tokens[7].text == "to" &&
+				!tokens[0].operator && !tokens[1].operator && !tokens[2].operator &&
+				!tokens[3].operator && !tokens[4].operator && !tokens[5].operator &&
+				!tokens[6].operator && !tokens[7].operator && !tokens[8].operator {
+				result = append(result, retentionQuarantineStmt{line: l.number, root: tokens[4], keep: tokens[6], quarantine: tokens[8]})
+				index++
+				continue
 			}
 			if len(tokens) != 7 || tokens[0].operator || tokens[0].text != "rsync" ||
 				tokens[1].operator || tokens[1].text != "retention" || tokens[2].operator || tokens[2].text != "plan" ||

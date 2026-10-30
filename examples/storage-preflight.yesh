@@ -4,5 +4,5 @@
 
 backup = device by uuid "replace-with-real-uuid"
 inspect $backup
-require mounted /mnt/backup from $backup filesystem "ext4"
+require mounted /mnt/backup from $backup filesystem "ext4" writable
 echo "backup mount identity preflight passed"

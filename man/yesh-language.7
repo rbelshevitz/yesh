@@ -110,6 +110,21 @@ normal execution; it is a preview primitive. Use the CLI
 .B --plan
 mode when the surrounding script must also avoid external commands and other
 filesystem changes.
+.SS retention quarantine
+.EX
+with lock $lock:
+    rsync retention quarantine in $root keep $keep to $quarantine
+.EE
+.PP
+The quarantine directory must already exist as a real direct child of the
+retention root. The operation moves completed
+.B snapshot.<number>
+directories older than
+.B keep
+with rename inside the explicit lock. It never deletes quarantine contents and
+has no copy fallback across filesystems. In
+.B --plan
+mode it reports candidates without changing the filesystem.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"
@@ -168,6 +183,45 @@ options never excuse a missing mount. Plan defers entry/device/mount checks.
 The loaded fstab snapshot is used; later edits are not reread. This verifies
 mountpoint, device and filesystem, not options, write access, free space or boot.
 Concurrent mount/device changes still require an external boundary.
+.SH NETWORK VALUES AND READ-ONLY REPORTS (LINUX)
+.SS IP and CIDR values
+.EX
+address = ip "192.0.2.17"
+network = cidr "192.0.2.0/24"
+if contains $network $address:
+    echo "inside"
+.EE
+.PP
+The current typed subset supports strict IPv4/IPv6 parsing, contains,
+overlaps, masked, first, last and address classification. These operations
+compute and validate values; they do not change network state. Invalid prefixes,
+IPv6 zones in CIDR values and mixed address families are errors.
+.SS External network reports
+.EX
+ip -j address show
+ip -j route show
+ip -j neigh show
+ss -H -n -l -t -u
+.EE
+.PP
+These remain ordinary external commands. They use the caller's permissions;
+yesh does not add sudo. Active arp-scan discovery is also external and must
+receive an explicit interface and IPv4 CIDR. The example checks an executable
+path with exists and
+reports that Debian/Ubuntu, Rocky and Alma Linux normally provide a package
+named arp-scan. It does not install packages, select --localnet implicitly or
+scan routed networks.
+.PP
+Examples must use neutral addresses and MAC values or explicit parameters;
+they must not publish identifiers from a real infrastructure. A real positive
+ARP result requires a separate host on the same Layer-2 segment.
+.SH EXTERNAL DEPENDENCIES AND PRIVILEGE
+.PP
+A missing executable must stop before the useful operation or select an
+explicit dependency-error branch. Package hints are informational. yesh never
+invokes sudo or prompts for a password automatically; cron and CI should use
+sudo -n when privilege is explicitly required. Local root does not grant root
+on a remote host.
 .SH COMMANDS
 Commands remain Unix commands and are executed without an implicit shell.
 Arguments are preserved as separate values.

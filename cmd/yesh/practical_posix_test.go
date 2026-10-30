@@ -64,9 +64,26 @@ func TestPOSIXCorpusAdaptationSafetyContracts(t *testing.T) {
 		{name: "rsync preview", file: "rsync-preview.yesh", must: []string{"rsync -a --dry-run", "--itemize-changes", "-- $source $target"}},
 		{name: "incremental rsync", file: "rsync-incremental.yesh", must: []string{"with lock $lock:", "--delay-updates", "--link-dest $previous"}, forbid: []string{"--delete", "--delete-excluded", "--delete-missing-args", "--remove-source-files", "--ignore-errors"}},
 		{name: "rsync retention plan", file: "rsync-retention-plan.yesh", must: []string{"rsync retention plan in $root keep $keep"}, forbid: []string{"unlink ", "delete ", "find "}},
+		{name: "rsync retention quarantine", file: "rsync-retention-quarantine.yesh", must: []string{"with lock $lock:", "rsync retention quarantine in $root keep $keep to $quarantine"}, forbid: []string{"rm ", "delete ", "unlink "}},
+		{name: "selected restore", file: "rsync-selected-restore.yesh", must: []string{"findmnt --target $target", "rsync -a -- $source $target"}, forbid: []string{"rm ", "delete ", "--delete"}},
+		{name: "config systemd RWE", file: "config-systemd-rwe.yesh", must: []string{"grep -q", "publish $next to $active", "service restart yesh-config-rwe.service until active within 10s", "journal yesh-config-rwe.service since 5m lines 20"}, forbid: []string{"sudo ", "systemctl daemon-reload", "--delete"}},
+		{name: "deploy release RWE", file: "deploy-release-rwe.yesh", must: []string{"rsync -az --delay-updates -- $source $stage", "mv -T -- $current_next $current", "mv -T -- $rollback_next $current"}, forbid: []string{"sudo ", "--delete", "StrictHostKeyChecking=no"}},
+		{name: "incident report RWE", file: "incident-report-rwe.yesh", must: []string{"journal systemd-journald.service since 15m lines 20", "show $systemd fields pid ppid uid state rss start_time cgroup", "findmnt --target /", "df -P -h -- /"}, forbid: []string{"service restart", "service start", "umount", "mount "}},
+		{name: "rsync network preflight", file: "rsync-network-preflight.yesh", must: []string{"getent ahosts $dns_name", "ip route get $route_target", "BatchMode=yes", "StrictHostKeyChecking=yes", "rsync -a --dry-run --itemize-changes -e $ssh_command -- $source $target"}, forbid: []string{"--delete", "StrictHostKeyChecking=no", "sudo "}},
+		{name: "networked incremental RWE", file: "rsync-networked-incremental-rwe.yesh", must: []string{"rsync -a --fsync --delay-updates --timeout=30 -e $ssh_command -- $source $temporary", "publish $temporary to $current", "remote source path check failed"}, forbid: []string{"--delete", "StrictHostKeyChecking=no", "sudo "}},
+		{name: "IP CIDR preflight", file: "ip-cidr-check.yesh", must: []string{"network = cidr 192.0.2.0/24", "address = ip 192.0.2.42", "if contains $network $address:"}, forbid: []string{"ip route", "ip address add", "iptables"}},
+		{name: "IP CIDR overlap", file: "ip-cidr-overlap.yesh", must: []string{"network = masked cidr 192.0.2.17/24", "if overlaps $network $more_specific:"}, forbid: []string{"ip route", "ip address add", "iptables"}},
+		{name: "IP class preflight", file: "ip-class-check.yesh", must: []string{"address = ip fe80::1%eth0", "if is link-local $address:"}, forbid: []string{"ip route", "ip address add", "iptables"}},
+		{name: "IP CIDR bounds", file: "ip-cidr-bounds.yesh", must: []string{"first_address = first $network", "last_address = last $network", "if contains $network $first_address:"}, forbid: []string{"ping ", "ip route", "ip address add"}},
+		{name: "network interface report", file: "network-interface-report.yesh", must: []string{"ip -j address show"}, forbid: []string{"ip address add", "ip address change", "ip address replace", "ip address flush", "sudo "}},
+		{name: "network route report", file: "network-route-report.yesh", must: []string{"ip -j route show"}, forbid: []string{"ip route add", "ip route change", "ip route replace", "ip route flush", "sudo "}},
+		{name: "network neighbour report", file: "network-neighbour-report.yesh", must: []string{"ip -j neigh show"}, forbid: []string{"ip neigh add", "ip neigh change", "ip neigh replace", "ip neigh del", "sudo "}},
+		{name: "network listener report", file: "network-listener-report.yesh", must: []string{"ss -H -n -l -t -u | head -n 200"}, forbid: []string{"ss -K", "kill", "sudo "}},
+		{name: "arp scan dependency", file: "arp-scan-by-mac.yesh", must: []string{"exists $arp_scan", "$arp_scan --interface $interface --numeric --quiet $network", "apt install arp-scan", "dnf install arp-scan"}, forbid: []string{"sudo ", "--localnet"}},
+		{name: "cron backup RWE", file: "cron-backup-rwe.yesh", must: []string{"with lock $lock:", "sleep $delay", "rsync -a --fsync --delay-updates --timeout=30 -- $source $temporary", "publish $temporary to $current"}, forbid: []string{"crontab ", "sudo ", "--delete"}},
 		{name: "rsync destination preflight", file: "rsync-destination-preflight.yesh", must: []string{"findmnt --target $root", "stat -c", "df -P -h -- $root", "rsync retention plan in $root keep $keep"}, forbid: []string{"rsync -", "publish ", "delete ", "unlink "}},
 		{name: "rsnapshot preflight", file: "rsnapshot-preflight.yesh", must: []string{"rsnapshot -c $config configtest", "rsnapshot -c $config -t $level"}},
-		{name: "rsnapshot guarded apply", file: "rsnapshot-apply.yesh", must: []string{"findmnt --source $mount_source --target $root", "rsnapshot -c $config -t $level", "YESH_RSNAPSHOT_CONFIRM"}},
+		{name: "rsnapshot guarded apply", file: "rsnapshot-apply.yesh", must: []string{"findmnt --source $mount_source --target $root", "df -P -h -- $root", "free_space $root at_least 20MiB", "rsnapshot -c $config -t $level", "YESH_RSNAPSHOT_CONFIRM"}},
 		{name: "mount preflight", file: "storage-check.yesh", must: []string{"findmnt --target $mountpoint", "df -P -h -- $mountpoint"}},
 		{name: "ssh health", file: "ssh-health.yesh", must: []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ConnectTimeout=5"}, forbid: []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"}},
 	}
@@ -1340,6 +1357,44 @@ func TestPOSIXPracticalRsnapshotGuardedApply(t *testing.T) {
 	want := []string{"rsnapshot", "-c", config, "daily"}
 	if calls != 5 || len(args) < len(want) || strings.Join(args[len(args)-len(want):], "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("confirmed interval missing from trace: %q", args)
+	}
+}
+
+func TestPOSIXPracticalRsnapshotGuardedApplyFreeSpaceFailureStopsRotation(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "rsnapshot.conf")
+	confirm := filepath.Join(dir, "approved")
+	trace := filepath.Join(dir, "trace")
+	writeTestFile(t, config, []byte("config_version 1.2\n"), 0600)
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "df"), []byte("#!/bin/sh\nexit 1\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\n"), 0700)
+	writeTestFile(t, confirm, nil, 0600)
+	cmd := practicalCommand(t, dir, practicalExample(t, "rsnapshot-apply.yesh"))
+	cmd.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSNAPSHOT_CONFIG="+config,
+		"YESH_RSNAPSHOT_LEVEL=daily",
+		"YESH_RSNAPSHOT_ROOT="+root,
+		"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
+		"YESH_RSNAPSHOT_CONFIRM="+confirm,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("free-space preflight unexpectedly passed: err=%v output=%q", err, out)
+	}
+	if data, readErr := os.ReadFile(trace); readErr == nil && len(data) != 0 {
+		t.Fatalf("rsnapshot ran after free-space command failed: %q", data)
 	}
 }
 

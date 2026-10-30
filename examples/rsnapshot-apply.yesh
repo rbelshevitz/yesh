@@ -13,6 +13,8 @@
 # This wrapper does not parse or rewrite rsnapshot.conf. In particular, review
 # rsync_long_args, sync_first, retain, no_create_root, lockfile, backup_script,
 # and remote SSH entries in `rsnapshot -t` before creating the confirmation.
+# The fixed 20MiB floor is a conservative preflight guard, not a size estimate
+# for a successful snapshot.
 
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
@@ -23,13 +25,18 @@ confirm = environment YESH_RSNAPSHOT_CONFIRM
 if exists $config:
     if exists $root:
         if findmnt --source $mount_source --target $root:
-            rsnapshot -c $config configtest
-            rsnapshot -c $config -t $level
-            if exists $confirm:
-                rsnapshot -c $config $level
+            df -P -h -- $root
+            if free_space $root at_least 20MiB:
+                rsnapshot -c $config configtest
+                rsnapshot -c $config -t $level
+                if exists $confirm:
+                    rsnapshot -c $config $level
+                else:
+                    echo "review rsnapshot test output and create the confirmation file"
+                    exit 4
             else:
-                echo "review rsnapshot test output and create the confirmation file"
-                exit 4
+                echo "snapshot root has less than 20MiB free"
+                exit 5
         else:
             echo "snapshot root is not mounted"
             exit 3

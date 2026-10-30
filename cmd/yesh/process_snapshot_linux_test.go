@@ -137,6 +137,18 @@ func TestProcessTableRejectsUnknownField(t *testing.T) {
 	}
 }
 
+func TestProcessTableIncludesStableStartTime(t *testing.T) {
+	var output bytes.Buffer
+	processes := []processInfo{{pid: 42, startTime: 12345}}
+	if err := writeProcessTable(&output, processes, []string{"pid", "start_time"}); err != nil {
+		t.Fatal(err)
+	}
+	want := "PID\tSTART_TIME\n42\t12345\n"
+	if output.String() != want {
+		t.Fatalf("table = %q, want %q", output.String(), want)
+	}
+}
+
 func TestProcessSummaryCalculatesRSSWithoutOverflow(t *testing.T) {
 	var output bytes.Buffer
 	processes := []processInfo{{rssBytes: 10}, {rssBytes: 30}}

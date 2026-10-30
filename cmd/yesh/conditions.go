@@ -18,6 +18,9 @@ const (
 	matchesCondition
 	freeSpaceCondition
 	processMemoryCondition
+	containsCondition
+	overlapsCondition
+	addressClassCondition
 )
 
 type conditionExpr struct {
@@ -75,6 +78,26 @@ func parseCondition(text string) (conditionExpr, error) {
 			return expr, err
 		}
 		expr.kind = processMemoryCondition
+	} else if keyword(0, "contains") {
+		if len(terms) != 3 || terms[1].operator || terms[2].operator {
+			return expr, fmt.Errorf("expected: contains $cidr $ip")
+		}
+		expr.kind = containsCondition
+	} else if keyword(0, "overlaps") {
+		if len(terms) != 3 || terms[1].operator || terms[2].operator {
+			return expr, fmt.Errorf("expected: overlaps $cidr $cidr")
+		}
+		expr.kind = overlapsCondition
+	} else if keyword(0, "is") {
+		if len(terms) != 3 || terms[1].operator || terms[2].operator {
+			return expr, fmt.Errorf("expected: is link-local|multicast|global-unicast $ip")
+		}
+		switch terms[1].text {
+		case "link-local", "multicast", "global-unicast", "loopback":
+		default:
+			return expr, fmt.Errorf("unknown address class %q", terms[1].text)
+		}
+		expr.kind = addressClassCondition
 	}
 	return expr, nil
 }
@@ -101,7 +124,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.scalar == "" || strings.ContainsRune(v.scalar, 0) {
+		if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.scalar == "" || strings.ContainsRune(v.scalar, 0) {
 			return false, fmt.Errorf("%s:%d: exists expects one non-empty path string", r.filename, line)
 		}
 		ok, err := fileExists(v.scalar)
@@ -127,7 +150,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if left.fstab != nil || left.device != nil || left.isList || left.regex != nil || right.regex == nil {
+		if left.fstab != nil || left.device != nil || left.ip != nil || left.cidr != nil || left.isList || left.regex != nil || right.regex == nil {
 			return false, fmt.Errorf("%s:%d: matches expects text matches regex", r.filename, line)
 		}
 		return right.regex.MatchString(left.scalar), nil
@@ -136,7 +159,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if path.fstab != nil || path.device != nil || path.isList || path.regex != nil || path.scalar == "" || strings.ContainsRune(path.scalar, 0) {
+		if path.fstab != nil || path.device != nil || path.ip != nil || path.cidr != nil || path.isList || path.regex != nil || path.scalar == "" || strings.ContainsRune(path.scalar, 0) {
 			return false, fmt.Errorf("%s:%d: free_space expects one non-empty path string", r.filename, line)
 		}
 		need, err := parseByteSize(expr.terms[3].text)
@@ -166,6 +189,58 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 			return false, fmt.Errorf("%s:%d: memory: %w", r.filename, line, err)
 		}
 		return total <= need, nil
+	case containsCondition:
+		network, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		address, err := r.conditionValue(expr.terms[2], line)
+		if err != nil {
+			return false, err
+		}
+		if network.cidr == nil || address.ip == nil {
+			return false, fmt.Errorf("%s:%d: contains expects a CIDR prefix and an IP address", r.filename, line)
+		}
+		if network.cidr.Addr().BitLen() != address.ip.BitLen() {
+			return false, fmt.Errorf("%s:%d: contains cannot mix IPv4 and IPv6", r.filename, line)
+		}
+		return network.cidr.Contains(*address.ip), nil
+	case overlapsCondition:
+		left, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		right, err := r.conditionValue(expr.terms[2], line)
+		if err != nil {
+			return false, err
+		}
+		if left.cidr == nil || right.cidr == nil {
+			return false, fmt.Errorf("%s:%d: overlaps expects two CIDR prefixes", r.filename, line)
+		}
+		if left.cidr.Addr().BitLen() != right.cidr.Addr().BitLen() {
+			return false, fmt.Errorf("%s:%d: overlaps cannot mix IPv4 and IPv6", r.filename, line)
+		}
+		return left.cidr.Overlaps(*right.cidr), nil
+	case addressClassCondition:
+		address, err := r.conditionValue(expr.terms[2], line)
+		if err != nil {
+			return false, err
+		}
+		if address.ip == nil {
+			return false, fmt.Errorf("%s:%d: address class expects an IP address", r.filename, line)
+		}
+		switch expr.terms[1].text {
+		case "link-local":
+			return address.ip.IsLinkLocalUnicast(), nil
+		case "multicast":
+			return address.ip.IsMulticast(), nil
+		case "global-unicast":
+			return address.ip.IsGlobalUnicast(), nil
+		case "loopback":
+			return address.ip.IsLoopback(), nil
+		default:
+			return false, fmt.Errorf("%s:%d: unknown address class %q", r.filename, line, expr.terms[1].text)
+		}
 	}
 	if r.plan {
 		return false, fmt.Errorf("%s:%d: --plan cannot evaluate command condition: %s", r.filename, line, expr.text)

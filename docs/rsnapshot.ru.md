@@ -28,6 +28,11 @@ Remote backup также остаётся штатной возможность�
 `ssh_args`, agent/`known_hosts` и строки `backup user@host:/path target/`.
 yesh проверяет границы и порядок запуска, но не повторяет rotation engine.
 
+Disposable remote-проверка [`yesh-rsnapshot-fixture.sh`](../scripts/yesh-rsnapshot-fixture.sh)
+запускает этот wrapper на отдельной Debian-машине: проверяет `--plan`, две
+ротации, restore и повторное использование inode. Это не проверка production
+mount, потери питания или удалённого SSH-источника.
+
 Для реального interval есть отдельный guarded wrapper
 [`rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh). Он требует заранее
 созданный оператором confirmation-файл после просмотра `rsnapshot -t`; сам
@@ -173,3 +178,9 @@ yesh backup.yesh verify daily web-1/app ./restore-check
 
 > Обычная ошибка оператора должна остановить выполнение до разрушительного
 > действия и объяснить, что именно нужно исправить.
+Перед применением на съёмном или отдельном backup-диске сначала нужно проверить
+не только `findmnt`, но и доступное место. Пример `examples/rsnapshot-apply.yesh`
+показывает `df`, затем требует минимум `20MiB`, и только после этого запускает
+`configtest`, test mode и явное подтверждение. Это нижняя защитная граница, а не
+оценка размера будущего снимка: rsnapshot всё равно может завершиться с ошибкой.
+

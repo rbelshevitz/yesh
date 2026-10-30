@@ -1,0 +1,9 @@
+# CIDR normalization and overlap checks. No network state is changed.
+
+network = masked cidr 192.0.2.17/24
+more_specific = cidr 192.0.2.128/25
+
+if overlaps $network $more_specific:
+    echo "prefixes overlap"
+else:
+    echo "prefixes are disjoint"

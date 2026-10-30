@@ -1,0 +1,27 @@
+# Validate, publish, and activate one disposable service configuration.
+# The validator and systemd unit are explicit; yesh does not add sudo.
+#
+# Required environment:
+#   YESH_CONFIG_STAGED  candidate configuration
+#   YESH_CONFIG_ACTIVE  current published configuration
+#   YESH_CONFIG_NEXT    private staging path on the same filesystem
+# The unit is intentionally a literal below: typed systemd diagnostics must
+# not accept secret environment values as a unit name.
+
+staged = environment YESH_CONFIG_STAGED
+active = environment YESH_CONFIG_ACTIVE
+next = environment YESH_CONFIG_NEXT
+
+if exists $staged:
+    if grep -q '^mode=production$' $staged:
+        install -m 0640 -- $staged $next
+        publish $next to $active
+        service restart yesh-config-rwe.service until active within 10s
+        service status yesh-config-rwe.service
+        journal yesh-config-rwe.service since 5m lines 20
+    else:
+        echo "configuration validation failed"
+        exit 3
+else:
+    echo "staged configuration is missing"
+    exit 2

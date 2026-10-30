@@ -82,3 +82,22 @@ func retentionCandidates(root string, keep int, protected ...string) ([]retentio
 	}
 	return snapshots[keep:], nil
 }
+
+func retentionQuarantineCandidates(root, quarantine string, keep int) ([]retentionCandidate, error) {
+	if quarantine == "" {
+		return nil, fmt.Errorf("quarantine directory is empty")
+	}
+	root = filepath.Clean(root)
+	quarantine = filepath.Clean(quarantine)
+	if filepath.Dir(quarantine) != root {
+		return nil, fmt.Errorf("quarantine must be a direct child of retention root")
+	}
+	info, err := os.Lstat(quarantine)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("quarantine must be a real directory")
+	}
+	return retentionCandidates(root, keep)
+}

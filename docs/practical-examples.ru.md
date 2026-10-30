@@ -291,10 +291,10 @@ else:
 
 ```yesh
 nginx = processes where name is "nginx"
-show $nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss start_time cgroup
 ```
 
-Вывод содержит выбранные PID, UID, состояние, RSS в байтах и cgroup. Полный
+Вывод содержит выбранные PID, UID, состояние, RSS в байтах, время запуска и cgroup. Полный
 набор также включает PPID, PGID, SID и имя. Это не аналог `pkill`: yesh не посылает
 сигналы и не изменяет процессы. В WSL с запущенным nginx пример показал
 master и четыре worker-процесса в одном systemd cgroup.

@@ -266,6 +266,62 @@ options never excuse a missing mount. Plan defers entry/device/mount checks.
 The loaded fstab snapshot is used; later edits are not reread. This verifies
 mountpoint, device and filesystem, not options, write access, free space or boot.
 Concurrent mount/device changes still require an external boundary.
+.SS Read-only network reports and checks (Linux)
+Read-only reports can call the external ip and ss commands explicitly:
+.nf
+ip -j address show
+ip -j route show
+ip -j neigh show
+ss -H -n -l -t -u
+.fi
+.PP
+These commands use the current user's permissions; yesh does not add sudo and
+does not promise access to every netlink field. Command failures, permission
+errors and unavailable netlink stop the script. The examples do not create
+interfaces, routes, rules, namespaces or connections.
+.PP
+Typed address and network values provide computation and validation:
+.nf
+address = ip "192.0.2.17"
+network = cidr "192.0.2.0/24"
+if contains $network $address:
+    echo "inside"
+.fi
+.PP
+The current subset supports strict IPv4/IPv6 parsing, contains, overlaps,
+masked, first, last and address classification. It does not change network
+state. IPv6 zones in CIDR values, mixed address families and invalid prefixes
+are errors.
+.PP
+Active neighbour discovery with arp-scan remains an external, separate
+example. It must receive an explicit interface and IPv4 CIDR, check an
+executable path with exists, and explain a missing package:
+.nf
+arp-scan --interface $interface --numeric --quiet $network
+.fi
+.PP
+On Debian/Ubuntu, Rocky and Alma Linux the package is normally named arp-scan
+in a configured repository. arp-scan sends active Layer-2 ARP requests only on
+the specified local network, may require CAP_NET_RAW, and cannot discover hosts
+beyond a router. yesh does not install packages, silently select --localnet,
+or elevate privileges.
+.PP
+Documentation examples do not contain addresses or MACs from a particular
+infrastructure. For a real test, an operator supplies the interface, IPv4
+address and MAC to a wrapper; a single IPv4 target is restricted to /32.
+A positive ARP test requires another host on the same Layer-2 segment. Running
+the scan on the target host does not prove that the host is discoverable.
+.SS External programs, packages and sudo
+An external command is part of the example's contract. A missing executable
+must stop before the useful operation or select an explicit dependency-error
+branch. A package hint is informational, not an installation request. Package
+names and binary paths must still be checked on the host.
+.PP
+yesh never invokes sudo or prompts for a password automatically. If a step
+needs privilege, the operator supplies the execution context explicitly. For
+cron and CI, use sudo -n so missing authorization fails rather than blocking.
+Run plan and apply with comparable context; local root does not grant root on a
+remote host.
 .SH SECURITY
 Known shell interpreters are rejected after argument expansion on every stage.
 Known code interpreters and execution wrappers are rejected in pipelines.

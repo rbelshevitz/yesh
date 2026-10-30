@@ -1,0 +1,6 @@
+# Address classification for a read-only network preflight.
+
+address = ip fe80::1%eth0
+
+if is link-local $address:
+    echo "link-local address requires an interface scope"

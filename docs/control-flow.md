@@ -113,3 +113,16 @@ symlinks are rejected. The report labels the newest entries `KEEP` and the
 older entries `PRUNE`; the latter is only a report label. The count must be
 between 1 and 10000. The operation never removes or renames anything, even
 outside `--plan`.
+
+### Retention quarantine
+
+```yesh
+with lock $lock:
+    rsync retention quarantine in $root keep $keep to $quarantine
+```
+
+The quarantine directory must already exist as a real direct child of `root`.
+The operation reads only completed `snapshot.<number>` directories inside the
+explicit lock and moves entries older than `keep` with `rename`. It never
+deletes quarantine contents and has no copy fallback across filesystems.
+`--plan` reports candidates without changing the filesystem.

@@ -240,6 +240,9 @@ mount, and lock, but does not reimplement its rotation engine.
   moving anything.
 - [ ] Move candidates only with an atomic same-filesystem rename; a
   cross-filesystem condition must stop the operation.
+- [x] A disposable Debian fixture confirmed same-filesystem rename, validation,
+  safe rerun, and lock handling; quarantine contents were not physically
+  deleted.
 - [ ] Do not physically delete quarantine contents in the first version; a
   retry must be safe and must not merge directories.
 - [ ] Add `--plan`, a positive test, changed-state failure, lock conflict,

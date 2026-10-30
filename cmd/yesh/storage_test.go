@@ -38,18 +38,22 @@ func TestStorageIdentityAndMount(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		name, raw string
-		ok        bool
+		name, raw, mode string
+		ok              bool
 	}{
-		{"exact", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/"}]}`, true},
-		{"parent", `{"filesystems":[{"target":"/","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/"}]}`, false},
-		{"wrong device", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:2","fsroot":"/"}]}`, false},
-		{"wrong fs", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"xfs","maj:min":"8:1","fsroot":"/"}]}`, false},
-		{"subtree", `{"filesystems":[{"target":"/backup","source":"/dev/test[/data]","fstype":"ext4","maj:min":"8:1","fsroot":"/data"}]}`, false},
-		{"missing", `{"filesystems":[]}`, false}, {"invalid", `garbage`, false},
+		{"exact", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/"}]}`, "", true},
+		{"parent", `{"filesystems":[{"target":"/","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/"}]}`, "", false},
+		{"wrong device", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:2","fsroot":"/"}]}`, "", false},
+		{"wrong fs", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"xfs","maj:min":"8:1","fsroot":"/"}]}`, "", false},
+		{"subtree", `{"filesystems":[{"target":"/backup","source":"/dev/test[/data]","fstype":"ext4","maj:min":"8:1","fsroot":"/data"}]}`, "", false},
+		{"readonly", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/","vfs-options":"ro,relatime","fs-options":"ro,norecovery"}]}`, "readonly", true},
+		{"readonly rejects writable", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/","vfs-options":"rw,relatime","fs-options":"rw"}]}`, "readonly", false},
+		{"writable", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/","vfs-options":"rw,relatime","fs-options":"rw"}]}`, "writable", true},
+		{"writable rejects readonly", `{"filesystems":[{"target":"/backup","source":"/dev/test","fstype":"ext4","maj:min":"8:1","fsroot":"/","vfs-options":"ro,relatime","fs-options":"ro,norecovery"}]}`, "writable", false},
+		{"missing", `{"filesystems":[]}`, "", false}, {"invalid", `garbage`, "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := checkStorageMount([]byte(tc.raw), "/backup", d, "ext4"); (err == nil) != tc.ok {
+			if err := checkStorageMount([]byte(tc.raw), "/backup", d, "ext4", tc.mode); (err == nil) != tc.ok {
 				t.Fatal(err)
 			}
 		})
@@ -59,6 +63,11 @@ func TestStorageSyntaxAndTypes(t *testing.T) {
 	for _, source := range []string{"inspect $disk | cat", "inspect $disk > file", "require mounted /backup", "require mounted /backup from $disk filesystem ext4 | cat"} {
 		if _, err := parse(source, "storage.yesh"); err == nil {
 			t.Fatalf("accepted %s", source)
+		}
+	}
+	for _, source := range []string{"require mounted /backup from $disk filesystem ext4 readonly", "require mounted /backup from $disk filesystem ext4 writable"} {
+		if _, err := parse(source, "storage.yesh"); err != nil {
+			t.Fatalf("rejected %s: %v", source, err)
 		}
 	}
 	r := &runtime{values: map[string]value{"disk": {device: &storageDevice{}}}, filename: "storage.yesh", plan: true}

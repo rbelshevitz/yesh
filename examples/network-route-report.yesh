@@ -1,0 +1,4 @@
+# Read-only routing-table report. No route is added, changed, replaced, or
+# flushed; permission and utility failures remain visible errors.
+
+ip -j route show

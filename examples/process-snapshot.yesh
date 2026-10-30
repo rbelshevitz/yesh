@@ -3,5 +3,5 @@
 # show does not send signals or change process state.
 
 nginx = processes where name is "nginx"
-show $nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss start_time cgroup
 summarize $nginx memory rss

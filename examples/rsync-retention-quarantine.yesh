@@ -1,0 +1,19 @@
+# Apply retention quarantine only inside an explicit lock.
+# The quarantine directory must already exist as a direct child of root.
+# No content is deleted; --plan prints the validated rename candidates.
+
+root = environment YESH_RSYNC_ROOT
+keep = environment YESH_RSYNC_KEEP
+quarantine = environment YESH_RSYNC_QUARANTINE
+lock = environment YESH_RSYNC_LOCK
+
+if exists $root:
+    if exists $quarantine:
+        with lock $lock:
+            rsync retention quarantine in $root keep $keep to $quarantine
+    else:
+        echo "quarantine directory is missing"
+        exit 2
+else:
+    echo "snapshot root is missing"
+    exit 2

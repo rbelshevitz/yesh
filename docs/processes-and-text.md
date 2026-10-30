@@ -2,7 +2,7 @@
 
 ## The decision on sed and awk
 
-`sed` and `awk` remain ordinary Unix commands. Embedding them would violate
+`sed` and `awk` remain external Linux commands. Embedding them would violate
 the principle of one clear way to do each thing and require maintaining two
 extra grammars,
 quoting systems, and state models.
@@ -28,13 +28,14 @@ PIDs can be reused. A process query returns structured records, not stdout:
 
 ```yesh
 nginx = processes where name is "nginx"
-show $nginx fields pid uid state rss cgroup
+show $nginx fields pid uid state rss start_time cgroup
 summarize $nginx memory rss
 ```
 
 The implemented read-only snapshot matches the exact Linux kernel name and
 reports selected fields such as PID, UID, state, RSS, PPID, PGID, SID, name,
-and cgroup. RSS is in bytes. The operation sends no signals and changes no
+and cgroup. `start_time` is the Linux kernel start-time tick count, useful for
+distinguishing reused PIDs. RSS is in bytes. The operation sends no signals and changes no
 process state. A process that disappears while `/proc` is being read is not
 reported as a false result.
 

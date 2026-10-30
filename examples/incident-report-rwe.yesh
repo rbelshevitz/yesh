@@ -1,0 +1,21 @@
+# Read-only incident report for one known systemd service.
+# The wrapper captures stdout and stderr separately and archives both files.
+# No service, process, mount, or device is changed by this script.
+#
+# Bash comparison:
+#   systemctl show ... >status.out 2>status.err
+#   journalctl --no-pager --output=json --unit systemd-journald.service \
+#     --since=-15m --lines=20 >journal.out 2>journal.err
+#   ps ...; findmnt ...; df ...
+# yesh keeps the service unit, journal bounds, process fields, and storage
+# target visible. The outer wrapper supplies the report file descriptors.
+
+service status systemd-journald.service
+journal systemd-journald.service since 15m lines 20
+
+systemd = processes where name is "systemd"
+show $systemd fields pid ppid uid state rss start_time cgroup
+summarize $systemd memory rss
+
+findmnt --target /
+df -P -h -- /

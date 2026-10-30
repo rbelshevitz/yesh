@@ -123,3 +123,17 @@ rsync retention plan in $root keep $keep
 это только метка, а не команда удаления. Число должно быть от 1 до 10000.
 Операция никогда не удаляет и не переименовывает файлы, даже вне режима
 `--plan`.
+
+### Quarantine старых snapshot
+
+```yesh
+with lock $lock:
+    rsync retention quarantine in $root keep $keep to $quarantine
+```
+
+Операция принимает только существующий реальный дочерний каталог `quarantine`
+внутри `root`, повторно строит список `snapshot.<number>` и перемещает только
+записи старше `keep` атомарным same-filesystem rename. В cross-filesystem
+случае `rename` завершается ошибкой; copy+remove не используется. Содержимое
+quarantine не удаляется. В `--plan` выводятся кандидаты и destination, но
+filesystem не меняется. Блокировка должна быть явной снаружи операции.

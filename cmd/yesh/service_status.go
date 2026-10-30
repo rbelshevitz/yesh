@@ -22,7 +22,7 @@ func (r *runtime) executeServiceStatus(s serviceStatusStmt) error {
 	if err != nil {
 		return err
 	}
-	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
+	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service status expects one non-empty unit name")
 	}
 	if err := validateUnitName(v.scalar); err != nil {
@@ -51,7 +51,7 @@ func (r *runtime) executeServiceRestart(s serviceRestartStmt) error {
 	if err != nil {
 		return err
 	}
-	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
+	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service %s expects one non-empty unit name", s.action)
 	}
 	if err := validateUnitName(v.scalar); err != nil {
@@ -73,7 +73,7 @@ func (r *runtime) executeServiceWait(s serviceWaitStmt) error {
 	if err != nil {
 		return err
 	}
-	if v.fstab != nil || v.device != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
+	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service wait expects one non-empty unit name")
 	}
 	if err := validateUnitName(v.scalar); err != nil {
