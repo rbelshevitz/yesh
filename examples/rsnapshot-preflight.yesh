@@ -9,8 +9,8 @@
 # The config must set snapshot_root, lockfile and (for removable media)
 # no_create_root=1. Remote sources remain ordinary rsnapshot backup entries;
 # SSH authentication and known_hosts come from the normal OpenSSH setup.
-
 # Role of yesh: expose preflight, confirmation, and failure handling; rsnapshot remains the snapshot engine.
+
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
 

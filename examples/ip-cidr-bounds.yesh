@@ -1,7 +1,7 @@
 # CIDR boundaries are mathematical first/last addresses.
 # There is no implicit "usable host" subtraction for IPv4 or IPv6.
-
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
+
 network = cidr 192.0.2.17/31
 first_address = first $network
 last_address = last $network

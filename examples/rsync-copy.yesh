@@ -3,8 +3,8 @@
 # Change: rsync copies files into the target; extra target files are not deleted.
 # Failure: a missing or unmounted target stops before rsync; rsync errors remain visible.
 # Boundary: `exists` checks the path only; it does not prove that the backup device is mounted.
-
 # Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
+
 source = "source/"
 target = "target/"
 if exists $target:

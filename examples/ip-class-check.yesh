@@ -3,8 +3,8 @@
 # Change: none; this is arithmetic and validation, not a network query.
 # Result: a link-local address prints a reminder about interface scope;
 # other classes produce no output in this minimal example.
-
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
+
 address = ip fe80::1%eth0
 
 if is link-local $address:

@@ -12,8 +12,14 @@
 # slash semantics. Codes 2..5 distinguish missing paths, unsafe source, a
 # non-empty target, and an unmounted target. Verify bytes/checksums after rsync;
 # a successful copy alone does not prove application-level recovery.
-
+# Companion RWE script: `scripts/yesh-selected-restore-rwe.sh`. From the
+# repository root, run `sh scripts/yesh-selected-restore-rwe.sh ./yesh
+# examples/rsync-selected-restore.yesh`; it creates a temporary test tree,
+# supplies the three environment variables, checks `--plan`, verifies a
+# successful restore, and exercises symlink, non-empty-target, and missing-source
+# failures. The script is the test stand; this file is the reusable yesh workflow.
 # Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
+
 snapshot = environment YESH_RESTORE_SNAPSHOT
 source = environment YESH_RESTORE_SOURCE
 target = environment YESH_RESTORE_TARGET

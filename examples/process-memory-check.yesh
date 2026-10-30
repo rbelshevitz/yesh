@@ -1,7 +1,7 @@
 # Environment-dependent example: checks processes visible in this Linux host.
 # Fail if all nginx processes together exceed the RSS budget.
-
 # Role of yesh: select and report a bounded process view; the kernel and procfs remain the sources of state.
+
 nginx = processes where name is "nginx"
 
 if memory $nginx rss at_most 512MiB:

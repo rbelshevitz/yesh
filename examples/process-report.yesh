@@ -5,8 +5,8 @@
 # Bash would need separate commands, quoting, and text parsing to produce a
 # similar report. yesh keeps process identity, fields, and RSS arithmetic
 # explicit. The example is read-only: it does not signal or modify processes.
-
 # Role of yesh: select and report a bounded process view; the kernel and procfs remain the sources of state.
+
 sshd = processes where name is "sshd"
 show $sshd fields pid ppid uid state rss start_time cgroup
 summarize $sshd memory rss

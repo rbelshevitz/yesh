@@ -1,8 +1,8 @@
 # Environment-dependent example: replace /backup with an existing mounted path.
 # Read-only report for the filesystem behind a path.
 # No mount, unmount, partitioning, formatting, or device changes are made.
-
 # Role of yesh: make the read-only preflight and refusal path explicit; Linux storage tools provide the state.
+
 mountpoint = /backup
 
 if findmnt --target $mountpoint:

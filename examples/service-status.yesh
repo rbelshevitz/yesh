@@ -14,6 +14,6 @@
 #   systemctl show --no-pager \
 #     --property=Id,LoadState,ActiveState,SubState systemd.service
 # The yesh form validates the unit and the returned Id before printing it.
-
 # Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
+
 service status systemd-journald.service

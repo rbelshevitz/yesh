@@ -15,8 +15,8 @@
 # Inputs are fixed in this example: systemd-journald.service and `/`. A missing
 # unit, inaccessible journal, or failed diagnostic command is an error; a
 # successful report only describes observations at one point in time.
-
 # Role of yesh: keep the inputs, command arguments, and failure boundary readable; external tools perform the domain operation.
+
 service status systemd-journald.service
 journal systemd-journald.service since 15m lines 20
 

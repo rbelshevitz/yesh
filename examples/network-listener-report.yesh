@@ -3,6 +3,6 @@
 # Change: none; yesh does not close sockets or alter network state.
 # Failure: a missing `ss` or a permission error stops the example.
 # Boundary: the report preserves `ss` text; it does not prove that a service is healthy.
-
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
+
 ss -H -n -l -t -u | head -n 200

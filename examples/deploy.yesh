@@ -1,8 +1,8 @@
 # Environment-dependent example: requires SSH access to web-1 and rsync.
 # Replace the host, paths, and service name before running.
 # Minimal deployment example.
-
 # Role of yesh: keep remote arguments, checks, and failure boundaries visible; SSH or rsync performs the remote operation.
+
 host = web-1
 release = build/current/
 # The address is one complete value: there is no substitution inside host:path.

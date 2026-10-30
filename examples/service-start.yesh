@@ -12,6 +12,6 @@
 # Bash equivalent:
 #   systemctl start yesh-codex-fixture.service && \
 #     test "$(systemctl show -p ActiveState --value yesh-codex-fixture.service)" = active
-
 # Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
+
 service start yesh-codex-fixture.service until active within 10s

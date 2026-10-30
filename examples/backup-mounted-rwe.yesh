@@ -9,8 +9,8 @@
 # filesystem identity check failed, and 4 means the 20 MiB floor was not met.
 # A failed preflight must leave the target untouched; verify that with `--plan`
 # and the negative fixture cases.
-
 # Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
+
 mountpoint = environment YESH_RWE_MOUNTPOINT
 expected_source = environment YESH_RWE_SOURCE
 source = environment YESH_RWE_SOURCE_DIR
@@ -35,4 +35,3 @@ if exists $source:
 else:
     echo "backup source is missing"
     exit 2
-

@@ -1,8 +1,8 @@
 # Fixture-dependent example: requires the prepared `test-initrd.img` fixture.
 # Check one exact path in the prepared test initramfs.
 # This checks the manifest, not driver compatibility or module loading.
-
 # Role of yesh: sequence the read-only image checks and show their failure path; initrd tools inspect the image.
+
 image = "test-initrd.img"
 modulefile = "usr/lib/modules/6.1.0-yesh-test/kernel/drivers/nvme/host/nvme.ko"
 lsinitramfs $image | grep -F -x -- $modulefile

@@ -3,8 +3,8 @@
 # Change: a valid candidate replaces `active.conf` through `active.conf.next`.
 # Failure: an invalid candidate returns 3 and leaves the active file unchanged.
 # Boundary: this is one parameter check, not a complete service validator.
-
 # Role of yesh: make validation, publication order, and refusal visible; the external validator or service remains authoritative.
+
 staged = "staged.conf"
 active = "active.conf"
 next = "active.conf.next"

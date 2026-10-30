@@ -19,8 +19,8 @@
 #     -- "$SOURCE" "$TARGET"
 # The yesh form keeps each argv visible in --plan and does not add deletion
 # behavior implicitly.
-
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
+
 dns_name = environment YESH_RSYNC_DNS_NAME
 route_target = environment YESH_RSYNC_ROUTE_TARGET
 host = environment YESH_RSYNC_HOST

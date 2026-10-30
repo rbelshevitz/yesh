@@ -4,8 +4,8 @@
 # Failure: a missing root/quarantine or a conflicting destination stops the run.
 # Boundary: the quarantine directory must already exist as a direct child of root;
 # `--plan` prints validated rename candidates without moving anything.
-
 # Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
+
 root = environment YESH_RSYNC_ROOT
 keep = environment YESH_RSYNC_KEEP
 quarantine = environment YESH_RSYNC_QUARANTINE

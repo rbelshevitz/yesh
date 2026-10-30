@@ -7,8 +7,8 @@
 # the script before the corresponding publication step.
 # Bash comparison: `set -euo pipefail`, quoted variables, and two temporary
 # names are needed to express the same publish-after-success rule.
-
 # Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
+
 source = "source"
 partial = "backup.tar.gz.partial"
 archive = "backup.tar.gz"

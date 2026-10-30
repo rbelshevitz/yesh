@@ -20,6 +20,6 @@
 #   journalctl --no-pager --output=json --unit systemd-journald.service \
 #     --since=-15m --lines=80
 # yesh makes the bounds part of the statement and its plan.
-
 # Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
+
 journal systemd-journald.service since 15m lines 80

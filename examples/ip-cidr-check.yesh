@@ -1,7 +1,7 @@
 # Typed IP/CIDR preflight. This is arithmetic and validation only: it never
 # changes addresses, routes, interfaces, or firewall state.
-
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
+
 network = cidr 192.0.2.0/24
 address = ip 192.0.2.42
 

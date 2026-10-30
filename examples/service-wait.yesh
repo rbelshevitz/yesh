@@ -26,6 +26,6 @@
 #   systemctl is-active --quiet api.service
 # A loop around that command still needs a deadline and diagnostics. The yesh
 # form makes the unit, postcondition and deadline visible to code review.
-
 # Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
+
 service wait systemd-journald.service until active within 30s

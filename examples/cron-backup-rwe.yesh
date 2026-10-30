@@ -7,8 +7,8 @@
 # Preconditions: root/source exist and destination names are private to this
 # run. A failed or cancelled run must not publish `current` or `result`; inspect
 # partial files and lock cleanup in the fixture.
-
 # Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
+
 root = environment YESH_CRON_ROOT
 source = environment YESH_CRON_SOURCE
 temporary = environment YESH_CRON_TEMPORARY

@@ -6,8 +6,8 @@
 #   YESH_ARP_INTERFACE  exact interface, for example enp6s18
 #   YESH_ARP_NETWORK    explicit IPv4 CIDR, preferably one address as /32
 #   YESH_ARP_MAC        exact MAC to find
-
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
+
 interface = environment YESH_ARP_INTERFACE
 network = environment YESH_ARP_NETWORK
 mac = environment YESH_ARP_MAC

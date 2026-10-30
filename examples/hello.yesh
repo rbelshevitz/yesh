@@ -1,6 +1,6 @@
 # Ordinary Unix commands with readable control flow.
-
 # Role of yesh: keep the inputs, command arguments, and failure boundary readable; external tools perform the domain operation.
+
 name = world
 things = [one, two, three]
 
