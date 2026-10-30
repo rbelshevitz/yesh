@@ -64,7 +64,7 @@ func TestQuickstartExamplesMatchAndParse(t *testing.T) {
 
 func TestSyntaxGuideExamplesParse(t *testing.T) {
 	blocks := yeshBlocks(t, "syntax-guide.ru.md")
-	if len(blocks) != 17 {
+	if len(blocks) != 18 {
 		t.Fatalf("syntax guide examples changed; update execution coverage: %d", len(blocks))
 	}
 	for i, source := range blocks {
