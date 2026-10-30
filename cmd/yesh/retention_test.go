@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	stdruntime "runtime"
 	"testing"
 )
 
@@ -96,6 +97,9 @@ func TestRetentionCandidatesRejectsInvalidKeepAndRoot(t *testing.T) {
 }
 
 func TestRetentionQuarantinePlanAndApply(t *testing.T) {
+	if stdruntime.GOOS != "linux" {
+		t.Skip("retention quarantine execution uses Linux advisory locks")
+	}
 	root := t.TempDir()
 	quarantine := filepath.Join(root, "quarantine")
 	if err := os.Mkdir(quarantine, 0700); err != nil {
@@ -183,6 +187,9 @@ func executeRetentionQuarantine(t *testing.T, root, quarantine, lock string) err
 }
 
 func TestRetentionQuarantineRuntimeFailureMatrix(t *testing.T) {
+	if stdruntime.GOOS != "linux" {
+		t.Skip("retention quarantine execution uses Linux advisory locks")
+	}
 	t.Run("destination collision is preflight failure", func(t *testing.T) {
 		root := t.TempDir()
 		quarantine := filepath.Join(root, "quarantine")
