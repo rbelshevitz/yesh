@@ -88,6 +88,21 @@ func TestPOSIXCLIStdinAndStderr(t *testing.T) {
 	}
 }
 
+func TestPOSIXCLILargeConcurrentOutput(t *testing.T) {
+	fixture := posixFixture(t, `dd if=/dev/zero bs=65536 count=32 2>/dev/null & dd if=/dev/zero bs=65536 count=32 >&2 2>/dev/null & wait`)
+	script := filepath.Join(t.TempDir(), "output.yesh")
+	writeTestFile(t, script, []byte(fixture+"\n"), 0600)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	out, err := posixCLI(t, ctx, script).CombinedOutput()
+	if err != nil {
+		t.Fatalf("concurrent output: %v", err)
+	}
+	if len(out) < 4*1024*1024 {
+		t.Fatalf("captured only %d bytes from stdout and stderr", len(out))
+	}
+}
+
 func TestPOSIXCLIScriptSizeLimit(t *testing.T) {
 	script := filepath.Join(t.TempDir(), "oversized.yesh")
 	writeTestFile(t, script, bytes.Repeat([]byte{'#'}, maxScriptBytes+1), 0600)
@@ -243,6 +258,52 @@ func TestPOSIXCLIForwardsSignals(t *testing.T) {
 				t.Fatalf("child group survived %s: %v", sig, err)
 			}
 		})
+	}
+}
+
+func TestPOSIXCLISIGTERMKillsExternalDescendant(t *testing.T) {
+	dir := t.TempDir()
+	parentPID, childPID := filepath.Join(dir, "parent.pid"), filepath.Join(dir, "child.pid")
+	script := filepath.Join(dir, "descendant.yesh")
+	fixture := posixFixture(t, `echo $$ > "$1"; (trap '' TERM; while :; do :; done) & echo $! > "$2"; wait`)
+	writeTestFile(t, script, []byte(fmt.Sprintf("%s %q %q\n", fixture, parentPID, childPID)), 0600)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	cmd := posixCLI(t, ctx, script)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cmd.Process.Kill() }()
+
+	var parent, child int
+	until := time.Now().Add(3 * time.Second)
+	for time.Now().Before(until) {
+		parentData, _ := os.ReadFile(parentPID)
+		childData, _ := os.ReadFile(childPID)
+		_, parentErr := fmt.Sscanf(string(parentData), "%d", &parent)
+		_, childErr := fmt.Sscanf(string(childData), "%d", &child)
+		if parentErr == nil && childErr == nil && parent > 0 && child > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if parent == 0 || child == 0 {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("external command descendants did not become ready: parent=%d child=%d", parent, child)
+	}
+	defer syscall.Kill(-parent, syscall.SIGKILL)
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Wait(); err == nil {
+		t.Fatal("SIGTERM unexpectedly succeeded")
+	}
+	if ctx.Err() != nil {
+		t.Fatal("SIGTERM handling stalled")
+	}
+	if err := syscall.Kill(-parent, 0); err != syscall.ESRCH {
+		t.Fatalf("external descendant process group survived: %v", err)
 	}
 }
 
