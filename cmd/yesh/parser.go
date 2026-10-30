@@ -71,6 +71,14 @@ type serviceStatusStmt struct {
 
 func (serviceStatusStmt) stmt() {}
 
+type serviceResourcesStmt struct {
+	line    int
+	manager string
+	unit    commandToken
+}
+
+func (serviceResourcesStmt) stmt() {}
+
 type serviceRestartStmt struct {
 	line          int
 	manager       string
@@ -415,6 +423,10 @@ func (p parser) parseService(text string, line int) (statement, error) {
 		return nil, p.err(line, err.Error())
 	}
 	manager, offset := systemdManager(tokens, 2)
+	if len(tokens) == offset+1 && builtinKeyword(tokens[0], "service") &&
+		builtinKeyword(tokens[1], "resources") && !tokens[offset].operator {
+		return serviceResourcesStmt{line: line, manager: manager, unit: tokens[offset]}, nil
+	}
 	if len(tokens) == offset+5 && builtinKeyword(tokens[0], "service") &&
 		builtinKeyword(tokens[1], "wait") && !tokens[offset].operator &&
 		builtinKeyword(tokens[offset+1], "until") && !tokens[offset+2].operator &&

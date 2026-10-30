@@ -15,6 +15,7 @@ service status api.service
 service restart api.service until active within 30s
 service wait api.service until active within 30s
 journal api.service since 15m lines 100
+service resources api.service
 service status user api.service
 journal user api.service since 15m lines 100
 ```
@@ -32,6 +33,15 @@ wait for a long-lived service to terminate. Journal output is JSON Lines,
 capped at four MiB, and rejects diagnostics on stderr so a partial or
 permission-warning result is not presented as success. Cursor/boot filters and
 follow mode remain design targets; bounded `wait` is implemented.
+
+`service resources UNIT` is a read-only snapshot of a Linux unit and its cgroup:
+`ControlGroup`, the main PID, process count, total RSS, available memory/task/CPU
+counters, OOM events, and a process table. The main PID is not treated as the
+whole service: child processes come from the unit cgroup and its subgroups.
+Unavailable fields are printed as `unavailable`, and a process that disappears
+during the snapshot may be omitted. The operation sends no signals and changes
+no limits. It requires Linux, an available systemd manager, and cgroup v2; it is
+a point-in-time observation, not a guarantee of future service behavior.
 
 `DURATION` currently uses the Go duration form accepted by yesh, such as
 `300ms`, `2s`, `15m`, or `1h30m`; it is intentionally narrower than the full
@@ -120,7 +130,8 @@ stopping.
 ## Current boundary and next work
 
 The implemented MVP contains read-only `service status`, bounded `service
-wait`, restart-with-postcondition, and bounded JSON journal forms. They use a
+wait`, restart-with-postcondition, bounded JSON journal, and read-only
+`service resources` forms. They use a
 fixed `systemctl show` allowlist, exact unit identity, explicit system/user
 profiles, finite deadlines, and transparent `--plan` argv.
 
@@ -185,6 +196,7 @@ read-only fleet report.
 | restart is not readiness | `examples/service-restart.yesh` (fixture-backed) | inactive postcondition stops the script |
 | bounded polling | `examples/service-wait.yesh` | transition to active, timeout, failed-state fast error |
 | bounded journal output | `examples/service-journal.yesh` | JSON validation, stderr failure, empty output success |
+| unit resource snapshot | `examples/service-resources.yesh` | cgroup/process correlation and bounded resource fields |
 
 For an opt-in check against a real systemd manager, use
 [`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh). It creates

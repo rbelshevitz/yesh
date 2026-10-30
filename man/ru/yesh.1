@@ -197,6 +197,7 @@ service status systemd-journald.service
 service restart yesh-codex-fixture.service until active within 10s
 service wait systemd-journald.service until active within 30s
 journal systemd-journald.service since 15m lines 20
+service resources systemd-journald.service
 .fi
 .PP
 Строка restart относится к временному стенду: сначала используйте
@@ -218,6 +219,13 @@ systemctl show. Restart вызывает systemctl restart, затем в одн
 или journalctl. Средства работы со службами и журналом работают только в Linux.
 Пустой журнал — успешный пустой результат; диагностика, плохой JSON,
 недоступная шина и отказ доступа считаются ошибкой.
+.PP
+Операция `resources` работает только для чтения. Она связывает точную службу
+с её ControlGroup, читает подгруппы cgroup v2 и показывает главный PID, число
+процессов, суммарный RSS, доступные счётчики памяти/задач/CPU, события OOM и
+таблицу процессов. Сигналы службе не посылаются, лимиты не меняются.
+Недоступные поля помечаются как `unavailable`; результат является снимком
+момента и требует Linux, systemd и доступной для чтения cgroup v2.
 .SS Чтение хранилищ (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"

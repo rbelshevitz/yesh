@@ -191,6 +191,7 @@ service status systemd-journald.service
 service restart yesh-codex-fixture.service until active within 10s
 service wait systemd-journald.service until active within 30s
 journal systemd-journald.service since 15m lines 20
+service resources systemd-journald.service
 .fi
 .PP
 The restart line is a disposable fixture example; inspect it with
@@ -213,6 +214,13 @@ profile means the system manager; the user profile adds --user to systemctl
 or journalctl. The service and journal adapters are Linux-only. Empty journal
 output is a successful empty result; diagnostics, invalid JSON, unavailable
 bus, and permission failures are errors.
+.PP
+The resources operation is read-only. It connects the exact unit to its
+ControlGroup, reads the cgroup v2 subtree, and reports the main PID, process
+count, total RSS, available memory/task/CPU counters, OOM events, and a process
+table. It does not signal the service or change resource limits. Missing fields
+are reported as unavailable; the result is a point-in-time observation and
+requires Linux, systemd, and readable cgroup v2 state.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"

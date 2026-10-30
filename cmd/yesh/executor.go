@@ -71,6 +71,10 @@ func (r *runtime) execute(items []statement) error {
 			if err := r.executeServiceStatus(s); err != nil {
 				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
 			}
+		case serviceResourcesStmt:
+			if err := r.executeServiceResources(s); err != nil {
+				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
+			}
 		case serviceRestartStmt:
 			if err := r.executeServiceRestart(s); err != nil {
 				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)

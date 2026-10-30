@@ -17,6 +17,7 @@ service start api.service until active within 30s
 service restart api.service until active within 30s
 service wait api.service until active within 30s
 journal api.service since 15m lines 100
+service resources api.service
 service status user api.service
 journal user api.service since 15m lines 100
 ```
@@ -28,15 +29,24 @@ journal user api.service since 15m lines 100
 `service status`, `service start UNIT until active within DURATION`,
 `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION` и
-ограниченный `journal UNIT since DURATION lines N` уже реализованы. Restart
-использует единый конечный бюджет клиента и опрашивает состояние точной unit
-до postcondition или deadline; `systemctl --wait` не используется, потому что
-для долгоживущей службы он может ждать её завершения. Journal выдаёт JSON Lines, ограничен
+ограниченный `journal UNIT since DURATION lines N` уже реализованы. Перезапуск
+использует единый конечный бюджет клиента и опрашивает состояние точной службы
+до требуемого состояния или крайнего срока; `systemctl --wait` не используется, потому что
+для долгоживущей службы он может ждать её завершения. Журнал выдаёт строки JSON, ограничен
 четырьмя MiB и отклоняет диагностику в stderr, чтобы предупреждение о правах
-или частичный результат не выглядели успехом. Cursor/boot-фильтры и follow
-пока остаются целевым дизайном; bounded `wait` уже реализован.
+или частичный результат не выглядели успехом. Фильтры загрузки и чтение потока
+пока остаются целевым дизайном; ограниченное ожидание уже реализовано.
 
-`DURATION` пока использует форму Go duration, принятую yesh: например,
+`service resources UNIT` — снимок службы Linux и всей её cgroup только для чтения:
+`ControlGroup`, главный PID, число процессов, суммарный RSS, доступные
+счётчики памяти, задач и CPU, OOM-события и таблица процессов. Главный PID не
+считается всей службой: дочерние процессы берутся из cgroup и её подгрупп.
+Недоступное поле выводится как `unavailable`, а исчезнувший процесс может не
+попасть в моментальный снимок. Операция не посылает сигналов и не меняет
+лимиты. Она поддерживается только на Linux с доступным systemd и cgroup v2;
+это снимок состояния, а не доказательство будущего поведения службы.
+
+`DURATION` пока использует форму длительности Go, принятую yesh: например,
 `300ms`, `2s`, `15m` или `1h30m`. Полный синтаксис `systemd.time` намеренно
 не принимается.
 
@@ -127,6 +137,7 @@ journal api.service since 15m lines 100
 | restart не равен readiness | `examples/service-restart.yesh` (fixture-backed) | отказ postcondition останавливает скрипт |
 | конечный polling | `examples/service-wait.yesh` | переход в active, timeout, быстрый failed-state |
 | ограниченный journal | `examples/service-journal.yesh` | JSON, ошибка stderr, успешный пустой результат |
+| ресурсный снимок службы | `examples/service-resources.yesh` | связь cgroup с процессами и ограниченные счётчики |
 
 Для проверки настоящего systemd есть отдельный opt-in-скрипт
 [`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh). Он создаёт
@@ -150,8 +161,9 @@ journal api.service since 15m lines 100
 
 ## Текущая граница и следующий поиск
 
-В MVP уже реализованы read-only `service status`, bounded `service wait`,
-start и restart с postcondition и bounded JSON journal. Они используют фиксированный
+В MVP уже реализованы `service status` только для чтения, ограниченное
+`service wait`, start и restart с требуемым состоянием, ограниченный журнал в
+JSON и `service resources` для снимка cgroup. Они используют фиксированный
 allowlist `systemctl show`, точную identity unit, профиль system/user, конечные
 сроки и прозрачный argv в `--plan`.
 

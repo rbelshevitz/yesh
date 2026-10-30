@@ -91,6 +91,15 @@ echo '--- status: expected success ---'
 printf '%s\n' 'service status yesh-codex-fixture.service' >"$tmp_dir/status.yesh"
 "$yesh_bin" "$tmp_dir/status.yesh"
 
+echo '--- resources: expected success ---'
+printf '%s\n' 'service resources yesh-codex-fixture.service' >"$tmp_dir/resources.yesh"
+resources_output=$($yesh_bin "$tmp_dir/resources.yesh")
+printf '%s\n' "$resources_output"
+if ! printf '%s\n' "$resources_output" | grep -q 'SERVICE_RESOURCES id=yesh-codex-fixture.service'; then
+  echo 'error: service resource snapshot did not identify the fixture unit' >&2
+  exit 1
+fi
+
 echo '--- wait: expected success ---'
 printf '%s\n' 'service wait yesh-codex-fixture.service until active within 10s' >"$tmp_dir/wait.yesh"
 "$yesh_bin" "$tmp_dir/wait.yesh"

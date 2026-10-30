@@ -44,6 +44,92 @@ func TestLinuxServiceStatusReportsSystemctlFailure(t *testing.T) {
 	}
 }
 
+func TestLinuxServiceResourcesUsesBoundedSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	systemctl := filepath.Join(dir, "systemctl")
+	script := "#!/bin/sh\nprintf '%s\\n' 'Id=api.service' 'LoadState=loaded' 'ActiveState=inactive' 'SubState=dead' 'MainPID=0' 'ControlGroup=' 'NRestarts=2'\n"
+	if err := os.WriteFile(systemctl, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	r := &runtime{values: map[string]value{}, filename: "service.yesh"}
+	items, err := parse("service resources api.service\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.execute(items); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLinuxServiceResourcesRejectsUnexpectedUnit(t *testing.T) {
+	dir := t.TempDir()
+	systemctl := filepath.Join(dir, "systemctl")
+	script := "#!/bin/sh\nprintf '%s\\n' 'Id=other.service' 'LoadState=loaded' 'ActiveState=active' 'SubState=running' 'MainPID=1' 'ControlGroup=/system.slice/other.service' 'NRestarts=0'\n"
+	if err := os.WriteFile(systemctl, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	r := &runtime{values: map[string]value{}, filename: "service.yesh"}
+	items, err := parse("service resources api.service\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.execute(items); err == nil {
+		t.Fatal("expected unexpected unit to be rejected")
+	}
+}
+
+func TestLinuxServiceResourcesPlanDoesNotQuerySystemctl(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	r := &runtime{values: map[string]value{}, filename: "service.yesh", plan: true}
+	items, err := parse("service resources api.service\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.execute(items); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParseServiceResourceProperties(t *testing.T) {
+	got, err := parseServiceResourceProperties([]byte("Id=api.service\nLoadState=loaded\nActiveState=active\nSubState=running\nMainPID=42\nControlGroup=/system.slice/api.service\nNRestarts=0\n"))
+	if err != nil || got["ControlGroup"] != "/system.slice/api.service" {
+		t.Fatalf("properties=%v err=%v", got, err)
+	}
+	if _, err := parseServiceResourceProperties([]byte("Id=api.service\nLoadState=loaded\nActiveState=active\nSubState=running\nControlGroup=/x\nUnknown=value\n")); err == nil {
+		t.Fatal("accepted unexpected systemctl property")
+	}
+}
+
+func TestLinuxReadServiceCgroupIncludesCurrentProcess(t *testing.T) {
+	cgroup, err := readProcessCgroup("/proc/self/cgroup")
+	if err != nil || cgroup == "" {
+		t.Skipf("cgroup v2 is unavailable: %v", err)
+	}
+	processes, metrics, rss, err := readServiceCgroup("/sys/fs/cgroup", cgroup)
+	if err != nil {
+		t.Skipf("current cgroup is not readable: %v", err)
+	}
+	found := false
+	for _, process := range processes {
+		if process.pid == os.Getpid() {
+			found = true
+			break
+		}
+	}
+	if !found || rss == 0 || metrics["memory.current"] == "" {
+		t.Fatalf("current process missing from cgroup snapshot: found=%v rss=%d metrics=%v", found, rss, metrics)
+	}
+}
+
+func TestLinuxReadServiceCgroupRejectsEscapingPath(t *testing.T) {
+	if _, _, _, err := readServiceCgroup(t.TempDir(), "/../../proc"); err == nil {
+		t.Fatal("accepted cgroup path escaping root")
+	}
+}
+
 func TestLinuxSystemdUserProfileIsVisibleInArgv(t *testing.T) {
 	dir := t.TempDir()
 	systemctl := filepath.Join(dir, "systemctl")

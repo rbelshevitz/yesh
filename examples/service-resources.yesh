@@ -1,0 +1,22 @@
+# Goal: explain whether one systemd service is consuming resources through its
+# workers or child processes, rather than looking only at MainPID.
+#
+# Inputs and environment: an exact systemd unit name, a Linux systemd manager,
+# readable cgroup v2 state, and /proc. Replace the unit with a service that is
+# meaningful on the target host; systemd-journald.service is only an example.
+#
+# Order: yesh asks systemd for the exact unit and ControlGroup, reads the cgroup
+# subtree, then joins its processes with /proc and prints one bounded snapshot.
+#
+# Changes: none. The operation is read-only; it does not start, stop, signal,
+# throttle, or otherwise modify the service or its resource limits.
+#
+# Failure and boundary: a missing unit, denied access, unavailable cgroup, or a
+# process disappearing during the read is reported or marked unavailable. The
+# result describes one moment and does not prove future load or explain the
+# cause of an incident by itself.
+#
+# Role of yesh: keep the unit identity, cgroup membership, process fields, and
+# resource counters connected and visible. systemd, cgroup v2, and /proc remain
+# the sources of state.
+service resources systemd-journald.service

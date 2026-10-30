@@ -17,6 +17,17 @@ func TestParserAcceptsServiceStatus(t *testing.T) {
 	}
 }
 
+func TestParserAcceptsServiceResources(t *testing.T) {
+	items, err := parse("service resources user api.service\n", "service.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, ok := items[0].(serviceResourcesStmt)
+	if !ok || stmt.manager != "user" || stmt.unit.text != "api.service" {
+		t.Fatalf("unexpected service resources statement: %#v", items[0])
+	}
+}
+
 func TestParserAcceptsServiceRestartWithPostcondition(t *testing.T) {
 	items, err := parse("service restart nginx.service until active within 2s\n", "service.yesh")
 	if err != nil {
@@ -82,6 +93,7 @@ func TestParserRejectsAmbiguousServiceStatus(t *testing.T) {
 		"service start nginx.service\n",
 		"service status\n",
 		"service status nginx.service extra\n",
+		"service resources nginx.service extra\n",
 		"service status nginx.service | cat\n",
 		"service restart nginx.service until active within 0s\n",
 		"service restart nginx.service until active within forever\n",
