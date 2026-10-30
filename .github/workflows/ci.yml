@@ -45,7 +45,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rsync pv rsnapshot initramfs-tools-core cpio zstd
-      - run: go test -trimpath ./...
+      - name: Portable tests (Windows)
+        if: runner.os == 'Windows'
+        run: go test -trimpath ./...
+      - name: Linux tests
+        if: runner.os == 'Linux'
+        run: go test -trimpath ./...
       - name: POSIX lifecycle and pipeline race checks
         if: runner.os != 'Windows'
         run: go test -race -trimpath ./cmd/yesh -run 'Test(POSIX|Linux|Pipeline)' -count=3 -timeout=240s
