@@ -10,9 +10,14 @@ yesh \- readable Linux automation with bounded process pipelines
 runs a small indentation-based automation language through its own
 process runtime. It does not translate scripts to Bash.
 A failing command stops the script by default.
+The script's command syntax is checked before the first external process starts;
+runtime values and filesystem state are checked only when the selected action runs.
 .PP
 This implementation is experimental. Read the script and its external
 commands before granting access to privileged resources.
+The project is under active development; the safety measures documented in
+SAFETY.md are mandatory requirements and must be implemented before a stable
+release. yesh is not an operating-system isolation boundary for untrusted code.
 .SH OPTIONS
 .TP
 .B \-\-plan
@@ -80,7 +85,7 @@ The lock is released on success, error, cancellation, or script exit.
 Plan mode displays the path without acquiring it. The parent directory and
 permissions are the operator's responsibility; this is not a sandbox.
 .PP
-Use Bpublish source to destinationR for an atomic same-filesystem rename.
+Use \fBpublish source to destination\fR for an atomic same-filesystem rename.
 It never falls back to copying across filesystems; it provides namespace
 atomicity, not power-loss durability.
 .PP
@@ -188,7 +193,7 @@ service wait systemd-journald.service until active within 30s
 journal systemd-journald.service since 15m lines 20
 .fi
 .PP
-The restart line is a disposable-fixture example; inspect it with
+The restart line is a disposable fixture example; inspect it with
 --plan or run it only after creating that fixture. It is not a request to
 restart a production service.
 .PP

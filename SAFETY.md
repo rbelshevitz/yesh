@@ -64,12 +64,75 @@ when isolation is required.
 - Use `--plan` for review, but remember that a plan is not a transaction and
   does not eliminate TOCTOU races.
 
-## Security backlog
+## High-impact Linux operations
 
-- controlled `PATH` and environment policy for privileged/runbook execution;
-- argument validation or typed wrappers for high-impact external commands;
-- lexer, parser, value-expansion, redirect, and runtime fuzzing;
-- `govulncheck` and dependency scanning in CI;
-- a documented threat model and release security checklist;
-- a privileged loopback/storage fixture in a disposable VM or Rocky host;
-- full OS-level isolation for untrusted scripts.
+The following operations need an explicit review of the expanded arguments,
+the resolved paths, the current mount, and the account that will run them.
+This is a risk catalogue, not a complete detector: an arbitrary external
+program can hide the same effect behind different names or configuration.
+
+- `rm -r`, `rm --no-preserve-root`, `find -delete`, and similar recursive
+  removal can destroy a tree. A missing or wrong path is still dangerous;
+  `rm`'s own safeguards are not a yesh policy. See the [GNU `rm(1)` manual](https://www.man7.org/linux/man-pages/man1/rm.1.html).
+- `mkfs.*`, `wipefs`, `dd` to a device, and block-device writes can destroy a
+  filesystem or its metadata. Verify the device identity and require a
+  disposable fixture before testing. See the [`mkfs(8)` manual](https://man7.org/linux/man-pages/man8/mkfs.8.html).
+- `mount --bind`/`--rbind`, `mount --move`, remounts, and propagation changes
+  alter which files are visible and where writes go. A read-only bind does not
+  necessarily make the underlying filesystem read-only. See the [`mount(8)` manual](https://www.man7.org/linux/man-pages/man8/mount.8.html).
+- `systemctl stop`, `restart`, `kill`, `clean`, `isolate`, and operations that
+  reload or replace service configuration can interrupt unrelated work. The
+  systemd manual explicitly calls `isolate` dangerous because it can stop
+  processes outside the requested target. See the [systemd `systemctl` manual](https://www.freedesktop.org/software/systemd/man/systemctl.html).
+- `rsync --delete*`, `--delete-excluded`, `--delete-missing-args`, and
+  `--remove-source-files` can remove destination or source entries.
+  `--inplace` can leave an existing destination file partially updated after
+  interruption; `--link-dest` creates hard-link relationships between trees;
+  `--partial`/`--partial-dir` leave or reuse transfer state and must not use a
+  directory writable by other users. `--delay-updates` changes when updated
+  files become visible. See the [official rsync manual](https://www.man7.org/linux/man-pages/man1/rsync.1.html).
+
+For these operations, yesh can make the command and failure boundary visible,
+but it cannot prove that a path, device, remote host, service unit, or external
+program means what the operator intended. A future command-specific policy
+should classify known high-impact arguments before start; it must not pretend
+that a blacklist is a sandbox.
+
+## Privilege and `sudo`
+
+yesh must never add `sudo` implicitly. Whether a command needs extra privilege
+depends on the operation, ownership, ACLs, capabilities, mount options, service
+policy, and (for SSH/rsync) the remote account. `sudo` itself only runs a
+command as another user when the local security policy permits it; it is not a
+proof that the command is safe. See the [`sudo(8)` manual](https://www.man7.org/linux/man-pages/man8/sudo.8.html).
+
+The useful behavior is therefore:
+
+- classify known operations as read-only, user-writable, privileged, or
+  environment-dependent;
+- check the current identity and the relevant local facts when that check is
+  reliable and read-only;
+- stop before a state-changing operation when a required privilege is absent;
+- show which stage requires privilege and which account will execute it;
+- never repair the situation by wrapping an arbitrary command in `sudo`.
+
+For an unknown external command, yesh must report that privilege requirements
+are unknown. A successful preflight cannot prove future access: permissions,
+ACLs, capabilities, set-user-ID programs, remote policy, and paths can change
+between the check and the operation. Privileged workflows should use an
+explicitly reviewed command, account, environment, and operating-system policy.
+
+## Mandatory security work before a stable release
+
+The following are required project work, not optional recommendations:
+
+- define controlled `PATH` and environment policy for privileged/runbook
+  execution;
+- implement argument validation or typed wrappers for high-impact external
+  commands;
+- maintain lexer, parser, value-expansion, redirect, and runtime fuzzing;
+- add `govulncheck` and dependency scanning in CI;
+- publish a threat model and release security checklist;
+- keep a privileged loopback/storage fixture in a disposable VM or Rocky host;
+- document and test full OS-level isolation for untrusted scripts, or clearly
+  state that yesh does not provide it.

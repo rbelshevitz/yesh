@@ -14,6 +14,12 @@ remain ordinary commands, while the language around them is intentionally small
 and readable. yesh is a language and interpreter for Linux automation, not an
 interactive shell or a Bash-compatible shell replacement.
 
+> **Development status:** yesh is under active development and is not a stable
+> production safety boundary. The measures listed in [SAFETY.md](SAFETY.md) are
+> mandatory project requirements and will be implemented before a stable release.
+> Until then, treat the current prototype as reviewable tooling, not as a
+> substitute for operator judgment or operating-system isolation.
+
 > **Bash without the historical syntax complexity.**
 >
 > Read a yesh script from top to bottom. Strings stay strings, lists stay
