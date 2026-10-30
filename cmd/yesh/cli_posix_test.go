@@ -155,6 +155,29 @@ func TestPOSIXCLIExecutionFailureWarnsAboutState(t *testing.T) {
 	}
 }
 
+func TestPOSIXCLILongScriptSyntaxErrorPreventsExecution(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "marker")
+	script := filepath.Join(dir, "long.yesh")
+	var source strings.Builder
+	fmt.Fprintf(&source, "echo before > %q\n", marker)
+	for i := 0; i < 2000; i++ {
+		source.WriteString("echo filler\n")
+	}
+	source.WriteString("cat \"unterminated\n")
+	writeTestFile(t, script, []byte(source.String()), 0600)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := posixCLI(t, ctx, script).CombinedOutput()
+	if err == nil || !bytes.Contains(out, []byte("unterminated")) {
+		t.Fatalf("long script syntax error was not reported: %v %s", err, out)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("command before the final syntax error ran: %v", err)
+	}
+}
+
 func TestPOSIXCLIPlanExpandedArguments(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "marker")
@@ -218,6 +241,65 @@ func TestPOSIXCLIForwardsSignals(t *testing.T) {
 			}
 			if err := syscall.Kill(-child, 0); err != syscall.ESRCH {
 				t.Fatalf("child group survived %s: %v", sig, err)
+			}
+		})
+	}
+}
+
+func TestPOSIXCLICancelsMultiProcessPipeline(t *testing.T) {
+	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
+		t.Run(sig.String(), func(t *testing.T) {
+			dir := t.TempDir()
+			firstPID, secondPID := filepath.Join(dir, "first.pid"), filepath.Join(dir, "second.pid")
+			script := filepath.Join(dir, "pipeline.yesh")
+			first := posixFixture(t, `echo $$ > "$1"; trap '' INT TERM; while :; do :; done`)
+			second := posixFixture(t, `echo $$ > "$1"; trap '' INT TERM; while :; do :; done`)
+			source := fmt.Sprintf("%s %q | %s %q\n", first, firstPID, second, secondPID)
+			writeTestFile(t, script, []byte(source), 0600)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			cmd := posixCLI(t, ctx, script)
+			var output bytes.Buffer
+			cmd.Stderr = &output
+			if err := cmd.Start(); err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = cmd.Process.Kill() }()
+
+			var firstChild, secondChild int
+			until := time.Now().Add(3 * time.Second)
+			for time.Now().Before(until) {
+				firstData, _ := os.ReadFile(firstPID)
+				secondData, _ := os.ReadFile(secondPID)
+				_, firstErr := fmt.Sscanf(string(firstData), "%d", &firstChild)
+				_, secondErr := fmt.Sscanf(string(secondData), "%d", &secondChild)
+				if firstErr == nil && secondErr == nil && firstChild > 0 && secondChild > 0 {
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			if firstChild == 0 || secondChild == 0 {
+				_ = cmd.Process.Kill()
+				_ = cmd.Wait()
+				t.Fatalf("pipeline children did not become ready: first=%d second=%d", firstChild, secondChild)
+			}
+			defer syscall.Kill(-firstChild, syscall.SIGKILL)
+			defer syscall.Kill(-secondChild, syscall.SIGKILL)
+
+			if err := cmd.Process.Signal(sig); err != nil {
+				t.Fatal(err)
+			}
+			if err := cmd.Wait(); err == nil {
+				t.Fatal("interrupted pipeline succeeded")
+			}
+			if ctx.Err() != nil {
+				t.Fatalf("pipeline cancellation stalled: %s", output.String())
+			}
+			for name, child := range map[string]int{"first": firstChild, "second": secondChild} {
+				if err := syscall.Kill(-child, 0); err != syscall.ESRCH {
+					t.Fatalf("%s process group survived %s: %v", name, sig, err)
+				}
 			}
 		})
 	}
