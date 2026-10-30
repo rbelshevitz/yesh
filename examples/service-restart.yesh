@@ -34,4 +34,5 @@
 # The yesh form keeps argv boundaries, timeout and the postcondition visible.
 # It does not add `sudo`, enable the unit, or repair a failed service.
 
+# Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
 service restart yesh-codex-fixture.service until active within 10s

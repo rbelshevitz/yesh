@@ -14,6 +14,7 @@
 # systemd state is changed by the explicit restart. A failed grep leaves the
 # active file and service unchanged. Check with `--plan` before a real run.
 
+# Role of yesh: make validation, publication order, and refusal visible; the external validator or service remains authoritative.
 staged = environment YESH_CONFIG_STAGED
 active = environment YESH_CONFIG_ACTIVE
 next = environment YESH_CONFIG_NEXT

@@ -104,15 +104,19 @@ boundary and operational rules.
 
 See the [Bash corpus catalog](bash-corpus.md) for sources and license status.
 
-Before adding language features, evaluate yesh against 20–30 independent
-administration scripts. Each entry needs its Bash source, a yesh adaptation,
+Before adding language features, evaluate yesh against independent long-form
+administration workflows. Each entry needs its Bash source, a yesh adaptation,
 `--plan`, positive and negative tests, and one concrete reviewability or
 safety benefit. A script that merely renames an external command is not
-evidence for a new language feature.
+evidence for a new language feature. The first-pass workflow map is in
+`docs/real-world-workflows.ru.md`.
 
-- [ ] Select and sanitize backup/rsync, systemd/journal, storage, SSH/SCP,
-  and network-check scripts; do not import disabled host-key checks, hidden
+- [x] Define a first-pass map of 12 long workflows covering backup/rsync,
+  systemd/journal, storage, SSH/SCP, configuration publication, diagnosis,
+  initrd, network, and cron; do not import disabled host-key checks, hidden
   `sudo`, or destructive defaults.
+- [ ] Pin each workflow to a source URL and commit, sanitize its inputs, and
+  retain behavior descriptions rather than copied source code.
 - [x] Adapt an initial set without extending the language: service check,
   read-only storage preflight, backup preview, and SSH health check. These are
   independent examples under `examples/`, with fixture-backed tests in
@@ -121,9 +125,150 @@ evidence for a new language feature.
   splitting/quoting risk, hidden pipeline failure, or missing safe yesh
   expressiveness in [practical examples](practical-examples.md) and the
   design/safety notes. This is an initial inventory, not a claim that the
-  20–30-script corpus is complete.
+  workflow corpus is complete.
+- [x] Define one adaptation contract: disposable/read-only fixture, `--plan`,
+  positive and negative paths, observable result, safe rerun, and an honest
+  boundary of what was proven.
+- [ ] Complete B1, incremental backup/restore, as one runnable acceptance case
+  with Bash comparison, yesh file, plan, failure matrix, and restore check.
+- [ ] Complete B3, validation → publish → service restart → postcondition →
+  journal, on a disposable systemd fixture without new DSL.
+- [ ] Complete B5, read-only failed-service diagnosis, and test whether the
+  current process snapshots, journal, storage checks, and separated stderr are
+  sufficient for a useful incident report.
+- [ ] After B1/B3/B5, tabulate repeated language gaps; only a problem repeated
+  in at least two independent workflows becomes a candidate built-in.
 - [ ] Consider a new built-in only after the same justified problem occurs in
   at least two corpus scenarios.
+
+### Current syntax freeze and error model
+
+- [x] Freeze grammar expansion temporarily: explainability must come from
+  ordinary checks, structured results, `--plan`, and diagnostics rather than a
+  growing set of special keywords.
+- [x] Define the external-command rule: only exit code `0` is success; any
+  non-zero code, signal, or timeout stops the workflow and cannot publish the
+  result.
+- [x] Confirm for rsync workflows that engine-specific codes `23`, `24`, `30`,
+  and `35` are non-zero rsync failures; partial transfer cannot reach
+  `publish`. These are not yesh exit codes or universal error classes.
+- [ ] Review the missing-source assertion after `dc91150`: weakening it to
+  “any non-zero code” must not hide the actual rsync code or partial-transfer
+  cause.
+- [ ] Preserve the external command's raw exit code, signal, timeout, stderr,
+  and stage in structured diagnostics; do not turn rsync `23` into a yesh-wide
+  code or classify it as only a missing-source condition.
+- [ ] Decide separately which top-level CLI code yesh returns for a general
+  command failure, without losing the external code in diagnostics and reports.
+- [ ] Do not add syntax or built-ins solely to make workflows explainable;
+  complete B1/B3/B5 on the existing execution model first.
+
+## Strategic priority for the next 2–3 months
+
+The project has moved beyond a syntax experiment. The main test is now
+predictable execution of real Linux runbooks, not the number of language
+constructs. Freeze the syntax temporarily; do not add features for individual
+explainable workflows.
+
+1. **Freeze syntax.** Stabilize existing forms and do not expand the grammar
+   merely to make one workflow shorter.
+2. **Specify behavior.** For every construct define argv, action order, exit
+   codes, signal/timeout, cleanup, `--plan`, and state after failure. Keep the
+   yesh-wide model separate from engine-specific external-command codes.
+3. **Strengthen the runtime.** Prioritize processes, pipelines, cancellation,
+   timeouts, locks, temporary files, memory, and structured diagnostics. An
+   external command failure must never become a false success.
+4. **Expand the corpus.** Complete B1/B3/B5 as runnable acceptance cases, then
+   grow the corpus to 30–50 real administrative workflows without copying
+   source Bash code.
+5. **Test independently.** Give the scenarios and binary to other Linux
+   administrators or a clean external fixture; look for failures missed by
+   the project's own tests.
+6. **Prepare a preview release.** Provide one binary, a clear Linux support
+   matrix, explicit limits, examples, and reproducible acceptance-test commands.
+
+Practical viability criterion: write ten non-demonstration yesh scripts and use
+them for about a month. If there is no desire to move them back to Bash or
+Python, that is stronger evidence than adding another hundred features. Stars
+and popularity are not first-release success criteria.
+
+## Real-World Examples as the acceptance format
+
+The Russian project term Р.П.П. means **реальные практические примеры**;
+English documentation uses **Real-World Examples (RWE)**. An RWE is a runnable
+Linux runbook or read-only diagnostic, not a short syntax sample and not a
+guarantee for every production host.
+
+Every RWE must include:
+
+- a real external utility or a realistic disposable fixture;
+- an operator-sized yesh script and a short Bash comparison;
+- exact inputs, argv, action order, and expected state;
+- a positive path and applicable negative cases: missing input, wrong target,
+  permission failure, timeout, or partial failure;
+- `--plan`, safe rerun, and proof that previous state was not damaged;
+- checks for content, permissions, codes, stderr, cleanup, and lock release;
+- an explicit boundary describing what requires another Linux host, root,
+  hardware, network access, or production policy.
+
+The first ten RWE cases are:
+
+1. incremental backup → atomic publish → restore verification;
+2. retention with quarantine of old snapshots and no physical deletion;
+3. config validation → publish → systemd restart → postcondition → journal;
+4. failed-service incident report from service/journal/process/storage data;
+5. mount backup with UUID/PARTUUID, read-only, and free-space preflight;
+6. remote SSH/rsync pull with host-key policy and partial-transfer failure;
+7. selected-version restore into an empty target with checksum/manifest;
+8. read-only initrd/module/kernel preflight before reboot;
+9. nightly cron backup with lock, timeout, log, and alert result;
+10. network preflight before backup: route, DNS, TCP/SSH, and remote path.
+
+Current status: storage/fstab, systemd/journal, process snapshots,
+rsync/rsnapshot, and individual fixtures have completed RWE slices. The unified
+long-form B1/B3/B5 acceptance cases still need to be assembled and run as whole
+operator workflows. A language construct is not justified by RWE until the
+same problem requires it in at least two independent examples.
+
+### Priority operator stories for Debian
+
+The first three acceptance cases should run on a disposable Debian host or an
+isolated fixture, in this order:
+
+1. **B1 — nightly backup to a separate disk:** `fstab/UUID → mount → free space
+   → lock → rsync staging → publish → restore smoke-test`. Negative paths:
+   wrong disk, missing mount, insufficient space, partial rsync, and held lock.
+2. **B3 — service configuration publication:** `validator → temporary file →
+   publish → systemd restart → wait active → journal`. On validator or restart
+   failure, the previous state must remain available.
+3. **B5 — failed-service diagnosis:** `service status → bounded journal →
+   process snapshot → cgroup → mount/free space → incident report`. It is
+   read-only and must not signal foreign PIDs or auto-heal the service.
+
+Next: remote SSH/rsync pull with host-key policy, selected-version restore into
+an empty target, retention quarantine without physical deletion, release deploy
+with rollback, initrd preflight, cron backup, and network preflight. Each must
+be a complete operator story with failure and result verification, not a wrapper
+around one external command.
+
+### External behavioral references found
+
+- [x] Reviewed licensed backup references: `cytopia/linux-timemachine` (MIT;
+  incremental, atomic/resumable local and remote backup) and
+  `pedroetb/rsync-incremental-backup` (MIT; local/remote/system variants,
+  timeout, partial directory, rotation lock, and retention).
+- [x] Decision recorded: use their behavior and failure cases, not copied Bash
+  source; use `osync` only as a behavioral reference until its license is
+  separately verified, and do not reproduce its bidirectional sync engine.
+- [x] Use official `rsync/rrsync` documentation as requirements for restricted
+  SSH/rsync: path allowlists, dangerous dereference restrictions, and explicit
+  server-side options; do not import its GPL code.
+- [ ] Pin the source URL and commit for B1/B2/B7 in `docs/bash-corpus.md`, then
+  compare the Bash baseline and independent yesh adaptation with one failure
+  matrix.
+- [ ] Do not expand yesh into osync or a deploy framework: the RWE value is in
+  the visible transitions `preflight → lock → transfer → partial failure →
+  publish → retention → restore → verification`.
 
 ## Next practical slice: safe transfer and backup
 

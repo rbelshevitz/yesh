@@ -1,5 +1,6 @@
 # CIDR normalization and overlap checks. No network state is changed.
 
+# Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
 network = masked cidr 192.0.2.17/24
 more_specific = cidr 192.0.2.128/25
 

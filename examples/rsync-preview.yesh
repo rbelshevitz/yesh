@@ -1,5 +1,10 @@
-# Show changes without modifying the source or destination.
+# Goal: show proposed rsync changes without modifying source or destination.
+# Inputs: `source/` is the source tree; `target/` must already exist and be mounted.
+# Change: none; `--dry-run` asks rsync for a preview only.
+# Failure: a missing or unmounted target stops before rsync; rsync errors remain visible.
+# Boundary: this checks the target mount, not the full contents or future write access.
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 source = "source/"
 target = "target/"
 

@@ -2,6 +2,7 @@
 # Verify that the expected backup mount is present.
 # This is a read-only check; it does not mount or unmount anything.
 
+# Role of yesh: make the read-only preflight and refusal path explicit; Linux storage tools provide the state.
 mountpoint = /backup
 
 if findmnt --target $mountpoint:

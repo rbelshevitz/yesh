@@ -22,6 +22,7 @@
 # quarantine. Codes 2..5 identify missing inputs, mount, confirmation, or
 # capacity failures; inspect the resulting snapshot and lock cleanup separately.
 
+# Role of yesh: expose preflight, confirmation, and failure handling; rsnapshot remains the snapshot engine.
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
 root = environment YESH_RSNAPSHOT_ROOT

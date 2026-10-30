@@ -9,6 +9,7 @@
 # `publish`. An existing current or temporary path is rejected to make reruns
 # explicit. `--plan` shows both branches without opening or writing paths.
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 dns_name = environment YESH_RSYNC_DNS_NAME
 route_target = environment YESH_RSYNC_ROUTE_TARGET
 host = environment YESH_RSYNC_HOST

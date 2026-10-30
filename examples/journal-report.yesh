@@ -1,5 +1,5 @@
-# Environment-dependent example: requires journalctl access and sshd.service.
-# Print a bounded service journal report without following the journal.
+# Environment-dependent example: requires journal access and sshd.service.
+# Print a bounded service-journal report without following the journal.
 
-service = sshd.service
-journalctl --no-pager --unit $service --lines 80
+# Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
+journal sshd.service since 15m lines 80

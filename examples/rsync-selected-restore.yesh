@@ -13,6 +13,7 @@
 # non-empty target, and an unmounted target. Verify bytes/checksums after rsync;
 # a successful copy alone does not prove application-level recovery.
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 snapshot = environment YESH_RESTORE_SNAPSHOT
 source = environment YESH_RESTORE_SOURCE
 target = environment YESH_RESTORE_TARGET

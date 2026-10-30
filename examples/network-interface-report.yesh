@@ -6,4 +6,5 @@
 #   ip -j address show
 # The yesh form makes the exact read-only argv visible in --plan.
 
+# Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
 ip -j address show

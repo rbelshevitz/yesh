@@ -1,7 +1,8 @@
 # Environment-dependent example: reads the host's /etc/fstab.
-# Read configuration through libmount without resolving devices or mounting.
-# Parser warnings stop the script; inspection hides option values.
+# Read the configuration through libmount without resolving devices or mounting
+# anything. Parser warnings stop the script; inspection hides option values.
 
+# Role of yesh: make the read-only preflight and refusal path explicit; Linux storage tools provide the state.
 mounts = fstab "/etc/fstab"
 inspect $mounts
 echo "fstab snapshot read; active mounts and boot readiness were not checked"

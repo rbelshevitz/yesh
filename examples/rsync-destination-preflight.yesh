@@ -1,4 +1,4 @@
-# Destination inventory for the current rsync workflow; this example only reads.
+# Destination inventory for this rsync workflow; this example only reads.
 # IMPORTANT: run this on the backup host. The backup host is the rsync
 # destination, so root is local here even when source is remote.
 # This is not a push-to-another-server workflow.
@@ -7,6 +7,7 @@
 # YESH_RSYNC_ROOT  existing local destination directory on this host
 # YESH_RSYNC_KEEP  number of newest completed snapshots to keep
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 root = environment YESH_RSYNC_ROOT
 keep = environment YESH_RSYNC_KEEP
 

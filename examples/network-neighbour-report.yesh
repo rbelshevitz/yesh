@@ -1,4 +1,7 @@
-# Read-only ARP/IPv6-neighbour report in JSON. A missing neighbour is an
-# observation, not proof that the host is unreachable.
+# Goal: print the current ARP/IPv6-neighbour table as JSON.
+# Input: kernel neighbour state, queried through `ip`.
+# Change: none; this is a read-only observation.
+# Boundary: a missing neighbour does not prove that the host is unreachable.
 
+# Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
 ip -j neigh show

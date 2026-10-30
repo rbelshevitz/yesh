@@ -2,17 +2,21 @@ name: CI
 
 on:
   push:
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
-      - 'examples/**'
-      - 'man/**'
+    paths:
+      - '.github/workflows/**'
+      - '**/*.go'
+      - '**/*.sh'
+      - '**/testdata/**'
+      - 'go.mod'
+      - 'go.sum'
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
-      - 'examples/**'
-      - 'man/**'
+    paths:
+      - '.github/workflows/**'
+      - '**/*.go'
+      - '**/*.sh'
+      - '**/testdata/**'
+      - 'go.mod'
+      - 'go.sum'
 
 permissions:
   contents: read

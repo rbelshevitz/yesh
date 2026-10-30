@@ -2,12 +2,13 @@
 # Inputs: `source/` in the current working directory; no environment is read.
 # Writes: `backup.tar.gz` and `backup-state.json`; a failed run may leave only
 # the private `.partial` file. Existing published files are not removed first.
-# Success: both files are renamed into place after their producing commands
-# succeed. Failure: exit 2 means the source is missing; an external command
-# error stops the script before publication.
+# Success: each file is renamed into place after its producing command succeeds.
+# Failure: exit 2 means the source is missing; an external command error stops
+# the script before the corresponding publication step.
 # Bash comparison: `set -euo pipefail`, quoted variables, and two temporary
 # names are needed to express the same publish-after-success rule.
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 source = "source"
 partial = "backup.tar.gz.partial"
 archive = "backup.tar.gz"

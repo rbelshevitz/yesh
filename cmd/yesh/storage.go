@@ -23,31 +23,31 @@ type storageDevice struct {
 func storageKeyword(t commandToken, word string) bool {
 	return !t.literal && !t.operator && t.text == word
 }
-func validateStorageStatement(t []commandToken) error {
+func parseStorageStatement(t []commandToken, line int) (storageStmt, error) {
 	inspectRef := false
 	if len(t) > 1 {
 		_, inspectRef = variableReference(t[1].text)
 	}
 	if len(t) == 2 && storageKeyword(t[0], "inspect") && !t[1].literal && !t[1].operator && inspectRef {
-		return nil
+		return storageStmt{line: line, kind: storageInspect, source: t[1]}, nil
 	}
 	sourceRef := false
 	if len(t) > 4 {
 		_, sourceRef = variableReference(t[4].text)
 	}
 	if len(t) == 5 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && !t[2].operator && !t[4].operator && !t[4].literal && sourceRef {
-		return nil
+		return storageStmt{line: line, kind: storageRequireFstab, path: t[2], source: t[4]}, nil
 	}
 	if len(t) == 6 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && !t[2].operator && !t[4].operator && !t[4].literal && sourceRef && storageModeKeyword(t[5]) {
-		return nil
+		return storageStmt{line: line, kind: storageRequireFstab, path: t[2], source: t[4], mode: t[5].text}, nil
 	}
 	if len(t) == 7 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && storageKeyword(t[5], "filesystem") && !t[2].operator && !t[4].operator && !t[4].literal && !t[6].operator && sourceRef {
-		return nil
+		return storageStmt{line: line, kind: storageRequireDevice, path: t[2], source: t[4], filesystem: t[6]}, nil
 	}
 	if len(t) == 8 && storageKeyword(t[0], "require") && storageKeyword(t[1], "mounted") && storageKeyword(t[3], "from") && storageKeyword(t[5], "filesystem") && !t[2].operator && !t[4].operator && !t[4].literal && !t[6].operator && sourceRef && storageModeKeyword(t[7]) {
-		return nil
+		return storageStmt{line: line, kind: storageRequireDevice, path: t[2], source: t[4], filesystem: t[6], mode: t[7].text}, nil
 	}
-	return fmt.Errorf("expected: inspect $value; require mounted path from $fstab_snapshot [readonly|writable]; or require mounted path from $device filesystem type [readonly|writable] (without pipeline or redirection)")
+	return storageStmt{}, fmt.Errorf("expected: inspect $value; require mounted path from $fstab_snapshot [readonly|writable]; or require mounted path from $device filesystem type [readonly|writable] (without pipeline or redirection)")
 }
 func storageModeKeyword(t commandToken) bool {
 	return storageKeyword(t, "readonly") || storageKeyword(t, "writable")
@@ -143,21 +143,14 @@ func validDeviceNumber(s string) bool {
 	return true
 }
 func (r *runtime) executeStorage(s storageStmt) error {
-	t := s.terms
-	mode := ""
-	if len(t) > 0 && storageModeKeyword(t[len(t)-1]) {
-		mode = t[len(t)-1].text
-	}
-	name, _ := variableReference(t[1].text)
-	if t[0].text == "require" {
-		name, _ = variableReference(t[4].text)
-	}
+	name, _ := variableReference(s.source.text)
+	mode := s.mode
 	v, ok := r.values[name]
-	if t[0].text == "require" && (len(t) == 5 || len(t) == 6) {
+	if s.kind == storageRequireFstab {
 		if !ok || v.fstab == nil {
 			return fmt.Errorf("require mounted without filesystem expects a fstab snapshot: %s", name)
 		}
-		path, err := r.storageString(t[2], s.line)
+		path, err := r.storageString(s.path, s.line)
 		if err != nil {
 			return err
 		}
@@ -181,7 +174,7 @@ func (r *runtime) executeStorage(s storageStmt) error {
 		}
 		return nil
 	}
-	if ok && v.fstab != nil && t[0].text == "inspect" {
+	if ok && v.fstab != nil && s.kind == storageInspect {
 		if r.plan {
 			fmt.Fprintf(os.Stdout, "PLAN inspect %s (deferred)\n", name)
 			return nil
@@ -189,23 +182,23 @@ func (r *runtime) executeStorage(s storageStmt) error {
 		return writeFstabInspection(os.Stdout, v.fstab)
 	}
 	if !ok || v.device == nil {
-		if t[0].text == "inspect" {
+		if s.kind == storageInspect {
 			return fmt.Errorf("inspect expects a device or fstab snapshot: %s", name)
 		}
 		return fmt.Errorf("storage expects a device value: %s", name)
 	}
-	if t[0].text == "inspect" {
+	if s.kind == storageInspect {
 		if r.plan {
 			fmt.Fprintf(os.Stdout, "PLAN inspect %s (deferred)\n", name)
 			return nil
 		}
 		return json.NewEncoder(os.Stdout).Encode(v.device)
 	}
-	path, err := r.storageString(t[2], s.line)
+	path, err := r.storageString(s.path, s.line)
 	if err != nil {
 		return err
 	}
-	fs, err := r.storageString(t[6], s.line)
+	fs, err := r.storageString(s.filesystem, s.line)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@
 # Read-only storage preflight for a backup destination.
 # The check does not mount, unmount, delete, or modify anything.
 
+# Role of yesh: make the read-only preflight and refusal path explicit; Linux storage tools provide the state.
 mountpoint = /backup
 
 if findmnt --target $mountpoint:

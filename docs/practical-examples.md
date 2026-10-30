@@ -8,6 +8,36 @@ The scenarios are exercised by `cmd/yesh/practical_posix_test.go` and
 `cmd/yesh/initrd_linux_test.go`. Tests use temporary directories, do not touch
 production services, and do not require a real remote SSH host.
 
+## How to read an example
+
+Files in `examples/` are runnable material, not pseudocode. The header comments
+state the goal, inputs, action order, writes, failure behavior, and the boundary
+of what the example proves. Values read with `environment NAME` must be set by
+the caller; they have no built-in defaults.
+
+Before an operation that changes state, inspect its plan:
+
+```text
+./yesh --plan examples/backup-mounted-rwe.yesh
+```
+
+`--plan` shows expanded arguments and branches without running external commands
+or opening redirections. For a practical example, check the resulting fixture,
+not only the exit code: verify published data, preserved old state on failure,
+partial files, and lock cleanup.
+
+| Task | Example | Main negative case |
+| --- | --- | --- |
+| Archive published after success | [`backup.yesh`](../examples/backup.yesh) | missing source or failed `tar`/`gzip` |
+| Backup to a verified filesystem | [`backup-mounted-rwe.yesh`](../examples/backup-mounted-rwe.yesh) | wrong UUID, unmounted filesystem, low space |
+| Configuration publication and restart | [`config-systemd-rwe.yesh`](../examples/config-systemd-rwe.yesh) | validator rejects the configuration |
+| Release deployment with rollback | [`deploy-release-rwe.yesh`](../examples/deploy-release-rwe.yesh) | missing source or incomplete staging |
+| Read-only incident report | [`incident-report-rwe.yesh`](../examples/incident-report-rwe.yesh) | unavailable service, journal, or diagnostic source |
+| Networked rsync snapshot | [`rsync-networked-incremental-rwe.yesh`](../examples/rsync-networked-incremental-rwe.yesh) | DNS, route, SSH, or remote-path failure |
+| Selected-snapshot restore | [`rsync-selected-restore.yesh`](../examples/rsync-selected-restore.yesh) | symlink source or non-empty target |
+| rsnapshot with confirmation | [`rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh) | missing confirmation or failed config test |
+| Scheduled backup | [`cron-backup-rwe.yesh`](../examples/cron-backup-rwe.yesh) | cancellation, timeout, or held lock |
+
 ## Exit-code rules
 
 The following convention belongs to the practical examples, not to the yesh

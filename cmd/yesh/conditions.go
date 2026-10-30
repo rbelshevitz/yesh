@@ -117,6 +117,11 @@ func (r *runtime) condition(text string, line int) (bool, error) {
 	return r.evaluateCondition(expr, line)
 }
 
+func isNonEmptyPathValue(v value) bool {
+	return v.fstab == nil && v.device == nil && v.ip == nil && v.cidr == nil &&
+		!v.isList && v.regex == nil && v.scalar != "" && !strings.ContainsRune(v.scalar, 0)
+}
+
 func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) {
 	switch expr.kind {
 	case existsCondition:
@@ -124,7 +129,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.scalar == "" || strings.ContainsRune(v.scalar, 0) {
+		if !isNonEmptyPathValue(v) {
 			return false, fmt.Errorf("%s:%d: exists expects one non-empty path string", r.filename, line)
 		}
 		ok, err := fileExists(v.scalar)
@@ -159,7 +164,7 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if path.fstab != nil || path.device != nil || path.ip != nil || path.cidr != nil || path.isList || path.regex != nil || path.scalar == "" || strings.ContainsRune(path.scalar, 0) {
+		if !isNonEmptyPathValue(path) {
 			return false, fmt.Errorf("%s:%d: free_space expects one non-empty path string", r.filename, line)
 		}
 		need, err := parseByteSize(expr.terms[3].text)
@@ -242,6 +247,10 @@ func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) 
 			return false, fmt.Errorf("%s:%d: unknown address class %q", r.filename, line, expr.terms[1].text)
 		}
 	}
+	return r.evaluateCommandCondition(expr, line)
+}
+
+func (r *runtime) evaluateCommandCondition(expr conditionExpr, line int) (bool, error) {
 	if r.plan {
 		return false, fmt.Errorf("%s:%d: --plan cannot evaluate command condition: %s", r.filename, line, expr.text)
 	}

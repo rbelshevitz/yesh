@@ -1,7 +1,11 @@
-# Apply retention quarantine only inside an explicit lock.
-# The quarantine directory must already exist as a direct child of root.
-# No content is deleted; --plan prints the validated rename candidates.
+# Goal: move old snapshots into a quarantine directory under an explicit lock.
+# Inputs: the root, retention count, quarantine directory, and lock come from the environment.
+# Change: selected snapshot directories are renamed; their contents are not deleted.
+# Failure: a missing root/quarantine or a conflicting destination stops the run.
+# Boundary: the quarantine directory must already exist as a direct child of root;
+# `--plan` prints validated rename candidates without moving anything.
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 root = environment YESH_RSYNC_ROOT
 keep = environment YESH_RSYNC_KEEP
 quarantine = environment YESH_RSYNC_QUARANTINE

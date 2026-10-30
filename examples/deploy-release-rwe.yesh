@@ -15,6 +15,7 @@
 # A missing source exits 2 before any remote command. Verify partial upload and
 # rollback in the disposable fixture; success is not proof of app readiness.
 
+# Role of yesh: keep remote arguments, checks, and failure boundaries visible; SSH or rsync performs the remote operation.
 host = environment YESH_DEPLOY_HOST
 source = environment YESH_DEPLOY_SOURCE
 stage = environment YESH_DEPLOY_STAGE

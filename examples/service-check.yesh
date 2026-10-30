@@ -2,6 +2,7 @@
 # Check access to systemd, then confirm each service is active.
 # Replace the service names with units installed on your machine.
 
+# Role of yesh: keep the service or journal request bounded and visible; systemd remains the source of state.
 services = [nginx, sshd]
 
 systemctl show --property=Version > /dev/null

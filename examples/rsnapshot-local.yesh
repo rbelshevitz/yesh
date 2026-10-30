@@ -1,7 +1,8 @@
 # Environment-dependent example: requires rsnapshot and a prepared local config.
-# Prepare the rsnapshot configuration separately, with no_create_root=1 and a lockfile.
-# Check that the target device is mounted before a real backup.
+# Prepare the rsnapshot configuration separately with no_create_root=1 and a
+# lockfile. Check that the target device is mounted before a real backup.
 
+# Role of yesh: expose preflight, confirmation, and failure handling; rsnapshot remains the snapshot engine.
 config = "rsnapshot.conf"
 rsnapshot -c $config configtest
 rsnapshot -c $config daily

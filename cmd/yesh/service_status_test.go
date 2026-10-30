@@ -56,7 +56,7 @@ func TestParserAcceptsBoundedJournalQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	stmt, ok := items[0].(journalStmt)
-	if !ok || stmt.sinceText != "15m" || stmt.lines != 20 {
+	if !ok || stmt.manager != "system" || stmt.sinceText != "15m" || stmt.lines != 20 {
 		t.Fatalf("unexpected journal statement: %#v", items[0])
 	}
 }

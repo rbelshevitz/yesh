@@ -2,6 +2,7 @@
 # Read-only snapshot of every process whose kernel name is exactly nginx.
 # show does not send signals or change process state.
 
+# Role of yesh: select and report a bounded process view; the kernel and procfs remain the sources of state.
 nginx = processes where name is "nginx"
 show $nginx fields pid uid state rss start_time cgroup
 summarize $nginx memory rss

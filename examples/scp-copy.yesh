@@ -2,6 +2,7 @@
 # Copy one backup artifact through the user's normal SSH config or agent.
 # No private keys, passwords, or passphrases are stored in this script.
 
+# Role of yesh: keep remote arguments, checks, and failure boundaries visible; SSH or rsync performs the remote operation.
 port = 22
 scp_options = [-P, $port, -o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
 source = "backup.tar.gz"

@@ -2,13 +2,15 @@
 # Inputs: YESH_RWE_MOUNTPOINT, YESH_RWE_SOURCE (UUID/PARTUUID),
 # YESH_RWE_SOURCE_DIR, and YESH_RWE_TARGET. The fixture supplies a disposable
 # ext4 mount and writable target; production mounts are not changed here.
-# Order: verify source/type/rw mount, then source and target, then free space,
+# Order: verify source, filesystem type, and read-write mount, then source and
+# target, then free space,
 # then run the visible rsync. No rsync argv is hidden in a shell wrapper.
 # Results: 0 means rsync completed; 2 means a path is missing, 3 means the
 # filesystem identity check failed, and 4 means the 20 MiB floor was not met.
 # A failed preflight must leave the target untouched; verify that with `--plan`
 # and the negative fixture cases.
 
+# Role of yesh: guard inputs, ordering, and publication boundaries; rsync remains the transfer engine.
 mountpoint = environment YESH_RWE_MOUNTPOINT
 expected_source = environment YESH_RWE_SOURCE
 source = environment YESH_RWE_SOURCE_DIR

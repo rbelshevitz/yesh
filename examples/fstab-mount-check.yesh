@@ -1,7 +1,8 @@
 # Environment-dependent example: requires /etc/fstab and an active /mnt/backup mount.
-# Match one UUID/PARTUUID entry to the exact active mount before backup.
+# Match one UUID/PARTUUID entry to the exact active mount before backing up.
 # No mount, automount activation or fstab writing is requested.
 
+# Role of yesh: make the read-only preflight and refusal path explicit; Linux storage tools provide the state.
 mounts = fstab "/etc/fstab"
 require mounted /mnt/backup from $mounts
 echo "configured backup device is mounted"

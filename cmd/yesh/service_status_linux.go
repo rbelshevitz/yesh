@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -190,10 +191,15 @@ func (r *runtime) waitForService(manager, unit, expectedState string, timeout ti
 		case <-ctx.Done():
 			return serviceStatus{}, fmt.Errorf("service wait %q timed out: last active_state=%s sub_state=%s", unit, last.ActiveState, last.SubState)
 		case <-ticker.C:
-			last, err = check()
+			var next serviceStatus
+			next, err = check()
 			if err != nil {
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					return serviceStatus{}, fmt.Errorf("service wait %q timed out: last active_state=%s sub_state=%s", unit, last.ActiveState, last.SubState)
+				}
 				return serviceStatus{}, err
 			}
+			last = next
 			if err := waitStateError(unit, last); err != nil {
 				return serviceStatus{}, err
 			}

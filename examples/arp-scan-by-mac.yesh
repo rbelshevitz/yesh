@@ -1,12 +1,13 @@
 # Active local-L2 discovery. Run this whole script explicitly in a privileged
-# context
-# or with a pre-granted CAP_NET_RAW for arp-scan. yesh never elevates itself.
+# context or with CAP_NET_RAW already granted to `arp-scan`. yesh never
+# elevates itself.
 #
 # Required environment:
 #   YESH_ARP_INTERFACE  exact interface, for example enp6s18
 #   YESH_ARP_NETWORK    explicit IPv4 CIDR, preferably one address as /32
 #   YESH_ARP_MAC        exact MAC to find
 
+# Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
 interface = environment YESH_ARP_INTERFACE
 network = environment YESH_ARP_NETWORK
 mac = environment YESH_ARP_MAC
