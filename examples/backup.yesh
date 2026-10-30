@@ -1,5 +1,12 @@
-# Run from a working directory containing source/.
-# Publish the archive only after every stage succeeds.
+# Goal: create one gzip-compressed tar archive from `source/`.
+# Inputs: `source/` in the current working directory; no environment is read.
+# Writes: `backup.tar.gz` and `backup-state.json`; a failed run may leave only
+# the private `.partial` file. Existing published files are not removed first.
+# Success: both files are renamed into place after their producing commands
+# succeed. Failure: exit 2 means the source is missing; an external command
+# error stops the script before publication.
+# Bash comparison: `set -euo pipefail`, quoted variables, and two temporary
+# names are needed to express the same publish-after-success rule.
 
 source = "source"
 partial = "backup.tar.gz.partial"

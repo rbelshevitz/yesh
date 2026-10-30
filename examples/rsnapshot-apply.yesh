@@ -1,4 +1,5 @@
-# Guarded rsnapshot apply wrapper. The rsnapshot.conf remains authoritative;
+# RWE: guarded rsnapshot interval with an explicit operator confirmation.
+# The rsnapshot.conf remains authoritative;
 # this script adds operator-facing checks before a destructive interval.
 #
 # Required environment:
@@ -15,6 +16,11 @@
 # and remote SSH entries in `rsnapshot -t` before creating the confirmation.
 # The fixed 20MiB floor is a conservative preflight guard, not a size estimate
 # for a successful snapshot.
+# Order: check config/root/mount/free space, run `configtest`, show test mode,
+# then require the pre-created confirmation file before the mutating interval.
+# The script does not parse or rewrite rsnapshot.conf and does not delete a
+# quarantine. Codes 2..5 identify missing inputs, mount, confirmation, or
+# capacity failures; inspect the resulting snapshot and lock cleanup separately.
 
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL

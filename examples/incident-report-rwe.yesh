@@ -1,4 +1,7 @@
-# Read-only incident report for one known systemd service.
+# RWE: collect a bounded, read-only incident report for one service.
+# Goal: put service state, recent journal, matching processes, root mount, and
+# free space in one operator-readable run. The script intentionally does not
+# diagnose the root cause or repair anything.
 # The wrapper captures stdout and stderr separately and archives both files.
 # No service, process, mount, or device is changed by this script.
 #
@@ -9,6 +12,9 @@
 #   ps ...; findmnt ...; df ...
 # yesh keeps the service unit, journal bounds, process fields, and storage
 # target visible. The outer wrapper supplies the report file descriptors.
+# Inputs are fixed in this example: systemd-journald.service and `/`. A missing
+# unit, inaccessible journal, or failed diagnostic command is an error; a
+# successful report only describes observations at one point in time.
 
 service status systemd-journald.service
 journal systemd-journald.service since 15m lines 20

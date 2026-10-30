@@ -1,4 +1,7 @@
-# Upload one release to a remote staging path, publish it, and roll back.
+# RWE: upload one release, publish it remotely, and exercise rollback.
+# Goal: make a complete release visible through one remote rename, then prove
+# that the previous release can be selected. The script does not build the
+# release or restart a service.
 # Remote paths are complete values; rsync and ssh remain visible engines.
 #
 # Required environment: YESH_DEPLOY_HOST, YESH_DEPLOY_SOURCE,
@@ -6,6 +9,11 @@
 # YESH_DEPLOY_REMOTE_FINAL, YESH_DEPLOY_REMOTE_FINAL_FILE,
 # YESH_DEPLOY_CURRENT_NEXT, YESH_DEPLOY_CURRENT,
 # YESH_DEPLOY_ROLLBACK_NEXT, and YESH_DEPLOY_PREVIOUS.
+# Preconditions: the source exists, SSH uses the supplied host-key policy, and
+# the remote staging/final paths are on the same filesystem for `mv`.
+# Writes: remote staging, remote final release, and the `current` symlink.
+# A missing source exits 2 before any remote command. Verify partial upload and
+# rollback in the disposable fixture; success is not proof of app readiness.
 
 host = environment YESH_DEPLOY_HOST
 source = environment YESH_DEPLOY_SOURCE

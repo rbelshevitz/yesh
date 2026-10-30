@@ -1,7 +1,13 @@
-# Network preflight followed by one remote rsync publication.
+# RWE: perform network preflight, then publish one remote rsync snapshot.
+# Goal: make network and remote-path assumptions visible before transfer.
 # The source is remote, while the snapshot root is local. Every network
 # command is visible and read-only; only rsync writes to the private staging
 # directory. The completed tree becomes visible only through publish.
+# Inputs: DNS name, route target, SSH host/path, and local root/current/
+# temporary/lock paths from the YESH_RSYNC_* environment variables.
+# Failure codes identify the failed preflight (2..7); rsync failure prevents
+# `publish`. An existing current or temporary path is rejected to make reruns
+# explicit. `--plan` shows both branches without opening or writing paths.
 
 dns_name = environment YESH_RSYNC_DNS_NAME
 route_target = environment YESH_RSYNC_ROUTE_TARGET

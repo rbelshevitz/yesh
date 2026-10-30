@@ -1,6 +1,12 @@
-# One scheduled backup run. The outer wrapper supplies the outer lock and
+# RWE: one scheduled backup run. The outer wrapper supplies the outer lock and
 # timeout; yesh keeps an inner lock around the filesystem operation as well.
 # The scheduler table is not read or changed by this script.
+# Goal: publish a completed snapshot and its result marker together from the
+# operator's point of view. The marker is written privately until rsync and
+# publish succeed. YESH_CRON_DELAY is a fixture control for cancellation tests.
+# Preconditions: root/source exist and destination names are private to this
+# run. A failed or cancelled run must not publish `current` or `result`; inspect
+# partial files and lock cleanup in the fixture.
 
 root = environment YESH_CRON_ROOT
 source = environment YESH_CRON_SOURCE

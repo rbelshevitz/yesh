@@ -1,10 +1,17 @@
-# Restore one explicitly selected completed snapshot into a new empty target.
+# RWE: restore one explicitly selected completed snapshot into an empty target.
+# Goal: make the source choice and the non-destructive target policy visible;
+# this is not a retention selector and never deletes target entries.
 # rsync remains the visible restore engine; yesh guards the source and target.
 #
 # Required environment:
 #   YESH_RESTORE_SNAPSHOT  completed local snapshot directory
 #   YESH_RESTORE_SOURCE    same directory with a trailing slash for rsync
 #   YESH_RESTORE_TARGET    existing empty directory on the intended filesystem
+# Preconditions: the snapshot is a real directory (not a symlink), the target
+# is mounted and empty, and the source/target values have the intended trailing
+# slash semantics. Codes 2..5 distinguish missing paths, unsafe source, a
+# non-empty target, and an unmounted target. Verify bytes/checksums after rsync;
+# a successful copy alone does not prove application-level recovery.
 
 snapshot = environment YESH_RESTORE_SNAPSHOT
 source = environment YESH_RESTORE_SOURCE

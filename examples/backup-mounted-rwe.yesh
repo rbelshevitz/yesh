@@ -1,6 +1,13 @@
-# RWE: Backup to a Verified Mounted Filesystem.
-# The fixture supplies a disposable mount, fstab snapshot, source and target.
-# yesh verifies the exact target before the visible rsync starts.
+# RWE: copy a source directory only to the expected mounted filesystem.
+# Inputs: YESH_RWE_MOUNTPOINT, YESH_RWE_SOURCE (UUID/PARTUUID),
+# YESH_RWE_SOURCE_DIR, and YESH_RWE_TARGET. The fixture supplies a disposable
+# ext4 mount and writable target; production mounts are not changed here.
+# Order: verify source/type/rw mount, then source and target, then free space,
+# then run the visible rsync. No rsync argv is hidden in a shell wrapper.
+# Results: 0 means rsync completed; 2 means a path is missing, 3 means the
+# filesystem identity check failed, and 4 means the 20 MiB floor was not met.
+# A failed preflight must leave the target untouched; verify that with `--plan`
+# and the negative fixture cases.
 
 mountpoint = environment YESH_RWE_MOUNTPOINT
 expected_source = environment YESH_RWE_SOURCE

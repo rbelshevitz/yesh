@@ -1,4 +1,7 @@
-# Validate, publish, and activate one disposable service configuration.
+# RWE: validate, publish, and activate one disposable service configuration.
+# Goal: make the new file visible only after validation, then require the exact
+# unit to become active. This is a fixture-backed example, not a generic
+# systemd deployment tool.
 # The validator and systemd unit are explicit; yesh does not add sudo.
 #
 # Required environment:
@@ -7,6 +10,9 @@
 #   YESH_CONFIG_NEXT    private staging path on the same filesystem
 # The unit is intentionally a literal below: typed systemd diagnostics must
 # not accept secret environment values as a unit name.
+# Writes: YESH_CONFIG_NEXT is staged, then published to YESH_CONFIG_ACTIVE;
+# systemd state is changed by the explicit restart. A failed grep leaves the
+# active file and service unchanged. Check with `--plan` before a real run.
 
 staged = environment YESH_CONFIG_STAGED
 active = environment YESH_CONFIG_ACTIVE
