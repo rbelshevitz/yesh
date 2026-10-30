@@ -10,12 +10,13 @@ A readable, safety-first language for Linux automation and preflight checks.
 [Русская версия README](README.ru.md)
 
 yesh is an experiment: POSIX commands and external Linux administration tools
-remain ordinary commands, while the language around them is intentionally small
+remain visible commands, while the language around them is intentionally small
 and readable. yesh is a language and interpreter for Linux automation, not an
-interactive shell or a Bash-compatible shell replacement.
+interactive shell or a Bash-compatible replacement.
 
-> **Development status:** yesh is under active development and is not a stable
-> production safety boundary. The measures listed in [SAFETY.md](SAFETY.md) are
+> **Development status:** yesh is under active development and is not yet ready
+> to serve as a production safety boundary. The measures listed in
+> [SAFETY.md](SAFETY.md) are
 > mandatory project requirements and will be implemented before a stable release.
 > Until then, treat the current prototype as reviewable tooling, not as a
 > substitute for operator judgment or operating-system isolation.
@@ -39,7 +40,7 @@ interactive shell or a Bash-compatible shell replacement.
 | `set -euo pipefail` | failures are errors by default |
 
 This table is an orientation, not the main proof that yesh is useful. The main
-evidence is **Real-World Examples (RWE)**: short administrative workflows where
+evidence is **Real-World Examples**: short administrative workflows where
 the script has real preconditions, an external Linux tool, a failure path and
 an observable result.
 
@@ -50,9 +51,10 @@ an observable result.
 | staged configuration update | invalid content replaces the active file | validate first, publish atomically, then inspect the result |
 | SSH/SCP delivery | hidden host-key or timeout policy, unclear argument boundaries | visible connection policy and exact arguments |
 
-An RWE is successful only when it demonstrates a concrete readability or
-safety advantage over the Bash version. A one-line wrapper around an external
-command is useful as a smoke test, but is not by itself evidence for yesh.
+A Real-World Example is successful only when it demonstrates a concrete
+readability or safety advantage over the Bash version. A one-line wrapper around
+an external command is useful as a smoke test, but is not by itself evidence for
+yesh.
 
 ## Why yesh is easier to read than Bash
 
@@ -91,7 +93,7 @@ The current prototype supports:
 - ordinary commands, pipes, and redirections;
 - explicit `$name` variable expansion, with bare words kept literal;
 - command failures that stop the script and report the source line;
-- a single `exists $path` predicate, regex conditions, and explicit `exit code`.
+- one `exists $path` predicate, regex conditions, and explicit `exit code`;
 - typed Linux operations for `service status`, bounded `service wait`, start
   and restart with a postcondition, and bounded `journal` over
   `systemctl`/`journalctl`;
@@ -149,7 +151,7 @@ package; a skip is not evidence that the integration works. Tests that need
 root, a real systemd manager, a device, SSH or a second UID are labelled as
 environment-dependent rather than presented as portable proof.
 
-The runnable map and its limitations are in
+The runnable examples and their limitations are documented in
 [Practical Examples](docs/practical-examples.md). A local verification run
 uses workspace-local caches:
 
@@ -157,7 +159,7 @@ uses workspace-local caches:
 GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go test ./...
 GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go test -race ./...
 GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go vet ./...
-go build -trimpath ./cmd/yesh
+GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go build -trimpath ./cmd/yesh
 ```
 
 These checks support a bounded operational claim: yesh's own execution model
@@ -167,8 +169,8 @@ security isolation, or safe execution of arbitrary external programs.
 
 ## Where yesh should help an administrator
 
-The useful target is the awkward layer around mature Linux tools. The tool
-already knows how to copy, restart, inspect or archive; yesh should make the
+The useful target is the awkward layer around mature Linux tools. The underlying
+tool already knows how to copy, restart, inspect or archive; yesh should make the
 preconditions, sequencing, failure policy and postcondition readable:
 
 - backup and restore workflows around `rsync`, `rsnapshot`, `tar` and `pv`;
@@ -203,11 +205,14 @@ comparison and the rules behind the syntax.
 The [Russian syntax tutorial](docs/syntax-guide.ru.md) gives a step-by-step
 path from the first script to a small administrative workflow.
 
+The [English syntax tutorial](docs/syntax-guide.md) is in progress. The Russian
+version is currently the complete tutorial.
+
 See the [English roadmap](docs/TODO.md) for current project priorities.
 
 ## Documentation and scope
 
-yesh is a language sketch focused on readable system-administration and
+yesh is an experimental language focused on readable system administration and
 operational scripts, not a general-purpose shell or an interactive command
 environment.
 The examples and design documents are the source of truth for its semantics.
@@ -252,10 +257,6 @@ The core design notes are [control flow](docs/control-flow.md),
 [systemd integration](docs/systemd.md).
 Runnable [English practical examples](docs/practical-examples.md) cover archives,
 rsync, rsnapshot, configuration changes, and read-only administration.
-
-The systemd/journal design and boundaries are documented in
-[systemd integration](docs/systemd.md); the practical verification map is in
-[the practical examples guide](docs/practical-examples.md).
 
 The runnable examples also include read-only process, journal, mount and SSH
 health checks in `examples/`.
