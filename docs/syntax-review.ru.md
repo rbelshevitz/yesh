@@ -12,11 +12,11 @@
 Значение переменной всегда запрашивается явно:
 
 ```yesh
-service = api
-echo $service
+unit = api
+echo $unit
 # api
-echo service
-# service
+echo unit
+# unit
 ```
 
 Правило: `$name` раскрывает только существующую переменную; неизвестное или

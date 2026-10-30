@@ -4,16 +4,16 @@
 не запускала первые команды и не обнуляла файл вывода.
 
 ```yesh
-service = api
-printf '%s\n' service "service" | sort > services.txt
+unit = api
+printf '%s\n' $unit "unit" | sort > units.txt
 ```
 
 Сравнение с Bash:
 
 ```bash
 set -o pipefail
-service=api
-printf '%s\n' "$service" 'service' | sort > services.txt
+unit=api
+printf '%s\n' "$unit" 'unit' | sort > units.txt
 ```
 
 Правило: `$name` раскрывает существующую переменную; слово без `$` и слово

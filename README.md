@@ -200,6 +200,9 @@ go build -trimpath -o yesh ./cmd/yesh
 Start with the [English quickstart](docs/quickstart.md) for a Bash-to-yesh
 comparison and the rules behind the syntax.
 
+The [Russian syntax tutorial](docs/syntax-guide.ru.md) gives a step-by-step
+path from the first script to a small administrative workflow.
+
 See the [English roadmap](docs/TODO.md) for current project priorities.
 
 ## Documentation and scope

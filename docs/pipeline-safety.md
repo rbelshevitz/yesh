@@ -4,16 +4,16 @@ yesh checks the entire pipeline before starting it, so a preflight error in a
 later stage does not start earlier commands or truncate the output file.
 
 ```yesh
-service = api
-printf '%s\n' service "service" | sort > services.txt
+unit = api
+printf '%s\n' $unit "unit" | sort > units.txt
 ```
 
 Bash comparison:
 
 ```bash
 set -o pipefail
-service=api
-printf '%s\n' "$service" 'service' | sort > services.txt
+unit=api
+printf '%s\n' "$unit" 'unit' | sort > units.txt
 ```
 
 Rule: `$name` expands an existing variable; a bare or quoted word is always a

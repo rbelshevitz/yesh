@@ -34,7 +34,7 @@ exit 99
 `
 
 func TestPOSIXQuickstartServiceOutcomes(t *testing.T) {
-	source := quickstartBlocks(t, "quickstart.md")[0]
+	source := yeshBlocks(t, "quickstart.md")[0]
 	for _, tc := range []struct {
 		mode                      string
 		code                      int
@@ -96,7 +96,7 @@ func TestPOSIXQuickstartServiceOutcomes(t *testing.T) {
 }
 
 func TestPOSIXQuickstartValuesAndExists(t *testing.T) {
-	blocks := quickstartBlocks(t, "quickstart.md")
+	blocks := yeshBlocks(t, "quickstart.md")
 	dir := t.TempDir()
 	present := filepath.Join(dir, "present")
 	writeTestFile(t, present, []byte("data"), 0600)
@@ -127,7 +127,7 @@ func TestPOSIXQuickstartValuesAndExists(t *testing.T) {
 
 func TestPOSIXQuickstartPipelineDrainsInput(t *testing.T) {
 	practicalDependencies(t, "sort")
-	source := quickstartBlocks(t, "quickstart.md")[2]
+	source := yeshBlocks(t, "quickstart.md")[2]
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "bin")
 	if err := os.Mkdir(bin, 0700); err != nil {
@@ -158,7 +158,7 @@ func TestPOSIXQuickstartPipelineDrainsInput(t *testing.T) {
 func TestPOSIXQuickstartPlanDoesNotQuerySystemd(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "check.yesh")
-	writeTestFile(t, script, []byte(quickstartBlocks(t, "quickstart.md")[0]+"\n"), 0600)
+	writeTestFile(t, script, []byte(yeshBlocks(t, "quickstart.md")[0]+"\n"), 0600)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := posixCLI(t, ctx, "--plan", script)

@@ -7,7 +7,7 @@ as a false condition.
 ```yesh
 config = /etc/os-release
 if exists $config:
-    cat < config
+    cat < $config
 else:
     echo "configuration file is missing"
     exit 2
@@ -35,13 +35,13 @@ with a correction hint.
 ## Regular-expression matching
 
 ```yesh
-service = api-42
+unit = api-42
 pattern = regex '^api-[0-9]+$'
-if $service matches $pattern:
+if $unit matches $pattern:
     echo "matching service"
 ```
 
-Bash comparison: `[[ "$service" =~ ^api-[0-9]+$ ]]`.
+Bash comparison: `[[ "$unit" =~ ^api-[0-9]+$ ]]`.
 
 `matches` is a separate word between a text value and a regex. Words inside
 quotes remain data, so `if printf '%s' 'a matches b':` checks `printf`'s status,

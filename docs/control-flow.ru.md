@@ -6,7 +6,7 @@
 ```yesh
 config = /etc/os-release
 if exists $config:
-    cat < config
+    cat < $config
 else:
     echo "нет файла конфигурации"
     exit 2
@@ -36,13 +36,13 @@ fi
 ## Совпадение с регулярным выражением
 
 ```yesh
-service = api-42
+unit = api-42
 pattern = regex '^api-[0-9]+$'
-if $service matches $pattern:
+if $unit matches $pattern:
     echo "подходящая служба"
 ```
 
-Сравнение с Bash: `[[ "$service" =~ ^api-[0-9]+$ ]]`.
+Сравнение с Bash: `[[ "$unit" =~ ^api-[0-9]+$ ]]`.
 Правило: `matches` — отдельное слово между текстовым значением и regex;
 слова внутри кавычек остаются данными.
 Поэтому `if printf '%s' 'a matches b':` проверяет код выхода printf,

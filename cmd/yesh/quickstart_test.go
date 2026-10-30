@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func quickstartBlocks(t *testing.T, filename string) []string {
+func yeshBlocks(t *testing.T, filename string) []string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("..", "..", "docs", filename))
 	if err != nil {
@@ -32,7 +32,7 @@ func quickstartBlocks(t *testing.T, filename string) []string {
 }
 
 func TestQuickstartExamplesMatchAndParse(t *testing.T) {
-	en, ru := quickstartBlocks(t, "quickstart.md"), quickstartBlocks(t, "quickstart.ru.md")
+	en, ru := yeshBlocks(t, "quickstart.md"), yeshBlocks(t, "quickstart.ru.md")
 	if len(en) != 4 {
 		t.Fatalf("quickstart scenarios changed; update execution coverage: %d", len(en))
 	}
@@ -59,5 +59,17 @@ func TestQuickstartExamplesMatchAndParse(t *testing.T) {
 	}
 	if normalize(en[0]) != normalize(string(example)) {
 		t.Fatal("quickstart service check differs from runnable example")
+	}
+}
+
+func TestSyntaxGuideExamplesParse(t *testing.T) {
+	blocks := yeshBlocks(t, "syntax-guide.ru.md")
+	if len(blocks) != 17 {
+		t.Fatalf("syntax guide examples changed; update execution coverage: %d", len(blocks))
+	}
+	for i, source := range blocks {
+		if _, err := parse(source+"\n", "syntax-guide.ru.md"); err != nil {
+			t.Fatalf("block %d: %v", i+1, err)
+		}
 	}
 }

@@ -188,6 +188,8 @@ yesh не предоставляет интерактивную строку в�
 
 - [Быстрый старт на английском](docs/quickstart.md)
 - [Быстрый старт на русском](docs/quickstart.ru.md)
+- [Учебник по синтаксису yesh](docs/syntax-guide.ru.md)
+- [Карта примеров по сложности](docs/example-map.ru.md)
 - [План развития на английском](docs/TODO.md)
 - [Подробный русский план](docs/TODO.ru.md)
 
