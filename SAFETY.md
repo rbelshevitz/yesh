@@ -3,7 +3,7 @@
 yesh supports scripts that may require administrative privileges. Ambiguous or
 unsafe situations should fail before a process starts whenever possible.
 
-## Forbidden in ordinary mode
+## What ordinary mode forbids
 
 ```yesh
 while true:              # no: no demonstrable end
@@ -33,12 +33,12 @@ eval text                # no: text does not become code
   not mean that `stderr` is automatically scrubbed of secrets.
 
 Where possible, limits must be checked before execution. The runtime must not
-create a process that later becomes unreachable because a pipeline reader is
+start a process that later becomes unreachable because a pipeline reader is
 missing.
 
-The `.yesh` source is limited to 4 MiB before parsing. Additional limits apply
-to loops, process snapshots, regular expressions, and Linux storage-query
-output.
+The source of a `.yesh` script is limited to 4 MiB before parsing. Additional
+limits apply to loops, process snapshots, regular expressions, and Linux
+storage-query output.
 
 ## Current guarantees
 
@@ -46,8 +46,8 @@ output.
   through a shell;
 - variable values are not reparsed as operators, and lists expand only
   explicitly;
-- `while`, background execution, command substitution, `eval`, and nested
-  shells are rejected;
+- `while`, background execution, command substitution, `eval`, and known shell
+  wrappers or nested shell stages are rejected;
 - pipelines are checked before execution, and a failure stops later work;
 - a pipeline timeout terminates its owned process group and waits for child
   processes;
@@ -124,7 +124,7 @@ effect under another name or in its configuration.
 
 For these operations, yesh can make the command and failure boundary visible,
 but cannot prove that a path, device, remote host, service, or external program
-means what the operator intended. The next separate step is policy for known
+means what the operator intended. The next step is a separate policy for known
 commands and dangerous arguments before execution; a blacklist must not be
 presented as isolation.
 
@@ -142,7 +142,7 @@ policy, and, for SSH/rsync, the remote account. `sudo` only runs a command as
 another user when the local policy permits it; it does not prove that the
 command is safe. See the [`sudo(8)` manual](https://www.man7.org/linux/man-pages/man8/sudo.8.html).
 
-The correct yesh behavior is therefore to:
+The appropriate yesh behavior is therefore to:
 
 - classify known operations as read-only, writable in user-owned locations,
   privilege-requiring, or environment-dependent;
@@ -152,7 +152,7 @@ The correct yesh behavior is therefore to:
 - show which stage requires privilege and which account will run it;
 - never fix the situation by wrapping an arbitrary command in `sudo`.
 
-For an unknown external command, yesh must state that its privilege
+For an unknown external command, yesh must explicitly state that its privilege
 requirements are unknown. Successful preflight does not prove future access:
 permissions, ACLs, capabilities, set-user-ID behavior, remote policy, and paths
 may change between checking and acting. A privileged script must have an
@@ -169,7 +169,7 @@ The following are required project work, not optional advice:
   the runtime using randomly generated data;
 - add `govulncheck` and dependency scanning to CI;
 - publish a threat model and release security checklist;
-- keep a privileged loopback/storage fixture only in a disposable VM or on a
+- keep a privileged loopback/storage fixture in a disposable VM or on a
   separate Rocky Linux host;
-- either document and test isolation of untrusted scripts, or clearly retain
-  the statement that yesh is not such an isolation mechanism.
+- either document and test isolation of untrusted scripts, or clearly state
+  that yesh does not provide such an isolation mechanism.
