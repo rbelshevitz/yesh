@@ -14,6 +14,10 @@ utilities and administration tools visible as external commands, while providing
 a small language for sequencing them, passing arguments, and handling failures.
 It is not an interactive shell or a Bash-compatible replacement.
 
+The repository includes 50+ examples, including real-world Linux workflows.
+Some examples require Linux, systemd, SSH, or other external tools and are not
+expected to run in every environment.
+
 > **Development status:** yesh is under active development and is not yet ready
 > to serve as a production safety boundary. The measures listed in
 > [SAFETY.md](SAFETY.md) define the project's requirements; the current
