@@ -324,6 +324,11 @@ yesh action with its parameters, not as an external `argv`. The plan cannot
 guarantee that the network, filesystem, service, or external program will still
 be available when the real run starts.
 
+This is not mainly a way to shorten a three-line script: a small Bash example
+may be just as short. The benefit appears as the workflow grows, because yesh
+keeps argument boundaries, publication steps, failure behavior, and the action
+order visible for review.
+
 If a command starts and fails, yesh reports the file, line, and why it stopped.
 An execution error is not an ordinary false condition, so adding `else`
 does not handle it:

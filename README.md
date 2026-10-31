@@ -34,13 +34,17 @@ one of them fails.
 ## The point
 
 The useful difference appears at the boundary where a small Bash script starts
-mixing checks, file replacement, and failure handling:
+mixing validation, file replacement, service restart, and failure handling:
 
 Bash:
 
 ```bash
+set -e
 if grep -q '^mode=production$' config.next; then
-    install -m 0640 config.next /etc/myapp.conf
+    install -m 0640 -- config.next /etc/myapp.conf.next
+    mv -T /etc/myapp.conf.next /etc/myapp.conf
+    systemctl restart myapp.service
+    systemctl is-active --quiet myapp.service
 fi
 ```
 
@@ -50,12 +54,14 @@ yesh:
 if grep -q '^mode=production$' config.next:
     install -m 0640 -- config.next /etc/myapp.conf.next
     publish /etc/myapp.conf.next to /etc/myapp.conf
+    service restart myapp.service until active within 10s
 ```
 
-The yesh version keeps the check, the publication boundary, and the failure
-behavior visible. The external `install` command prepares the file and its mode;
-`publish` is a yesh operation with same-filesystem rename semantics. It does
-not silently fall back to copying.
+The yesh version keeps validation, the publication boundary, and the service
+postcondition visible. The external `install` command prepares the file and its
+mode; `publish` uses a same-filesystem rename and does not silently fall back
+to copying. The typed restart has a finite ten-second budget and checks that
+the exact unit becomes active.
 
 The corresponding `--plan` output makes the boundary explicit:
 
@@ -63,6 +69,7 @@ The corresponding `--plan` output makes the boundary explicit:
 PLAN IF ["grep" "-q" "^mode=production$" "config.next"]
 PLAN ["install" "-m" "0640" "--" "config.next" "/etc/myapp.conf.next"]
 PLAN publish "/etc/myapp.conf.next" to "/etc/myapp.conf"
+PLAN ["systemctl" "restart" "myapp.service"] until active within 10s
 ```
 
 The rule is simple: `PLAN [...]` is an external command's argument list
@@ -135,6 +142,11 @@ wrong:
 
 The result is a small Go-based language for scripts that should be easy to
 write and easy to review.
+
+This example is not necessarily shorter than its
+Bash equivalent. The benefit appears when a script grows: yesh keeps argument
+boundaries, the publication step, the failure rule, and the reviewable `--plan`
+visible instead of making them depend on shell quoting and conventions.
 
 ## What the prototype supports
 
