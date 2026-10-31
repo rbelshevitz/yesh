@@ -70,7 +70,7 @@ The rule is simple: `PLAN [...]` is an external command's argument list
 
 ## Try it in a minute
 
-From a checkout with Go 1.27 or newer:
+From a checkout with Go 1.21 or newer:
 
 ```text
 go build -trimpath -o yesh ./cmd/yesh
@@ -259,14 +259,7 @@ Otherwise the Linux utility remains an ordinary visible command. yesh should
 orchestrate difficult commands, not grow a parallel implementation of `rsync`,
 `systemctl`, `mount`, `sed`, `awk` or a package manager.
 
-## Build and run
-
-Building yesh requires Go 1.27 or newer. From a checkout:
-
-```text
-go build -trimpath -o yesh ./cmd/yesh
-./yesh examples/hello.yesh
-```
+## Platform and documentation
 
 yesh targets Linux. Its examples use external tools and may additionally require a running systemd
 manager, root, a mounted filesystem, or a disposable test fixture. The
