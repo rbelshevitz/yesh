@@ -62,6 +62,22 @@ prototype does not protect against an arbitrary dangerous external program.
 The POSIX process model, signal and pipeline behavior, and the scope of the
 test corpus are documented in [POSIX runtime details](POSIX.md).
 
+## Two separate safety layers
+
+The language semantics and the external-command policy are different layers:
+
+- **Language semantics**: no `eval`, implicit shell expansion, uncontrolled
+  background execution, or unbounded loops; values and `argv` retain explicit
+  boundaries.
+- **Execution policy**: which external program is allowed, under which user,
+  with which arguments, paths, environment, and privileges.
+
+Rejecting `bash -c` belongs to the first layer. It prevents a script from
+bypassing yesh parsing and runtime rules, but it is not an isolation boundary:
+a renamed executable, `awk system()`, `find -exec`, or a program that creates a
+new session can still perform dangerous work. The second layer requires a
+separate, reviewed policy for external programs.
+
 ## Residual risks
 
 An external program can modify the system, start another shell internally,
@@ -157,6 +173,14 @@ The appropriate yesh behavior is therefore to:
 - show which stage requires privilege and which account will run it;
 - never fix the situation by wrapping an arbitrary command in `sudo`.
 
+A future execution-policy check should have three explicit outcomes:
+
+| Result | Meaning |
+| --- | --- |
+| `allowed` | The operation matches the reviewed policy; this does not mean that it will succeed. |
+| `denied` | A concrete policy violation was found; the operation must not start. |
+| `unknown` | There is not enough information to decide; it must not be silently treated as `allowed`. |
+
 For an unknown external command, yesh must explicitly state that its privilege
 requirements are unknown. Successful preflight does not prove future access:
 permissions, ACLs, capabilities, set-user-ID behavior, remote policy, and paths
@@ -168,6 +192,9 @@ explicitly reviewed command, account, environment, and operating-system policy.
 The following are required project work, not optional advice:
 
 - define controlled `PATH` and environment policies for privileged execution;
+- keep language restrictions separate from the external-command policy, with
+  explicit `allowed`/`denied`/`unknown` results and no implication that
+  `allowed` guarantees execution success;
 - implement argument validation or typed wrappers for high-impact external
   commands;
 - maintain fuzz checks for lexing, parsing, value expansion, redirects, and

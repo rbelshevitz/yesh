@@ -33,8 +33,10 @@ the binary has been run on real ARM64 hardware or an ARM64 virtual machine.
 2. Prepare a production-like rsnapshot/storage scenario on a separate
    filesystem, keeping durability limits explicit.
 3. Run an ARM64 smoke test and decide whether to add ARM64 to a later release.
-4. Consider controlled `PATH` and environment policy for privileged execution.
-5. Consider durable job identity and resume rules only after a concrete use case.
+4. Design a separate external-command policy with explicit `allowed`, `denied`,
+   and `unknown` outcomes; `allowed` means policy match, not execution success.
+5. Consider controlled `PATH` and environment policy for privileged execution.
+6. Consider durable job identity and resume rules only after a concrete use case.
 
 The networked `rsync` preflight, partial-transfer, failure, and retry scenarios
 have already been exercised on the disposable Debian stand. Do not add a new
@@ -43,6 +45,8 @@ network language layer or repeat those checks without a specific new failure.
 ## Boundaries
 
 - yesh is not an interactive shell, Bash replacement, sandbox, or backup engine;
+- rejecting `bash -c` and similar wrappers is a language rule, not an isolation
+  boundary;
 - `rsync`, `rsnapshot`, `systemctl`, `mount`, `sed`, `awk`, SSH, and package
   managers remain external tools with their native semantics;
 - do not add `cd`, `export`, command substitution, TTY/PTY, or broad shell
