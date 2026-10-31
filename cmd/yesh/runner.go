@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,11 +20,52 @@ type stage struct {
 }
 
 type stageResult struct {
-	index int
-	err   error
+	index     int
+	err       error
+	stderr    string
+	truncated bool
 }
 
+// commandDiagnostic preserves machine-readable facts while Unwrap keeps the
+// original exec.ExitError available to callers and conditions.
+type commandDiagnostic struct {
+	Message         string
+	Stage           int
+	Stages          int
+	Argv            []string
+	ExitCode        int
+	Signal          string
+	TimedOut        bool
+	Stderr          string
+	StderrTruncated bool
+	Duration        time.Duration
+	Cause           error
+}
+
+func (d *commandDiagnostic) Error() string { return d.Message }
+func (d *commandDiagnostic) Unwrap() error { return d.Cause }
+
 const maxPipelineStages = 32
+const maxDiagnosticStderr = 1 << 20
+
+type diagnosticBuffer struct {
+	bytes.Buffer
+	truncated bool
+}
+
+func (b *diagnosticBuffer) Write(data []byte) (int, error) {
+	if b.Len() < maxDiagnosticStderr {
+		keep := maxDiagnosticStderr - b.Len()
+		if len(data) > keep {
+			_, _ = b.Buffer.Write(data[:keep])
+			b.truncated = true
+			return len(data), nil
+		}
+		return b.Buffer.Write(data)
+	}
+	b.truncated = true
+	return len(data), nil
+}
 
 func (r *runtime) expandWord(token commandToken, line int) ([]string, error) {
 	if token.literal {
@@ -280,6 +323,13 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 			if len(stages) == 1 && s.input == "" && s.output == "" && (s.argv[0] == "echo" || s.argv[0] == "true" || s.argv[0] == "false") {
 				continue
 			}
+			hint := ""
+			if errors.Is(err, exec.ErrNotFound) {
+				hint = missingCommandHint(s.argv[0])
+			}
+			if hint != "" {
+				return fmt.Errorf("%s:%d: resolve %s: %w (%s)", r.filename, line, s.argv[0], err, hint)
+			}
 			return fmt.Errorf("%s:%d: resolve %s: %w", r.filename, line, s.argv[0], err)
 		}
 	}
@@ -297,12 +347,14 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 			return statusError{code: 1}
 		}
 	}
+	startedAt := time.Now()
 
 	deadline, stopDeadline := context.WithTimeout(parent, timeout)
 	defer stopDeadline()
 	ctx, cancel := context.WithCancel(deadline)
 	defer cancel()
 	cmds := make([]*exec.Cmd, len(stages))
+	stderrs := make([]diagnosticBuffer, len(stages))
 	files := make([]*os.File, 0, 2)
 	pipeFiles := make([]*os.File, 0, 2*(len(stages)-1))
 	defer func() { closeFiles(files, pipeFiles) }()
@@ -328,7 +380,7 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 		cmds[i] = exec.CommandContext(ctx, s.argv[0], s.argv[1:]...)
 		cmds[i].Cancel = group.terminate
 		cmds[i].WaitDelay = 2 * time.Second
-		cmds[i].Stderr = os.Stderr
+		cmds[i].Stderr = io.MultiWriter(os.Stderr, &stderrs[i])
 		if i == 0 {
 			cmds[i].Stdin = os.Stdin
 		}
@@ -410,7 +462,10 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 
 	results := make(chan stageResult, len(cmds))
 	for index, cmd := range cmds {
-		go func(index int, cmd *exec.Cmd) { results <- stageResult{index: index, err: cmd.Wait()} }(index, cmd)
+		go func(index int, cmd *exec.Cmd) {
+			err := cmd.Wait()
+			results <- stageResult{index: index, err: err, stderr: stderrs[index].String(), truncated: stderrs[index].truncated}
+		}(index, cmd)
 	}
 	allResults := make([]stageResult, 0, len(cmds))
 	failureFound := false
@@ -427,12 +482,60 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 		_ = group.kill()
 	}
 	if deadline.Err() != nil {
-		return fmt.Errorf("%s:%d: command interrupted: %w", r.filename, line, deadline.Err())
+		diagnostic := &commandDiagnostic{
+			Message: fmt.Sprintf("%s:%d: command interrupted: %s", r.filename, line, deadline.Err()),
+			Stage:   stageIndex(failure), Stages: len(stages), Argv: r.stageArgv(stages, failure),
+			TimedOut: errors.Is(deadline.Err(), context.DeadlineExceeded), Stderr: failure.stderr,
+			Cause: deadline.Err(),
+		}
+		diagnostic.Duration = time.Since(startedAt)
+		return diagnostic
 	}
 	if failure.err != nil && fatal {
-		return fmt.Errorf("%s:%d: command failed at pipeline stage %d/%d (%s): %s", r.filename, line, failure.index+1, len(stages), commandFailureDetail(failure.err), text)
+		diagnostic := r.newCommandDiagnostic(stages, failure)
+		diagnostic.Message = fmt.Sprintf("%s:%d: command failed at pipeline stage %d/%d (%s): %s", r.filename, line, failure.index+1, len(stages), commandFailureDetail(failure.err), text)
+		diagnostic.Duration = time.Since(startedAt)
+		return diagnostic
 	}
 	return failure.err
+}
+
+func stageIndex(result stageResult) int {
+	if result.index < 0 {
+		return 0
+	}
+	return result.index + 1
+}
+
+func (r *runtime) stageArgv(stages []stage, result stageResult) []string {
+	if result.index < 0 || result.index >= len(stages) {
+		return nil
+	}
+	args := append([]string(nil), stages[result.index].argv...)
+	secretValues := make(map[string]bool)
+	for _, value := range r.values {
+		if value.secret && value.scalar != "" {
+			secretValues[value.scalar] = true
+		}
+	}
+	for i, arg := range args {
+		if secretValues[arg] {
+			args[i] = "<environment value>"
+		}
+	}
+	return args
+}
+
+func (r *runtime) newCommandDiagnostic(stages []stage, result stageResult) *commandDiagnostic {
+	d := &commandDiagnostic{Stage: stageIndex(result), Stages: len(stages), Argv: r.stageArgv(stages, result), Stderr: result.stderr, StderrTruncated: result.truncated, Cause: result.err, ExitCode: -1}
+	if result.err != nil {
+		d.ExitCode = -1
+		if exit, ok := result.err.(*exec.ExitError); ok {
+			d.ExitCode = exit.ExitCode()
+			d.Signal = processSignal(exit.ProcessState)
+		}
+	}
+	return d
 }
 
 func selectStageFailure(results []stageResult) stageResult {

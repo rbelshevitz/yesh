@@ -207,6 +207,37 @@ func TestPOSIXPipelineFailureReportsStageAndExitCode(t *testing.T) {
 	}
 }
 
+func TestPOSIXCommandDiagnosticPreservesStageExitAndStderr(t *testing.T) {
+	fixture := posixFixture(t, "echo diagnostic >&2; exit 23")
+	err := runPOSIX(t, posixRuntime(), fixture, true)
+	var diagnostic *commandDiagnostic
+	if !errors.As(err, &diagnostic) {
+		t.Fatalf("structured command diagnostic was lost: %v", err)
+	}
+	if diagnostic.Stage != 1 || diagnostic.Stages != 1 || diagnostic.ExitCode != 23 || diagnostic.Signal != "" || diagnostic.TimedOut || diagnostic.Stderr != "diagnostic\n" {
+		t.Fatalf("unexpected diagnostic: %+v", diagnostic)
+	}
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 23 {
+		t.Fatalf("original exit error was lost: %v", err)
+	}
+	if len(diagnostic.Argv) != 1 || diagnostic.Argv[0] != fixture {
+		t.Fatalf("unexpected argv: %#v", diagnostic.Argv)
+	}
+}
+
+func TestPOSIXCommandDiagnosticBoundsStderr(t *testing.T) {
+	fixture := posixFixture(t, "head -c 1048577 /dev/zero >&2; exit 1")
+	err := runPOSIX(t, posixRuntime(), fixture, true)
+	var diagnostic *commandDiagnostic
+	if !errors.As(err, &diagnostic) {
+		t.Fatalf("structured command diagnostic was lost: %v", err)
+	}
+	if len(diagnostic.Stderr) != maxDiagnosticStderr || !diagnostic.StderrTruncated {
+		t.Fatalf("stderr was not bounded: len=%d truncated=%v", len(diagnostic.Stderr), diagnostic.StderrTruncated)
+	}
+}
+
 func TestPOSIXPipelineFirstFailureLastSuccess(t *testing.T) {
 	bad := posixFixture(t, "exit 7")
 	good := posixFixture(t, "cat")

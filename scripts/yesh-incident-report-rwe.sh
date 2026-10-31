@@ -18,7 +18,30 @@ test -x /bin/df || test -x /usr/bin/df
 test -x /bin/tar || test -x /usr/bin/tar
 
 base=$(mktemp -d /tmp/yesh-incident-report-rwe.XXXXXX)
-trap 'rm -rf -- "$base"' EXIT INT TERM HUP
+unit=/run/systemd/system/yesh-incident-rwe.service
+cleanup() {
+    rc=$?
+    systemctl stop yesh-incident-rwe.service >/dev/null 2>&1 || true
+    systemctl reset-failed yesh-incident-rwe.service >/dev/null 2>&1 || true
+    rm -f -- "$unit"
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    rm -rf -- "$base"
+    exit "$rc"
+}
+trap cleanup EXIT INT TERM HUP
+
+cat >"$unit" <<'UNIT'
+[Unit]
+Description=Disposable failing yesh incident fixture
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "echo disposable failure; exit 1"
+UNIT
+systemctl daemon-reload
+systemctl reset-failed yesh-incident-rwe.service >/dev/null 2>&1 || true
+systemctl start yesh-incident-rwe.service >/dev/null 2>&1 || true
+test "$(systemctl is-failed yesh-incident-rwe.service)" = failed
 
 plan=$base/plan.out
 if ! "$yesh" --plan "$example" >"$plan" 2>"$base/plan.err"; then
@@ -33,7 +56,7 @@ if ! "$yesh" "$example" >"$base/report.out" 2>"$base/report.err"; then
     echo "ERROR: incident report execution failed; report is incomplete" >&2
     exit 1
 fi
-grep -F 'SERVICE_STATUS id=systemd-journald.service' "$base/report.out" >/dev/null
+grep -F 'SERVICE_STATUS id=yesh-incident-rwe.service' "$base/report.out" >/dev/null
 grep -F 'PROCESS_COUNT' "$base/report.out" >/dev/null
 grep -F 'Filesystem' "$base/report.out" >/dev/null
 test ! -s "$base/report.err"
@@ -45,7 +68,7 @@ test -s "$base/report.tar"
 
 # A missing unit is a negative path: it must not become a successful bundle.
 bad=$base/bad.yesh
-sed 's/systemd-journald\.service/yesh-rwe-definitely-missing.service/g' "$example" >"$bad"
+sed 's/yesh-incident-rwe\.service/yesh-rwe-definitely-missing.service/g' "$example" >"$bad"
 "$yesh" "$bad" >"$base/bad.out" 2>"$base/bad.err" || true
 grep -F 'load_state=not-found' "$base/bad.out" >/dev/null
 test ! -e "$base/bad.tar"

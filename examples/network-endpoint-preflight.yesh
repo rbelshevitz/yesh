@@ -1,0 +1,15 @@
+# Read-only DNS and TCP preflight for one explicitly supplied endpoint.
+# No service or network state is changed. The target and port are inputs, not
+# a promise that the application behind the socket is healthy.
+#
+# YESH_NETWORK_DNS_NAME  one name or address for getent ahosts
+# YESH_NETWORK_TCP_HOST  one address or name for nc
+# YESH_NETWORK_TCP_PORT  one decimal TCP port
+# Role of yesh: keep the exact external argv and failure order visible.
+
+dns_name = environment YESH_NETWORK_DNS_NAME
+tcp_host = environment YESH_NETWORK_TCP_HOST
+tcp_port = environment YESH_NETWORK_TCP_PORT
+
+getent ahosts $dns_name
+nc -z -w 5 -- $tcp_host $tcp_port

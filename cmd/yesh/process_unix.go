@@ -11,6 +11,17 @@ import (
 	"syscall"
 )
 
+func processSignal(state *os.ProcessState) string {
+	if state == nil {
+		return ""
+	}
+	status, ok := state.Sys().(syscall.WaitStatus)
+	if !ok || status.Exited() || !status.Signaled() {
+		return ""
+	}
+	return status.Signal().String()
+}
+
 func commandContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 }

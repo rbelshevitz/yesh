@@ -1,4 +1,8 @@
-# RWE: guarded rsnapshot interval with an explicit operator confirmation.
+# Real-World Example: guarded rsnapshot interval with explicit confirmation.
+# Goal: make one potentially changing rsnapshot interval explainable before apply.
+# What yesh simplifies: the preflight order, the confirmation boundary, and the
+# postcondition are visible as ordinary blocks; a failed command stops before
+# the next action, without Bash-specific control-flow machinery.
 # The rsnapshot.conf remains authoritative;
 # this script adds operator-facing checks before a destructive interval.
 #
@@ -8,6 +12,8 @@
 #   YESH_RSNAPSHOT_ROOT     expected local snapshot_root/mount path
 #   YESH_RSNAPSHOT_SOURCE   expected mount source, preferably UUID=... or
 #                           PARTUUID=... rather than a mutable /dev name
+#   YESH_RSNAPSHOT_LOCK     expected lockfile path from rsnapshot.conf
+#   YESH_RSNAPSHOT_PUBLISHED expected path of the new level.0 directory
 #   YESH_RSNAPSHOT_CONFIRM  path that the operator creates after reviewing
 #                           the test output; it is not created by this script
 #
@@ -27,6 +33,8 @@ config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
+lock = environment YESH_RSNAPSHOT_LOCK
+published = environment YESH_RSNAPSHOT_PUBLISHED
 confirm = environment YESH_RSNAPSHOT_CONFIRM
 
 if exists $config:
@@ -38,6 +46,15 @@ if exists $config:
                 rsnapshot -c $config -t $level
                 if exists $confirm:
                     rsnapshot -c $config $level
+                    if exists $published:
+                        if exists $lock:
+                            echo "rsnapshot lockfile remains after successful interval"
+                            exit 6
+                        else:
+                            echo "rsnapshot interval completed"
+                    else:
+                        echo "rsnapshot interval completed without publishing the expected snapshot"
+                        exit 6
                 else:
                     echo "review rsnapshot test output and create the confirmation file"
                     exit 4

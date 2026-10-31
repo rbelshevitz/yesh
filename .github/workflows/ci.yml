@@ -53,7 +53,10 @@ jobs:
         run: go test -trimpath ./...
       - name: POSIX lifecycle and pipeline race checks
         if: runner.os != 'Windows'
-        run: go test -race -trimpath ./cmd/yesh -run 'Test(POSIX|Linux|Pipeline)' -count=3 -timeout=240s
+        # The ordinary Linux test job already runs the full suite. Keep one
+        # race-instrumented pass here so CI retains lifecycle coverage without
+        # spending nearly the entire job timeout on three identical repeats.
+        run: go test -race -trimpath ./cmd/yesh -run 'Test(POSIX|Linux|Pipeline)' -count=1 -timeout=180s
       - name: Pipeline parser fuzz smoke
         if: runner.os == 'Linux'
         run: go test ./cmd/yesh -run '^$' -fuzz FuzzPipelinePreflight -fuzztime=10s -parallel=2

@@ -7,18 +7,18 @@
 #
 # Bash comparison:
 #   systemctl show ... >status.out 2>status.err
-#   journalctl --no-pager --output=json --unit systemd-journald.service \
+#   journalctl --no-pager --output=json --unit yesh-incident-rwe.service \
 #     --since=-15m --lines=20 >journal.out 2>journal.err
 #   ps ...; findmnt ...; df ...
 # yesh keeps the service unit, journal bounds, process fields, and storage
 # target visible. The outer wrapper supplies the report file descriptors.
-# Inputs are fixed in this example: systemd-journald.service and `/`. A missing
+# Inputs are fixed in this example: yesh-incident-rwe.service and `/`. A missing
 # unit, inaccessible journal, or failed diagnostic command is an error; a
 # successful report only describes observations at one point in time.
 # Role of yesh: keep the inputs, command arguments, and failure boundary readable; external tools perform the domain operation.
 
-service status systemd-journald.service
-journal systemd-journald.service since 15m lines 20
+service status yesh-incident-rwe.service
+journal yesh-incident-rwe.service since 15m lines 20
 
 systemd = processes where name is "systemd"
 show $systemd fields pid ppid uid state rss start_time cgroup

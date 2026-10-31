@@ -76,16 +76,16 @@ test "$(cat "$root/snapshot.0/changed.txt")" = 'version one'
 test "$(cat "$root/snapshot.0/unchanged.txt")" = 'unchanged'
 test ! -e "$root/snapshot.0.tmp"
 
-printf '%s\n' 'version two' >"$source/changed.txt"
+printf '%s\n' 'version two, changed size' >"$source/changed.txt"
 run_yeshrsync "$root/snapshot.0" "$root/snapshot.1" "$root/snapshot.1.tmp"
 test "$(cat "$root/snapshot.0/changed.txt")" = 'version one'
-test "$(cat "$root/snapshot.1/changed.txt")" = 'version two'
+test "$(cat "$root/snapshot.1/changed.txt")" = 'version two, changed size'
 test "$(cat "$root/snapshot.1/unchanged.txt")" = 'unchanged'
 test "$(stat -c %i "$root/snapshot.0/unchanged.txt")" = "$(stat -c %i "$root/snapshot.1/unchanged.txt")"
 test ! -e "$root/snapshot.1.tmp"
 
 /usr/bin/rsync -a -- "$root/snapshot.1/" "$restore/"
-test "$(cat "$restore/changed.txt")" = 'version two'
+test "$(cat "$restore/changed.txt")" = 'version two, changed size'
 test "$(cat "$restore/unchanged.txt")" = 'unchanged'
 test "$(cat "$restore/subdir/nested.txt")" = 'nested'
 
@@ -97,7 +97,7 @@ fi
 test -d "$root/snapshot.1"
 test ! -e "$root/snapshot.2"
 test ! -e "$root/snapshot.2.tmp"
-test "$(cat "$root/snapshot.1/changed.txt")" = 'version two'
+test "$(cat "$root/snapshot.1/changed.txt")" = 'version two, changed size'
 
 echo 'RWE mounted incremental rsync, plan, link-dest, restore, and missing-source negative passed'
 

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParserRejectsWhile(t *testing.T) {
@@ -86,6 +90,30 @@ func TestRuntimeCommandFailureIncludesExitCode(t *testing.T) {
 	err := r.run("false", 4, true)
 	if err == nil || !strings.Contains(err.Error(), "exit code 1") || !strings.Contains(err.Error(), "false") {
 		t.Fatalf("command failure lost its cause: %v", err)
+	}
+}
+
+func TestJSONDiagnosticIncludesStructuredCommandFields(t *testing.T) {
+	code := 23
+	err := &commandDiagnostic{
+		Message: "test failure", Stage: 2, Stages: 3,
+		Argv: []string{"rsync", "<environment value>"}, ExitCode: code,
+		Stderr: "partial\n", StderrTruncated: true,
+		Duration: 125 * time.Millisecond,
+		Cause:    errors.New("cause"),
+	}
+	var out bytes.Buffer
+	writeJSONDiagnostic(&out, err, true)
+	var report map[string]any
+	if json.Unmarshal(out.Bytes(), &report) != nil {
+		t.Fatalf("invalid diagnostic JSON: %q", out.String())
+	}
+	if report["stage"] != float64(2) || report["stages"] != float64(3) || report["exit_code"] != float64(23) || report["stderr_truncated"] != true || report["execution_stopped"] != true || report["duration_ms"] != float64(125) {
+		t.Fatalf("unexpected diagnostic JSON: %s", out.String())
+	}
+	argv, ok := report["argv"].([]any)
+	if !ok || argv[1] != "<environment value>" {
+		t.Fatalf("secret was not represented safely: %s", out.String())
 	}
 }
 
