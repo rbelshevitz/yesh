@@ -9,12 +9,10 @@ failure behavior.
 
 [Русская версия README](README.ru.md)
 
-yesh is an early-stage project: ordinary Unix utilities and external Linux
-administration tools remain visible commands, while the language around them is
-intentionally small and readable. yesh is a language and interpreter for Linux
-automation, not an interactive shell or a Bash-compatible replacement. A yesh
-script describes a sequence of actions, their arguments, and what to do when
-one of them fails.
+yesh is an early-stage project for Linux automation. It keeps Linux command-line
+utilities and administration tools visible as external commands, while providing
+a small language for sequencing them, passing arguments, and handling failures.
+It is not an interactive shell or a Bash-compatible replacement.
 
 > **Development status:** yesh is under active development and is not yet ready
 > to serve as a production safety boundary. The measures listed in
