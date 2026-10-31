@@ -1367,6 +1367,10 @@ SHA-256 через SSH. Адреса, логины и ключи в репози
   флаги в `rsync_long_args`, семантику interval при `sync_first`,
   `no_create_root`, права родителя lockfile, владельца snapshot root и ошибки
   конфигурации из-за tabs/пробелов.
+- [x] В русской и английской главах учебника явно объяснить границу двух
+  проверок rsnapshot: `configtest` проверяет конфигурацию и зависимости без
+  изменения данных, а `-t LEVEL` показывает предполагаемые действия и не
+  доказывает успешность будущей передачи.
 - [x] Добавить и прогнать opt-in remote-rsnapshot fixture с disposable
   локальным источником, `no_create_root=1`, реальными `configtest`/test mode,
   двумя rotation, restore и проверкой hard links; не копировать grammar

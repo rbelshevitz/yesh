@@ -395,6 +395,12 @@ Before reading the yesh script, remember the basic `rsnapshot` model:
 - `rsnapshot -t` shows the selected interval's actions, but it does not replace
   `configtest` or prove that the transfer will succeed.
 
+`configtest` is rsnapshot's own configuration check: it validates the
+configuration syntax and required programs, but it does not run a backup or
+change snapshots. The `-t LEVEL` mode comes next: it shows the intended
+commands for the selected level without rotating snapshots, but it also does
+not prove that a future transfer will succeed.
+
 A small temporary configuration might look like this. Use tabs between fields
 in an actual `rsnapshot.conf`:
 
@@ -417,6 +423,7 @@ level = environment YESH_RSNAPSHOT_LEVEL
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
 lock = environment YESH_RSNAPSHOT_LOCK
+report = environment YESH_RSNAPSHOT_REPORT
 published = environment YESH_RSNAPSHOT_PUBLISHED
 confirm = environment YESH_RSNAPSHOT_CONFIRM
 ```
@@ -429,7 +436,7 @@ if exists $config:
         if findmnt --source $mount_source --target $root:
             if free_space $root at_least 20MiB:
                 rsnapshot -c $config configtest
-                rsnapshot -c $config -t $level
+                rsnapshot -c $config -t $level | tee $report
                 if exists $confirm:
                     rsnapshot -c $config $level
                     if exists $published:
@@ -442,7 +449,8 @@ if exists $config:
 
 The full file also reports a missing root, an unmounted destination, and low
 free space. The order is readable from top to bottom: check the configuration,
-root, mount, and free space; run `configtest`; show the interval in test mode;
+root, mount, and free space; run `configtest`; show and save the interval's
+test-mode report through `tee`; flag known deletion-related rsync options;
 require a pre-created confirmation file; apply the interval; then check for
 the expected `daily.0` and a released lock file.
 
@@ -456,7 +464,7 @@ The Bash idea would be:
 
 ```bash
 rsnapshot -c "$config" configtest || exit 1
-rsnapshot -c "$config" -t "$level" || exit 1
+rsnapshot -c "$config" -t "$level" | tee "$report" || exit 1
 test -e "$confirm" || exit 4
 rsnapshot -c "$config" "$level" || exit 1
 test -d "$published" || exit 6

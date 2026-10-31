@@ -456,6 +456,12 @@ else:
 - `rsnapshot -t` показывает действия выбранного уровня, но не заменяет
   `configtest` и не доказывает, что передача завершится успешно.
 
+`configtest` — встроенная проверка самого `rsnapshot`: она проверяет синтаксис
+конфигурации и необходимые программы, но не выполняет резервное копирование и
+не меняет снимки. Режим `-t LEVEL` идёт следующим шагом: он показывает
+предполагаемые команды выбранного уровня без ротации, но тоже не доказывает,
+что будущая передача завершится успешно.
+
 Минимальные параметры такой временной конфигурации выглядят примерно так;
 между полями конфигурации используется табуляция:
 
@@ -482,6 +488,7 @@ level = environment YESH_RSNAPSHOT_LEVEL
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
 lock = environment YESH_RSNAPSHOT_LOCK
+report = environment YESH_RSNAPSHOT_REPORT
 published = environment YESH_RSNAPSHOT_PUBLISHED
 confirm = environment YESH_RSNAPSHOT_CONFIRM
 ```
@@ -495,7 +502,7 @@ if exists $config:
         if findmnt --source $mount_source --target $root:
             if free_space $root at_least 20MiB:
                 rsnapshot -c $config configtest
-                rsnapshot -c $config -t $level
+                rsnapshot -c $config -t $level | tee $report
                 if exists $confirm:
                     rsnapshot -c $config $level
                     if exists $published:
@@ -508,8 +515,10 @@ if exists $config:
 
 Сначала проверяется файл конфигурации, корень снимков, точное монтирование и
 свободное место. Затем `configtest` проверяет конфигурацию, а `-t` показывает
-действия выбранного уровня без ротации. Только наличие заранее созданного
-файла подтверждения разрешает изменяющую команду. После неё проверяется
+действия выбранного уровня без ротации и одновременно сохраняет этот план в
+отчёт через `tee`. yesh отмечает в отчёте известные флаги удаления, но не
+объявляет конфигурацию безопасной автоматически. Только наличие заранее
+созданного файла подтверждения разрешает изменяющую команду. После неё проверяется
 ожидаемый `daily.0` и отсутствие файла блокировки.
 
 Вызов `rsnapshot` остаётся видимым: по нему можно заранее понять, какой файл

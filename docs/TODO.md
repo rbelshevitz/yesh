@@ -328,6 +328,10 @@ Real remote changes and restore tests belong in a dedicated test VM.
   surface `rsync_long_args` deletion flags, `sync_first` interval semantics,
   `no_create_root`, lockfile parent permissions, snapshot-root ownership, and
   tab-sensitive config errors;
+- [x] explain the boundary between the two rsnapshot checks in both syntax
+  tutorials: `configtest` validates configuration and dependencies without
+  changing data, while `-t LEVEL` shows intended actions but does not prove a
+  future transfer will succeed;
 - [ ] add an opt-in remote-rsnapshot fixture using rsnapshot's existing
   `backup user@host:/path target/`, `cmd_ssh`, `ssh_args`, agent, and
   `known_hosts` configuration. Do not mirror its config grammar or reimplement
