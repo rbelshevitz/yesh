@@ -98,6 +98,12 @@ program means what the operator intended. A future command-specific policy
 should classify known high-impact arguments before start; it must not pretend
 that a blacklist is a sandbox.
 
+An `rsnapshot` interval is also a high-impact operation: it can rotate or
+remove older levels according to `retain` and create hard links between
+snapshots. Before applying one, inspect the effective configuration, snapshot
+root, mount identity, `lockfile`, `no_create_root`, `configtest`, and test mode
+`-t`. An approval file does not replace those checks.
+
 ## Privilege and `sudo`
 
 yesh must never add `sudo` implicitly. Whether a command needs extra privilege

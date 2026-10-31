@@ -374,6 +374,106 @@ This still does not show that the application can use the new configuration.
 That requires an application-specific check and, when needed, a service
 operation followed by a check for the required state.
 
+## 13a. Practical example: rsnapshot
+
+The same rules can guard an external `rsnapshot` interval. yesh does not parse
+or rewrite `rsnapshot.conf`, and it does not implement rotation itself. Its
+role is to check the prerequisites, show the test run, require explicit
+confirmation, and verify the result.
+
+Before reading the yesh script, remember the basic `rsnapshot` model:
+
+- `snapshot_root` is the directory that contains the snapshot levels;
+- `retain daily 2` keeps `daily.0` as the newest level and `daily.1` as the
+  previous one;
+- unchanged files commonly share hard links between levels, so a snapshot is
+  not an independent copy to edit in place;
+- `no_create_root 1` prevents the tool from silently creating the root. The
+  root must already exist and be the expected mounted filesystem;
+- `backup /path/./ local/` sets the source-tree boundary: the path before
+  `/./` is not reproduced inside the snapshot;
+- `rsnapshot -t` shows the selected interval's actions, but it does not replace
+  `configtest` or prove that the transfer will succeed.
+
+A small temporary configuration might look like this. Use tabs between fields
+in an actual `rsnapshot.conf`:
+
+```text
+config_version	1.2
+snapshot_root	/backup/snapshots/
+no_create_root	1
+retain	daily	2
+lockfile	/tmp/rsnapshot.pid
+backup	/srv/data/./	local/
+```
+
+The complete yesh example is
+[`examples/rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh). Its
+inputs are explicit environment values:
+
+```yesh
+config = environment YESH_RSNAPSHOT_CONFIG
+level = environment YESH_RSNAPSHOT_LEVEL
+root = environment YESH_RSNAPSHOT_ROOT
+mount_source = environment YESH_RSNAPSHOT_SOURCE
+lock = environment YESH_RSNAPSHOT_LOCK
+published = environment YESH_RSNAPSHOT_PUBLISHED
+confirm = environment YESH_RSNAPSHOT_CONFIRM
+```
+
+The important order is:
+
+```yesh
+if exists $config:
+    if exists $root:
+        if findmnt --source $mount_source --target $root:
+            if free_space $root at_least 20MiB:
+                rsnapshot -c $config configtest
+                rsnapshot -c $config -t $level
+                if exists $confirm:
+                    rsnapshot -c $config $level
+                    if exists $published:
+                        if exists $lock:
+                            echo "rsnapshot lockfile remains after successful interval"
+                            exit 6
+                        else:
+                            echo "rsnapshot interval completed"
+```
+
+The full file also reports a missing root, an unmounted destination, and low
+free space. The order is readable from top to bottom: check the configuration,
+root, mount, and free space; run `configtest`; show the interval in test mode;
+require a pre-created confirmation file; apply the interval; then check for
+the expected `daily.0` and a released lock file.
+
+This is what yesh simplifies: the preflight order, the boundary between test
+mode and the changing command, the exact visible `rsnapshot` arguments, and
+the failure path are ordinary blocks instead of Bash-specific control-flow
+machinery. In `--plan`, yesh shows both branches without running `findmnt` or
+`rsnapshot` and without opening redirected files.
+
+The Bash idea would be:
+
+```bash
+rsnapshot -c "$config" configtest || exit 1
+rsnapshot -c "$config" -t "$level" || exit 1
+test -e "$confirm" || exit 4
+rsnapshot -c "$config" "$level" || exit 1
+test -d "$published" || exit 6
+test ! -e "$lock" || exit 6
+```
+
+The rule is: test mode and explicit confirmation come before the changing
+operation; a missing snapshot or a remaining lock is an error. yesh does not
+roll back a rotation that has already completed and does not delete a
+quarantine.
+
+The full disposable Real-World Example is
+[`yesh-rsnapshot-loopback-rwe.sh`](../scripts/yesh-rsnapshot-loopback-rwe.sh).
+It uses an ext4 loopback device and checks two rotations, restore, hard links,
+an invalid configuration, missing confirmation, a held lock, and resource
+cleanup. It does not use real disks or `/etc/rsnapshot.conf`.
+
 ## 14. Reading an unfamiliar script
 
 Ask five questions before you run a yesh script:

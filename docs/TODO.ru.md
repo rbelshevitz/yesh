@@ -315,7 +315,7 @@ release deploy с rollback, initrd preflight, cron backup и network preflight.
 - [ ] Закрепить для каждого B1/B2/B7 исходный URL и commit в
   `docs/bash-corpus.ru.md`, затем сравнить Bash baseline и независимую yesh
   adaptation по одной failure matrix.
-- [ ] Не расширять yesh до osync/deploy framework: ценность RWE — в понятных
+- [ ] Не расширять yesh до osync/deploy framework: ценность Р.П.П. — в понятных
   переходах `preflight → lock → transfer → partial failure → publish →
   retention → restore → verification`.
 
@@ -324,7 +324,7 @@ release deploy с rollback, initrd preflight, cron backup и network preflight.
 Длинный список ниже — карта возможных работ, а не обещание сделать всё. После
 фиксации scope приоритет задаётся тем, что усиливает формулу **Linux
 automation you can explain** и подтверждается Р.П.П. / Real-World Examples
-(RWE).
+(Р.П.П.).
 
 ### Веха 1: закрыть доказательство текущей модели
 
@@ -355,7 +355,7 @@ automation you can explain** и подтверждается Р.П.П. / Real-Wo
 - [ ] Определить политику `PATH`, environment и привилегированного запуска;
   не добавлять скрытый `sudo`.
 - [ ] Реализовать согласованные бюджеты длительных операций только после
-  отдельного RWE: timeout команды, ожидание lock, отсутствие прогресса,
+  отдельного Р.П.П.: timeout команды, ожидание lock, отсутствие прогресса,
   общий срок задания и наблюдаемая отмена.
 
 ### Веха 4: расширять Linux-область только вокруг доказанных проблем
@@ -363,10 +363,10 @@ automation you can explain** и подтверждается Р.П.П. / Real-Wo
 Порядок кандидатов: `rsync`/`rsnapshot`, `systemctl`/`journalctl`,
 `ssh`/`scp`, read-only storage (`findmnt`, `lsblk`, `blkid`, `df`, fstab),
 затем read-only сеть (IP/CIDR, интерфейсы, маршруты, listeners, DNS/TCP),
-cron и запросы пакетного менеджера. Каждая новая область начинается с RWE,
+cron и запросы пакетного менеджера. Каждая новая область начинается с Р.П.П.,
 а не с проектирования большого DSL.
 
-### Ближайший remote RWE: Debian через WSL2 Ubuntu
+### Ближайший remote Р.П.П.: Debian через WSL2 Ubuntu
 
 - [x] Собрать Linux-бинарь yesh с `-trimpath` и передать бинарь вместе с
   `scripts/yesh-fixture-test.sh` на отдельный Debian-сервер по SSH; не менять
@@ -395,9 +395,9 @@ cron и запросы пакетного менеджера. Каждая но�
 - автоматический `sudo`, широкий mount/boot/cgroup manager;
 - TTY/PTY, terminal job control и полноценное управление чужими процессами;
 - широкая SELinux/AppArmor-автоматизация;
-- устойчивое resume/state protocol до появления RWE, которому оно необходимо.
+- устойчивое resume/state protocol до появления Р.П.П., которому оно необходимо.
 
-Критерий перехода к следующей области: текущая веха имеет runnable RWE,
+Критерий перехода к следующей области: текущая веха имеет runnable Р.П.П.,
 отрицательный сценарий, проверку `--plan`, обновлённую документацию и ясное
 описание ограничений. Наличие свободного места в грамматике не является
 основанием добавлять новую возможность.
@@ -439,13 +439,19 @@ cron и запросы пакетного менеджера. Каждая но�
 - [x] Зафиксировать единый контракт адаптации: disposable/read-only fixture,
   `--plan`, положительный и отрицательный путь, наблюдаемый результат,
   безопасный rerun и честная граница доказанного.
-- [ ] Довести B1 — incremental backup/restore — до единого runnable
+- [x] Довести B1 — incremental backup/restore — до единого runnable
   acceptance-case: Bash-сравнение, yesh-файл, plan, failure matrix и restore.
-- [ ] Довести B3 — validation → publish → service restart → postcondition →
-  journal — на disposable systemd fixture без нового DSL.
-- [ ] Довести B5 — read-only диагностика failed service — и проверить, хватает
+  Реальный Debian loopback-прогон `scripts/yesh-rsync-mounted-rwe.sh` подтвердил
+  две версии, `--link-dest`, восстановление, отсутствие публикации при rsync
+  23 и очистку временного стенда.
+- [x] Довести B3 — validation → publish → service restart → postcondition →
+  journal — на disposable systemd fixture без нового DSL. Реальный Debian
+  прогон подтвердил план, атомарную публикацию, активное состояние службы,
+  журнал и отказ на неверной конфигурации.
+- [x] Довести B5 — read-only диагностика failed service — и проверить, хватает
   ли текущих process snapshot, journal, storage и раздельных stderr для
-  полезного incident report.
+  полезного incident report. Acceptance-сценарий использует временную
+  неисправную systemd-службу и удаляет её после проверки.
 - [ ] После B1/B3/B5 составить таблицу повторяющихся пробелов языка; только
   повторённая минимум в двух независимых workflow проблема становится
   кандидатом на новую встроенную операцию.
@@ -506,14 +512,14 @@ readonly mount, effective options и write probe только внутри вр�
 Последний checkpoint:
 
 ```text
-Цель: закрыть базовый Linux network/cron RWE и синхронизировать контракт.
+Цель: закрыть базовый Linux network/cron Р.П.П. и синхронизировать контракт.
 Сделано: добавлены typed IP/CIDR, read-only отчёты ip/ss, отдельный arp-scan
-пример с проверкой внешней зависимости, cron RWE и политика sudo; обновлены
+пример с проверкой внешней зависимости, cron Р.П.П. и политика sudo; обновлены
 три man-страницы.
 Решения: arp-scan остаётся внешней активной L2-утилитой; yesh не ставит пакеты,
 не выбирает сеть молча и не повышает права. Документация ориентирована на
 Debian/Ubuntu и Rocky/Alma, но проверка пакета остаётся обязанностью хоста.
-Открыто: реальный ограниченный arp-scan RWE с явно заданной целью; NFS/FUSE,
+Открыто: реальный ограниченный arp-scan Р.П.П. с явно заданной целью; NFS/FUSE,
 полный failure matrix обрыва rsync и типизированный crontab остаются вне текущей
 вехи.
 Проверки: `go test ./...`, `go vet ./...`, `go build -trimpath -buildvcs=false
@@ -635,8 +641,11 @@ argv предотвращает повторный разбор команд she
   `regexp` из стандартной библиотеки; стороннюю зависимость добавлять только
   при доказанной потребности и после сравнения безопасности, лицензии и
   читаемости API.
-- [ ] Структурированная диагностика: код выхода, сигнал, превышение времени,
-  стандартный поток ошибок, длительность, стадия конвейера.
+- [x] Структурированная диагностика: код выхода, сигнал, превышение времени,
+  стандартный поток ошибок и стадия конвейера; `--diagnostic json` сохраняет
+  безопасный `argv` и отмечает усечение `stderr`.
+- [x] Добавить длительность выполнения в структурированную диагностику;
+  в JSON она выдаётся в миллисекундах как `duration_ms`.
 - [x] Linux-тесты конвейеров: SIGPIPE, зависшая запись, превышение времени,
   ошибка запуска после старта части процессов.
 - [x] Проверки гонок и утечек: повторные конвейеры, файловые дескрипторы,
@@ -732,7 +741,7 @@ SCP и rsync, а не для замены `iproute2` или настройки �
 - `ip -j neigh show` — таблица соседей;
 - при отдельной необходимости — `ip -j link show`, без `set`, `add`, `del`.
 
-Не включать в yesh network RWE `ip address add|change|replace|delete`,
+Не включать в yesh network Р.П.П. `ip address add|change|replace|delete`,
 `ip route add|change|replace|delete|flush`, `ip link set`, `ip neigh add|change|
 replace|delete`, `ip rule`/`route` policy management, `ip monitor`, `ip netns`,
 `ip xfrm`, `ip tunnel`, `ip link` создание устройств и любые формы, меняющие
@@ -740,7 +749,7 @@ firewall, namespace, адрес, маршрут или состояние инт
 форма должна оставаться обычной внешней командой только при явном решении
 оператора, а не становиться скрытым встроенным действием.
 
-### Активное обнаружение через `arp-scan` — отдельный RWE
+### Активное обнаружение через `arp-scan` — отдельный Р.П.П.
 
 `arp-scan` не является чтением neighbour-таблицы: он отправляет ARP-запросы
 целям. Это отдельный активный сценарий для поиска IPv4-хостов в локальном
@@ -752,21 +761,22 @@ firewall, namespace, адрес, маршрут или состояние инт
   интерфейса; ограничить размер диапазона и время/число повторов.
 - [ ] Оставить `arp-scan` внешней командой; yesh не реализует raw sockets,
   ARP или таблицу производителей MAC.
-- [x] В первом примере явно проверять наличие `arp-scan` через `exists` по
-  абсолютному пути и
-  сообщать имя отсутствующей внешней утилиты и пакет-подсказку для
-  Debian/Ubuntu (`apt`) и Rocky/Alma (`dnf`); установки пакетов yesh не
-  выполняет.
+- [x] Для отсутствующей внешней команды показывать короткую пакетную
+  подсказку только для подтверждённой зависимости, семейства ОС и доступного
+  менеджера; не перечислять неподходящие семейства и не устанавливать пакеты.
+- [x] Добавить Linux-запускатель rsnapshot с временным ext4 loopback-образом,
+  `--plan`, двумя ротациями, восстановлением и проверкой освобождения loop и
+  lock-файла; реальные диски и `/etc/rsnapshot.conf` не используются.
 - [x] Добавить оболочечный запускатель с обязательными interface, IPv4 и MAC:
   одиночный адрес превращается в `/32`, неверные значения отклоняются до
   запуска, а `/usr/sbin` добавляется в PATH без скрытого sudo.
 - [ ] Требовать явное privileged-разрешение: yesh не вызывает `sudo` сам;
   оператор запускает весь сценарий через `sudo -n` либо заранее выдаёт только
   `CAP_NET_RAW` самому `arp-scan`.
-- [x] Fixture положительного и отрицательного RWE: найденный MAC, отсутствующий MAC,
+- [x] Fixture положительного и отрицательного Р.П.П.: найденный MAC, отсутствующий MAC,
   неверный интерфейс/CIDR, отказ прав и пустой результат; пустой результат не
   считать доказательством отсутствия хоста.
-- [x] Не публиковать реальные адреса и MAC в документации и примерах: RWE
+- [x] Не публиковать реальные адреса и MAC в документации и примерах: Р.П.П.
   принимает interface, IPv4 и MAC параметрами. Заготовки
   `yesh-arp-scan-rwe.sh`, `arp-scan-by-mac.yesh` и безопасный fixture уже
   загружены на Debian для будущего запуска с третьей машины.
@@ -1208,52 +1218,52 @@ Bind mount всей ФС не отличим от обычного mount. Вст
   будут затронуты; в плане не выполнять внешние команды.
 - [x] Р.П.П.: локальный стенд, обрыв передачи, lock, повторный запуск и
   проверка восстановления.
-- [x] RWE remote pull: отдельный Debian, `BatchMode=yes`, `ConnectTimeout=5`,
+- [x] Р.П.П. remote pull: отдельный Debian, `BatchMode=yes`, `ConnectTimeout=5`,
   `StrictHostKeyChecking=yes`, SSH/SCP checksum, remote source, два pull с
   `--link-dest`, partial remote read failure без публикации и missing-source
   negative; временные каталоги удаляются после теста.
-- [ ] RWE: заполненное место, незамонтированный backup-диск и отдельный
+- [ ] Р.П.П.: заполненное место, незамонтированный backup-диск и отдельный
   тестовый SSH-сервер остаются дополнительными окружениями, не подменяются
   удалённым pull-тестом.
 
-RWE `Backup to a Verified Mounted Filesystem` пройден на удалённом Debian:
+Р.П.П. `Backup to a Verified Mounted Filesystem` пройден на удалённом Debian:
 реальный yesh и loop/ext4 mount, positive rsync, `--plan` без записи,
 wrong-UUID, readonly, unmounted и low-space negative без ложного запуска
 backup и с сохранностью уже опубликованного файла. Пример —
 [`backup-mounted-rwe.yesh`](../examples/backup-mounted-rwe.yesh), fixture —
 `scripts/yesh-mounted-backup-rwe.sh`.
 
-RWE B1 `Mounted Incremental Rsync and Restore` также пройден: два запуска
+Р.П.П. B1 `Mounted Incremental Rsync and Restore` также пройден: два запуска
 реального yesh/rsync на mounted ext4, `--plan`, `--link-dest`, общий inode
 неизменённого файла, restore и missing-source code 23 без публикации нового
 snapshot. Fixture — `scripts/yesh-rsync-mounted-rwe.sh`.
 
-RWE B2 `Mounted Rsnapshot Rotation and Quarantine` пройден: реальный
+Р.П.П. B2 `Mounted Rsnapshot Rotation and Quarantine` пройден: реальный
 `rsnapshot`/yesh на mounted ext4, две rotation, `--plan`, same-filesystem
 quarantine, restore старой версии и cleanup lock/mount без busy. Fixture —
 `scripts/yesh-rsnapshot-mounted-rwe.sh`.
 
-RWE B8 `Selected Snapshot Restore` пройден локально и на Debian: реальный
+Р.П.П. B8 `Selected Snapshot Restore` пройден локально и на Debian: реальный
 yesh/rsync, `--plan` без записи, восстановление выбранной версии с проверкой
 checksum, а также отказ для symlink, непустого target и отсутствующего source.
 Fixture — `scripts/yesh-selected-restore-rwe.sh`, пример —
 `examples/rsync-selected-restore.yesh`. Remote pull с отдельной host-key и
-partial-transfer матрицей уже закрыт отдельным RWE B7.
+partial-transfer матрицей уже закрыт отдельным Р.П.П. B7.
 
-RWE B3 `Config Publish and Systemd Postcondition` пройден на disposable
+Р.П.П. B3 `Config Publish and Systemd Postcondition` пройден на disposable
 Debian unit: validator, `--plan`, staging через `install`, атомарный publish,
 typed restart/status, bounded JSON journal и invalid-config negative без
 изменения active-файла. Fixture — `scripts/yesh-config-systemd-rwe.sh`,
 пример — `examples/config-systemd-rwe.yesh`.
 
-RWE B4 `Remote Release Deploy and Rollback` пройден из operator workspace на
+Р.П.П. B4 `Remote Release Deploy and Rollback` пройден из operator workspace на
 Debian target: строгая SSH host-key policy, remote staging через
 `rsync --delay-updates`, атомарное переключение `current`, rollback,
 `--plan` без remote changes и missing-source negative. Fixture —
 `scripts/yesh-deploy-release-rwe.sh`, пример —
 `examples/deploy-release-rwe.yesh`; service restart остаётся отдельным B3.
 
-RWE B5 `Read-only Incident Report` пройден на Linux/systemd: bounded status и
+Р.П.П. B5 `Read-only Incident Report` пройден на Linux/systemd: bounded status и
 JSON journal, typed process snapshot, `findmnt`/`df`, отдельные stdout/stderr,
 внешний `tar`-архив, `--plan` без файлов и отказ для отсутствующего unit. Новый
 встроенный механизм архива не добавлялся; испытательный скрипт —
@@ -1262,33 +1272,35 @@ JSON journal, typed process snapshot, `findmnt`/`df`, отдельные stdout/
 
 ### Следующая область: B9 — архив наблюдений без изменений
 
-- [ ] Добавить в архив снимок интерфейсов и адресов через явный
+- [x] Добавить в архив снимок интерфейсов и адресов через явный
   `ip ... address show`/JSON, без `add`, `change`, `replace` или `flush`.
-- [ ] Добавить таблицу маршрутов через `ip ... route show`; не выполнять
+- [x] Добавить таблицу маршрутов через `ip ... route show`; не выполнять
   изменение маршрутов и не скрывать отказ доступа.
-- [ ] Добавить ограниченный список слушающих сокетов через `ss`; отсутствие PID/
+- [x] Добавить ограниченный список слушающих сокетов через `ss`; отсутствие PID/
   сведения о PID и процессах из-за прав считать ограничением отчёта, а не поводом для
   автоматического `sudo`.
-- [ ] Добавить один явно заданный DNS-адрес через `resolvectl query` или
-  `getent ahosts`; не принимать произвольный список целей и не менять службу
-  разрешения имён.
-- [ ] Добавить один явно заданный TCP-адрес с конечным временем ожидания;
-  превышение времени,
-  DNS-ошибка и отказ доступа должны иметь отдельные наблюдаемые статусы.
-- [ ] Сохранить раздельные stdout/stderr, ограничить объём вывода, сохранить
+- [x] Добавить один явно заданный DNS-адрес через `getent ahosts`; не
+  принимать произвольный список целей и не менять службу разрешения имён.
+- [x] Добавить один явно заданный TCP-адрес с конечным временем ожидания;
+  превышение времени, DNS-ошибка и отказ доступа имеют отдельные наблюдаемые
+  статусы. Endpoint Р.П.П. проверен на Debian с рабочим `127.0.0.1:22` и
+  зависшим TEST-NET `192.0.2.1:9` с ограничением `1s`.
+- [x] Сохранить раздельные stdout/stderr, ограничить объём вывода, сохранить
   `--plan`, опись, архив и отметку неполного отчёта из B5; не добавлять общий
   язык отчётов.
-- [ ] Не включать в этот RWE firewall/nftables, перехват пакетов, изменение DNS,
+- [ ] Не включать в этот Р.П.П. firewall/nftables, перехват пакетов, изменение DNS,
   маршрутов или адресов, полное окружение процессов, сетевые пространства имён
   и автоматическую SSH-проверку.
-- [ ] Для положительного и отрицательного сценариев использовать временную
+- [x] Для положительного и отрицательного сценариев использовать временную
   цель; сетевой снимок считать наблюдением конкретного Linux-хоста, а не
-  доказательством доступности сети или готовности production-системы.
+  доказательством доступности сети или готовности production-системы. Базовый
+  архив наблюдений и отрицательный случай отсутствующего `ip` пройдены на
+  Debian через `scripts/yesh-network-observation-rwe.sh`.
 
 Текущий прототип B11 — `examples/rsync-network-preflight.yesh`: локальная
 проверка защитных правил, `--plan` с обеими ветвями отказа и пробный запуск без
 записи на Debian (`getent` → `ip route get` → SSH-проверка пути →
-`rsync --dry-run`) уже пройдены. Это ещё не полный RWE резервного копирования:
+`rsync --dry-run`) уже пройдены. Это ещё не полный Р.П.П. резервного копирования:
 остаются отдельные испытания отказа DNS/маршрута/SSH/удалённого пути/частичной
 передачи и проверка, что после них снимок не публикуется.
 
@@ -1298,17 +1310,17 @@ JSON journal, typed process snapshot, `findmnt`/`df`, отдельные stdout/
 стартует rsync, а коды rsync `23` и `30` не маскируются. Это не заменяет реальный сетевой
 обрыв или рабочую сеть, но фиксирует порядок и отсутствие запасного обхода.
 
-Минимальный сетевой RWE также пройден на Debian: положительный удалённый
-`rsync` записал только временный локальный каталог и опубликовал его после
-успеха; `--plan` ничего не создал; отсутствующий удалённый путь не создал ни
-снимок, ни partial-каталог. Испытательный скрипт —
+Минимальный сетевой Р.П.П. пройден из второго WSL на Debian: положительный
+удалённый `rsync` записал только временный локальный каталог и опубликовал его
+после успеха; `--plan` ничего не создал; отсутствующий удалённый путь и
+частичный перенос с кодом 23 не создали готовый снимок; partial-каталог остался
+для диагностики, а повтор после восстановления прав успешно опубликовал новый
+снимок. Испытательный скрипт —
 `scripts/yesh-rsync-networked-incremental-rwe.sh`, пример —
-`examples/rsync-networked-incremental-rwe.yesh`. Обрыв посередине передачи и
-полная проверка частичного `rsync` остаются открытыми. Для рабочего запуска
-явно задан `rsync --timeout=30`: SSH `ConnectTimeout` ограничивает только
-установление соединения, а не последующее молчание канала. Автоматический
-повтор после обрыва пока запрещён; сначала нужна проверка staging и старого
-опубликованного снимка.
+`examples/rsync-networked-incremental-rwe.yesh`. Для рабочего запуска явно
+задан `rsync --timeout=30`: SSH `ConnectTimeout` ограничивает только
+установление соединения, а не последующее молчание канала. Реальный обрыв
+канала и восстановление после перезапуска машины остаются отдельной проверкой.
 
 ## Реальные практические примеры
 
@@ -1317,7 +1329,7 @@ JSON journal, typed process snapshot, `findmnt`/`df`, отдельные stdout/
   подключение и SCP через yesh на отдельную машину выполнены с ключевой
   авторизацией и сверены checksum.
   Remote pull/restore с отдельной host-key и partial-transfer матрицей пока не
-  заявляется; локальный выбранный restore закрыт отдельным RWE B8.
+  заявляется; локальный выбранный restore закрыт отдельным Р.П.П. B8.
 
 Для контролируемой тестовой машины есть opt-in реальный тест:
 
@@ -1344,10 +1356,13 @@ SHA-256 через SSH. Адреса, логины и ключи в репози
 - [x] pv: реальная передача двоичных данных, прогресс в stderr отдельно от данных.
 - [x] rsnapshot: configtest, две ротации, старое/новое содержимое,
   повторное использование hard links и освобождение lock.
-- [ ] Упростить работу с rsnapshot без замены engine: исполняемый wrapper на
-  yesh должен проверить snapshot root/mount и зависимости, запустить
-  `rsnapshot -c CONFIG configtest`, показать `rsnapshot -c CONFIG -t LEVEL` и
-  требовать явный apply-шаг для `rsnapshot -c CONFIG LEVEL`.
+- [x] Упростить работу с rsnapshot без замены engine: исполняемый wrapper на
+  yesh проверяет snapshot root/mount и зависимости, запускает
+  `rsnapshot -c CONFIG configtest`, показывает `rsnapshot -c CONFIG -t LEVEL` и
+  требует явный apply-шаг для `rsnapshot -c CONFIG LEVEL`. Полный disposable
+  прогон — `scripts/yesh-rsnapshot-loopback-rwe.sh`; на Debian подтверждены
+  `--plan`, две ротации, восстановление, hard links, invalid config, отсутствие
+  confirmation, занятый lock и cleanup loop/mount.
 - [ ] Перед apply показывать effective-конфигурацию rsnapshot: destructive
   флаги в `rsync_long_args`, семантику interval при `sync_first`,
   `no_create_root`, права родителя lockfile, владельца snapshot root и ошибки
@@ -1596,7 +1611,7 @@ crash-durability и retention остаются отдельными задача
 
 - [x] Проверки минимального окружения cron, конфликта блокировки и внешнего
   ограничения времени без изменения crontab.
-- [x] RWE cron-runbook: `env -i`, внешние `flock`/`timeout`, внутренний lock,
+- [x] Р.П.П. cron-runbook: `env -i`, внешние `flock`/`timeout`, внутренний lock,
   положительная публикация, занятый lock, отсутствующий source и timeout без
   публикации; реальный crontab не изменяется. Fixture —
   `scripts/yesh-cron-backup-rwe.sh`.
@@ -1617,7 +1632,7 @@ crash-durability и retention остаются отдельными задача
   [русская версия](../man/ru/yesh.1) и [карта внешних руководств](man-pages.ru.md).
 - [ ] Установка справочных страниц вместе с бинарным файлом в выбранный каталог.
 
-### Синхронизация man-страниц после сетевого и cron RWE
+### Синхронизация man-страниц после сетевого и cron Р.П.П.
 
 - [x] Обновить `man/yesh.1` и `man/ru/yesh.1` для типов `ip`/`cidr`,
   `contains`, `masked`, `overlaps`, `first`, `last` и предикатов классов
@@ -1626,7 +1641,7 @@ crash-durability и retention остаются отдельными задача
   семейств IPv4/IPv6, host bits, `/31`/`/32`, IPv6 zone и ошибками смешения.
 - [x] Добавить в обе yesh(1) практический сетевой пример: `ip -j address
   show`, `ip -j route show`, `ip -j neigh show`, ограниченный `ss`.
-- [x] Добавить cron RWE: `env -i`, абсолютные пути, внешний `flock`/`timeout`,
+- [x] Добавить cron Р.П.П.: `env -i`, абсолютные пути, внешний `flock`/`timeout`,
   внутренний lock yesh, коды `75`/`124`, partial без публикации и запрет
   изменения crontab.
 - [x] Добавить политику `sudo`: yesh не повышает права сам, `sudo -n` для
@@ -1651,10 +1666,10 @@ Unix-утилит в текущий план не входят.
 - [x] Отдельное WSL2-подтверждение: полный тестовый и race-набор, `/proc`,
   cgroup v2, systemd/journal, process groups/signals и практические fixture
   прошли; реальные адреса, логины и ключи в документацию не попадают.
-- [ ] Для следующего remote RWE использовать WSL2 как Linux-клиент: сначала
+- [ ] Для следующего remote Р.П.П. использовать WSL2 как Linux-клиент: сначала
   read-only probe и SSH-agent/key без секретов в репозитории, затем передача
   бинаря и только disposable fixture с cleanup. Это отдельная проверка
-  удалённого Debian и не переоткрывает закрытый process RWE.
+  удалённого Debian и не переоткрывает закрытый process Р.П.П..
 - [ ] В WSL установить/проверить procps, kmod, udev, util-linux,
   tmux, screen, rsyslog и средства чтения journal.
 - [x] В Linux CI запускать проверки групп процессов, SIGPIPE,
@@ -1681,9 +1696,11 @@ Unix-утилит в текущий план не входят.
   ту же форму данных, что и Linux-реализация, хотя сама операция на Windows
   возвращает понятную ошибку о неподдерживаемой платформе.
 - [x] Подтвердить зелёный CI для коммита `87807ca`.
-- [ ] Следующий рабочий шаг: failure matrix для сетевого `rsync` — обрыв,
-  частичная передача, повторный запуск и отсутствие публикации незавершённого
-  дерева.
+- [x] Failure matrix для сетевого `rsync`: положительная публикация, отсутствие
+  удалённого пути, частичная передача с кодом 23, сохранение partial без
+  публикации и успешный повтор после исправления причины.
+- [ ] Отдельно проверить реальный обрыв канала и восстановление после
+  перезапуска машины.
 
 ## Следующая веха: независимое написание сценариев
 
@@ -1755,10 +1772,10 @@ Unix-утилит в текущий план не входят.
   обрыв SSH/rsync во время передачи, коды 23/24/30/35, partial-файлы,
   повторный запуск и отсутствие публикации незавершённого дерева. Нужны
   положительный результат, содержимое после сбоя и проверка cleanup.
-- [ ] **sudo и cron/CI — операторский контракт.** Сделать RWE для `sudo -n`,
+- [ ] **sudo и cron/CI — операторский контракт.** Сделать Р.П.П. для `sudo -n`,
   одинакового контекста `--plan`/применения, явных `PATH`/`HOME`, локального
   root и удалённого пользователя; не добавлять скрытое повышение прав.
-- [ ] **Третья машина — реальный сетевой RWE.** Запустить параметризованный
+- [ ] **Третья машина — реальный сетевой Р.П.П..** Запустить параметризованный
   ARP `/32` и remote pull/restore с отдельного L2-хоста; проверить DNS,
   маршрут, SSH, отказ доступа и отсутствие публикации при ошибке.
 - [ ] **NFS/FUSE — только отдельным стендом.** Сначала read-only наблюдение и

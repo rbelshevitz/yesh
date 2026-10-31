@@ -4,6 +4,7 @@ yesh \- readable Linux automation with bounded process pipelines
 .SH SYNOPSIS
 .B yesh
 .RB [ \-\-plan ]
+.RB [ \-\-diagnostic\ text|json ]
 .I SCRIPT.yesh
 .SH DESCRIPTION
 .B yesh
@@ -24,6 +25,13 @@ release. yesh is not an operating-system isolation boundary for untrusted code.
 Validate commands and print expanded argument vectors and redirections
 without running commands or opening redirected files.
 Both branches of a command-based condition are shown.
+.TP
+.B \-\-diagnostic text|json
+Select the error format. The default is `text`.
+`json` emits one JSON object with the message, pipeline stage, safe `argv`,
+exit code or signal, timeout flag, bounded `stderr`, duration in milliseconds,
+and truncation flag.
+Secret environment values are omitted from `argv`.
 .SH LANGUAGE
 .SS Values and arguments
 .nf
@@ -307,28 +315,41 @@ state. IPv6 zones in CIDR values, mixed address families and invalid prefixes
 are errors.
 .PP
 Active neighbour discovery with arp-scan remains an external, separate
-example. It must receive an explicit interface and IPv4 CIDR, check an
-executable path with exists, and explain a missing package:
+example. It must receive an explicit interface and IPv4 CIDR. If the external
+command is missing, yesh may give a short package hint for a known Linux
+family:
 .nf
 arp-scan --interface $interface --numeric --quiet $network
 .fi
 .PP
-On Debian/Ubuntu, Rocky and Alma Linux the package is normally named arp-scan
-in a configured repository. arp-scan sends active Layer-2 ARP requests only on
-the specified local network, may require CAP_NET_RAW, and cannot discover hosts
-beyond a router. yesh does not install packages, silently select --localnet,
-or elevate privileges.
+The package name and install command are selected only for a confirmed family
+and an available package manager; yesh does not install packages. arp-scan
+sends active Layer-2 ARP requests only on the specified local network, may
+require CAP_NET_RAW, and cannot discover hosts beyond a router. yesh does not
+silently select --localnet or elevate privileges.
 .PP
 Documentation examples do not contain addresses or MACs from a particular
 infrastructure. For a real test, an operator supplies the interface, IPv4
 address and MAC to a wrapper; a single IPv4 target is restricted to /32.
 A positive ARP test requires another host on the same Layer-2 segment. Running
 the scan on the target host does not prove that the host is discoverable.
+.SS rsnapshot
+The example `examples/rsnapshot-apply.yesh` is a Real-World Example of a
+guarded `rsnapshot` interval. Its goal is to make a potentially changing
+operation explainable before it is applied. yesh simplifies the workflow by keeping
+the preflight order, test mode, explicit confirmation, and postcondition in
+ordinary blocks; `rsnapshot` arguments remain visible and a failure stops the
+next action.
+.PP
+yesh does not parse or rewrite `rsnapshot.conf`, perform rotation itself, or
+roll back a completed operation. The full disposable Real-World Example uses
+an ext4 loopback fixture: `scripts/yesh-rsnapshot-loopback-rwe.sh`.
 .SS External programs, packages and sudo
 An external command is part of the example's contract. A missing executable
-must stop before the useful operation or select an explicit dependency-error
-branch. A package hint is informational, not an installation request. Package
-names and binary paths must still be checked on the host.
+stops the script before the useful operation. For the small dependency set used
+by the practical examples, yesh may add one quiet package hint based on the
+current Linux family. The hint is informational, not an installation request;
+unknown cases remain an ordinary missing-executable error.
 .PP
 yesh never invokes sudo or prompts for a password automatically. If a step
 needs privilege, the operator supplies the execution context explicitly. For
