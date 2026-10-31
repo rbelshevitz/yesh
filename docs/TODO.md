@@ -1,83 +1,55 @@
 # Current yesh roadmap
 
-This is the short working roadmap. Detailed decisions, completed checks, and
-historical planning remain in the [archived roadmap](TODO-history.md).
+This is the short working map. Historical decisions and completed checks are
+kept in the [archive](TODO-history.md); this file is not a promise to implement
+every item listed below.
 
 ## Current position
 
-yesh is a readable language for sequential Linux automation. Linux commands
-remain visible, while yesh makes arguments, ordering, preconditions, and
-failure behavior easier to review.
+yesh is a readable language for sequential Linux automation. External Linux
+commands remain visible; yesh makes arguments, ordering, preconditions,
+publication boundaries, and failure behavior easier to review.
 
-Confirmed today:
+Confirmed:
 
-- assignments, strings, lists, `if`, `for`, commands, pipelines,
-  redirections, and `--plan`;
-- direct Go-runtime process execution without passing the script to Bash;
-- command and pipeline failure handling, time bounds, cancellation, and child
-  process cleanup;
-- `exists`, regular expressions, `exit code`, locking, and same-filesystem
-  publication;
-- practical workflows around `rsync`, `rsnapshot`, `tar`, `pv`, SSH/SCP,
-  systemd, journals, storage, and `/proc`;
-- every `examples/*.yesh` file is parsed by `TestAllExamplesParse`;
-- Linux CI, a separate Debian host, and an ext4 loopback fixture pass.
+- assignments, strings, lists, `if`, `for`, commands, pipelines, redirects,
+  `--plan`, `exists`, regular expressions, and explicit `exit code`;
+- direct Go-runtime process execution, bounded commands, cancellation, and
+  child-process cleanup;
+- advisory locks and same-filesystem `publish` without copy fallback;
+- practical scenarios around `tar`, `gzip`, `pv`, `rsync`, `rsnapshot`, SSH/SCP,
+  systemd, journals, storage, `/proc`, and read-only network observation;
+- Linux CI, WSL2, separate Debian fixtures, Rocky Linux checks, and loopback
+  ext4 scenarios;
+- more than 200 automated tests and four fuzz targets.
 
-These results do not promise universal OS support, power-loss durability,
-isolation of untrusted code, or success of an external utility in every host
-environment.
+The first public development release is `v0.1.0` for Linux amd64. Its GitHub
+draft contains the binary and checksums. ARM64 is not part of the release until
+the binary has been run on real ARM64 hardware or an ARM64 virtual machine.
 
-## Immediate priorities
+## Next after the pause
 
-### README as the project entry point
+1. Publish the existing `v0.1.0` GitHub draft.
+2. Prepare a production-like rsnapshot/storage scenario on a separate
+   filesystem, keeping durability limits explicit.
+3. Run an ARM64 smoke test and decide whether to add ARM64 to a later release.
+4. Consider controlled `PATH` and environment policy for privileged execution.
+5. Consider durable job identity and resume rules only after a concrete use case.
 
-- keep purpose, audience, one useful example, quick start, and links to detailed
-  documentation on the first screen;
-- distinguish the portable yesh layer, ordinary Unix utilities, and Linux-only
-  features;
-- verify quick-start commands in a clean environment;
-- keep the image and label environment-dependent examples honestly.
-
-Ready when a new reader understands the value of yesh and runs the first
-self-contained example before reading the architecture.
-
-### Backup and rsnapshot
-
-- show the actual `rsnapshot -t` output before a changing operation;
-- surface known deletion flags and check `snapshot_root`, mounts, lockfile,
-  ownership, and `no_create_root`;
-- prepare a production-like RWE on a separate filesystem with a known UUID;
-- test SSH sources, a full filesystem, an unmounted destination, partial
-  transfer, and rerun behavior.
-
-`rsync` and `rsnapshot` remain external engines. yesh does not mirror their
-configuration grammars or rotation implementations.
-
-### Storage reliability
-
-- define an `rsync --fsync` and directory-fsync profile;
-- inspect filesystem type and effective mount flags before changing data;
-- never describe an atomic rename as power-loss durability.
-
-## Later priorities
-
-- networked rsync failure matrix and safe retry behavior;
-- controlled `PATH` and environment policy for privileged execution;
-- durable job state, job identity, and resume rules;
-- typed operations only after two independent scenarios justify them;
-- read-only cron and package queries without hidden installation or mutation;
-- independent review of the tutorial by a Linux administrator.
+The networked `rsync` preflight, partial-transfer, failure, and retry scenarios
+have already been exercised on the disposable Debian stand. Do not add a new
+network language layer or repeat those checks without a specific new failure.
 
 ## Boundaries
 
-- yesh is not an interactive shell or a Bash-compatible language;
-- do not reimplement `rsync`, `rsnapshot`, `systemctl`, `mount`, `sed`, `awk`,
-  or a package manager;
-- do not add `cd`, `export`, command substitution, TTY/PTY, or other shell
-  features without a demonstrated need;
-- macOS/Darwin work is deferred;
-- root, real devices, systemd, SSH, and production paths require a separate
-  environment.
+- yesh is not an interactive shell, Bash replacement, sandbox, or backup engine;
+- `rsync`, `rsnapshot`, `systemctl`, `mount`, `sed`, `awk`, SSH, and package
+  managers remain external tools with their native semantics;
+- do not add `cd`, `export`, command substitution, TTY/PTY, or broad shell
+  compatibility without two independent practical scenarios;
+- do not claim power-loss durability, universal OS support, or success of an
+  external command in every environment;
+- macOS/Darwin work remains deferred.
 
 ## Evidence and documentation
 
@@ -86,4 +58,4 @@ configuration grammars or rotation implementations.
 - [execution safety](../SAFETY.md)
 - [syntax tutorial](syntax-guide.md)
 - [Russian roadmap](TODO.ru.md)
-- [archived roadmap](TODO-history.md)
+- [archived decisions and evidence](TODO-history.md)
