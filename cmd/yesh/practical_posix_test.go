@@ -1450,10 +1450,11 @@ func TestPOSIXPracticalRsnapshotGuardedApply(t *testing.T) {
 	}
 	config := filepath.Join(dir, "rsnapshot.conf")
 	confirm := filepath.Join(dir, "approved")
+	report := filepath.Join(dir, "rsnapshot-test.log")
 	trace := filepath.Join(dir, "trace")
 	writeTestFile(t, config, []byte("config_version 1.2\n"), 0600)
 	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nexit 0\n"), 0700)
-	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\nlast=\"\"\nfor last do :; done\nif [ \"$last\" = daily ]; then mkdir -p \"$YESH_RSNAPSHOT_PUBLISHED\"; fi\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'rsnapshot test plan'\nlast=\"\"\nfor last do :; done\nif [ \"$last\" = daily ]; then mkdir -p \"$YESH_RSNAPSHOT_PUBLISHED\"; fi\n"), 0700)
 	run := func() (int, string) {
 		cmd := practicalCommand(t, dir, practicalExample(t, "rsnapshot-apply.yesh"))
 		cmd.Env = append(os.Environ(),
@@ -1463,6 +1464,7 @@ func TestPOSIXPracticalRsnapshotGuardedApply(t *testing.T) {
 			"YESH_RSNAPSHOT_ROOT="+root,
 			"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
 			"YESH_RSNAPSHOT_LOCK="+filepath.Join(dir, "rsnapshot.pid"),
+			"YESH_RSNAPSHOT_REPORT="+report,
 			"YESH_RSNAPSHOT_PUBLISHED="+filepath.Join(root, "daily.0"),
 			"YESH_RSNAPSHOT_CONFIRM="+confirm,
 			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -1521,6 +1523,7 @@ func TestPOSIXPracticalRsnapshotGuardedApplyFreeSpaceFailureStopsRotation(t *tes
 	}
 	config := filepath.Join(dir, "rsnapshot.conf")
 	confirm := filepath.Join(dir, "approved")
+	report := filepath.Join(dir, "rsnapshot-test.log")
 	trace := filepath.Join(dir, "trace")
 	writeTestFile(t, config, []byte("config_version 1.2\n"), 0600)
 	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nexit 0\n"), 0700)
@@ -1535,6 +1538,7 @@ func TestPOSIXPracticalRsnapshotGuardedApplyFreeSpaceFailureStopsRotation(t *tes
 		"YESH_RSNAPSHOT_ROOT="+root,
 		"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
 		"YESH_RSNAPSHOT_CONFIRM="+confirm,
+		"YESH_RSNAPSHOT_REPORT="+report,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"TRACE_FILE="+trace,
 	)
