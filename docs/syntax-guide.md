@@ -288,8 +288,11 @@ YESH_BACKUP_SOURCE=source YESH_BACKUP_TARGET=backup ./yesh environment-check.yes
 ```
 
 The environment variable name is written without `$` because it is part of the
-declaration. A missing or empty value is an immediate error; the script does
-not start with a partially prepared set of values.
+declaration. A missing or empty value is an error when that assignment is
+evaluated. This does not mean that all required values were checked before the
+first command: commands with side effects earlier in the script may already
+have run. To guarantee a check before any change, read all required values at
+the beginning or use a separate preflight script with no mutating commands.
 
 ## 10. Regular expressions and `matches`
 
@@ -309,6 +312,11 @@ else:
 Patterns use Go RE2 syntax and are checked when assigned. The string
 `"a matches b"` remains data; it does not become an operator.
 
+A regular expression is for matching or extracting text. It does not define
+the language structure and should not replace ordinary string, list, file, or
+process operations. If an explicit comparison or a visible Linux command is
+clearer, use that instead of adding another regex condition.
+
 ## 11. Plans and error messages
 
 Use `--plan` to inspect the action order and expanded arguments:
@@ -322,7 +330,9 @@ external command stage, it shows the exact `argv` yesh would pass to the
 program. A built-in yesh operation, such as `publish`, is shown as a planned
 yesh action with its parameters, not as an external `argv`. The plan cannot
 guarantee that the network, filesystem, service, or external program will still
-be available when the real run starts.
+be available when the real run starts. It shows the possible execution
+structure: conditional actions include both branches. It does not predict
+which branch the real run will select.
 
 This is not mainly a way to shorten a three-line script: a small Bash example
 may be just as short. The benefit appears as the workflow grows, because yesh
@@ -527,6 +537,20 @@ language rules, stop and clarify it before running it.
 
 ## 15. Pre-run checklist
 
+The word “check” covers several different mechanisms here:
+
+| Mechanism | What it establishes |
+| --- | --- |
+| Parsing | Correct syntax and supported constructs |
+| `--plan` | Intended actions and arguments without execution; both conditional branches are shown as possibilities |
+| Preconditions | System state at the time of the check, such as an existing path or the expected filesystem |
+| Postcondition | An observable result after an action, such as service state or a published file |
+| Fixture test | Behavior of a particular script in a tested environment |
+
+None of these replaces the others: successful parsing does not check the host,
+the plan does not run commands, and a fixture test does not promise identical
+behavior on another system.
+
 Before you run it for real, check that:
 
 - required environment variables are set and non-empty;
@@ -534,7 +558,8 @@ Before you run it for real, check that:
 - each external command receives the arguments you expect;
 - commands that change data use temporary paths until publication;
 - an external failure cannot produce a false success message;
-- `--plan` shows the same order of actions you are about to run.
+- `--plan` shows the possible action structure and both conditional branches;
+  it does not claim which branch the real run will select.
 
 If the script needs `sudo`, run yesh in an environment that already has the
 required privileges, then inspect the plan and the real run there. yesh does

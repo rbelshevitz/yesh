@@ -269,8 +269,10 @@ preconditions, sequencing, failure policy and postcondition readable:
 
 The selection rule is deliberately narrow: add a typed operation only when the
 same readability or safety problem appears in at least two real workflows.
-Otherwise the Linux utility remains an ordinary visible command. yesh should
-orchestrate difficult commands, not grow a parallel implementation of `rsync`,
+That is a strict admission rule, not a suggestion: an inconvenient command is
+not by itself evidence for new yesh syntax. Otherwise the Linux utility remains
+an ordinary visible command. yesh should orchestrate difficult commands, not
+grow a parallel implementation of `rsync`,
 `systemctl`, `mount`, `sed`, `awk` or a package manager.
 
 ## Platform and documentation

@@ -152,7 +152,7 @@ Run a self-contained example that does not need systemd or installed services:
 On a systemd host, after choosing your service names, run
 `./yesh examples/service-check.yesh`. This checks state; it does not start services.
 
-Preview the service script in **dry-run** mode (no systemd access required):
+Preview the service script with `--plan` (no systemd access required):
 inspect expanded commands and branches without running external programs:
 
 ```text

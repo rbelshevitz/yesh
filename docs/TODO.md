@@ -30,17 +30,24 @@ the binary has been run on real ARM64 hardware or an ARM64 virtual machine.
 ## Next after the pause
 
 1. Publish the existing `v0.1.0` GitHub draft.
-2. Prepare a production-like rsnapshot/storage scenario on a separate
+2. Consolidate three canonical single-host workflows: backup/restore,
+   configuration publication with a service postcondition, and incident
+   diagnostics.
+3. Prepare a production-like rsnapshot/storage scenario on a separate
    filesystem, keeping durability limits explicit.
-3. Run an ARM64 smoke test and decide whether to add ARM64 to a later release.
-4. Design a separate external-command policy with explicit `allowed`, `denied`,
+4. Run an ARM64 smoke test and decide whether to add ARM64 to a later release.
+5. Design a separate external-command policy with explicit `allowed`, `denied`,
    and `unknown` outcomes; `allowed` means policy match, not execution success.
-5. Consider controlled `PATH` and environment policy for privileged execution.
-6. Consider durable job identity and resume rules only after a concrete use case.
+6. Consider controlled `PATH` and environment policy for privileged execution.
+7. Consider durable job identity and resume rules only after a concrete use case.
 
 The networked `rsync` preflight, partial-transfer, failure, and retry scenarios
 have already been exercised on the disposable Debian stand. Do not add a new
 network language layer or repeat those checks without a specific new failure.
+
+CI is an integration consumer, not a product direction: yesh may run inside a
+CI job, but it is not becoming a CI system with matrices, inventories,
+artifacts, or remote-worker orchestration.
 
 ## Boundaries
 
