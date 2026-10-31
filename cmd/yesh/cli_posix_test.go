@@ -45,6 +45,31 @@ func posixCLI(t *testing.T, ctx context.Context, args ...string) *exec.Cmd {
 	return cmd
 }
 
+func TestPOSIXCLIHelpAndVersion(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	for _, args := range [][]string{{"-h"}, {"--help"}} {
+		cmd := posixCLI(t, ctx, args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v: %v\n%s", args, err, out)
+		}
+		text := string(out)
+		for _, want := range []string{"yesh devel — Linux automation you can explain", "usage: yesh [flags] SCRIPT.yesh", "-version", "-plan"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("%v: help does not contain %q: %s", args, want, text)
+			}
+		}
+	}
+
+	cmd := posixCLI(t, ctx, "--version")
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "yesh devel\n" {
+		t.Fatalf("version: err=%v output=%q", err, out)
+	}
+}
+
 func TestPOSIXCronEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "nightly.yesh")

@@ -12,6 +12,10 @@ import (
 
 const maxScriptBytes = 4 << 20
 
+// version is replaced for release builds with:
+// go build -ldflags "-X main.version=v0.1.0"
+var version = "devel"
+
 func main() {
 	os.Exit(runCLI())
 }
@@ -19,13 +23,27 @@ func main() {
 func runCLI() int {
 	flags := flag.NewFlagSet(filepath.Base(os.Args[0]), flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
+	flags.Usage = func() {
+		fmt.Fprintf(flags.Output(), "yesh %s — Linux automation you can explain\n\n", version)
+		fmt.Fprintf(flags.Output(), "usage: %s [flags] SCRIPT.yesh\n\n", flags.Name())
+		fmt.Fprintln(flags.Output(), "flags:")
+		flags.PrintDefaults()
+	}
 	plan := flags.Bool("plan", false, "show commands without executing them")
 	diagnostic := flags.String("diagnostic", "text", "error diagnostic format: text or json")
+	showVersion := flags.Bool("version", false, "print version and exit")
 	if err := flags.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 2
 	}
+	if *showVersion {
+		fmt.Fprintf(os.Stdout, "yesh %s\n", version)
+		return 0
+	}
 	if flags.NArg() != 1 {
-		fmt.Fprintf(os.Stderr, "usage: %s [--plan] SCRIPT.yesh\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] SCRIPT.yesh\n", filepath.Base(os.Args[0]))
 		return 2
 	}
 	if *diagnostic != "text" && *diagnostic != "json" {
