@@ -5,22 +5,24 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A readable, safety-first language for Linux automation and preflight checks.
+A readable language for Linux automation and preflight checks, with explicit
+failure behavior.
 
 [Русская версия README](README.ru.md)
 
-yesh is an experiment: POSIX commands and external Linux administration tools
-remain visible commands, while the language around them is intentionally small
-and readable. yesh is a language and interpreter for Linux automation, not an
-interactive shell or a Bash-compatible replacement. A yesh script describes a
-sequence of actions, their arguments, and what to do when one of them fails.
+yesh is an experiment: ordinary Unix utilities and external Linux
+administration tools remain visible commands, while the language around them is
+intentionally small and readable. yesh is a language and interpreter for Linux
+automation, not an interactive shell or a Bash-compatible replacement. A yesh
+script describes a sequence of actions, their arguments, and what to do when
+one of them fails.
 
 > **Development status:** yesh is under active development and is not yet ready
 > to serve as a production safety boundary. The measures listed in
-> [SAFETY.md](SAFETY.md) are
-> mandatory project requirements and will be implemented before a stable release.
-> Until then, treat the current prototype as reviewable tooling, not as a
-> substitute for operator judgment or operating-system isolation.
+> [SAFETY.md](SAFETY.md) define the project's requirements; the current
+> prototype does not yet satisfy every stable-release requirement. Treat it as
+> reviewable tooling, not as a substitute for operator judgment or operating-
+> system isolation.
 
 > **Bash without the historical syntax complexity.**
 >
@@ -95,15 +97,15 @@ The current prototype supports:
 - explicit `$name` variable expansion, with bare words kept literal;
 - command failures that stop the script and report the source line;
 - one `exists $path` predicate, regex conditions, and explicit `exit code`;
-- typed Linux operations for `service status`, bounded `service wait`, start
-  and restart with a postcondition, and bounded `journal` over
+- typed Linux operations for `service status`, bounded `service wait`, restart
+  with a postcondition, and bounded `journal` over
   `systemctl`/`journalctl`;
 - `--plan` for expanded argv and branch inspection without running commands.
 
 ## What works today
 
 yesh is already useful for small read-only checks and guarded administration
-steps built from ordinary POSIX commands and external Linux tools:
+steps built from ordinary Unix utilities and external Linux tools:
 
 - bounded service and journal checks through explicit typed operations over
   `systemctl`/`journalctl`, without hidden `sudo`;
@@ -152,9 +154,22 @@ package; a skip is not evidence that the integration works. Tests that need
 root, a real systemd manager, a device, SSH or a second UID are labelled as
 environment-dependent rather than presented as portable proof.
 
+The current evidence covers Linux behavior through Linux CI, disposable Linux
+fixtures, and additional opt-in tests on a separate Debian host. Those tests
+exercise rsync and rsnapshot, including restore, lock, hard-link,
+partial-failure, and rerun cases. These results establish behavior in the
+named environments; they do not establish universal compatibility, power-loss
+durability, or production safety.
+
 The runnable examples and their limitations are documented in
 [Practical Examples](docs/practical-examples.md). A local verification run
 uses workspace-local caches:
+
+Every `examples/*.yesh` file is parsed by the test suite. Not every file runs in
+every default test job: syntax-guide and quickstart examples are exercised by
+named tests, while environment-dependent examples are covered by their Linux
+tests or opt-in fixture scripts. Each such example must state its required
+tools and environment.
 
 ```text
 GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go test ./...
@@ -193,12 +208,16 @@ orchestrate difficult commands, not grow a parallel implementation of `rsync`,
 
 ## Build and run
 
-Build and run the Go binary:
+Building yesh requires Go 1.27 or newer. From a checkout:
 
 ```text
 go build -trimpath -o yesh ./cmd/yesh
 ./yesh examples/hello.yesh
 ```
+
+yesh targets Linux. Its examples use external tools and may additionally require a running systemd
+manager, root, a mounted filesystem, or a disposable test fixture. The
+repository does not claim support for non-Linux operating systems.
 
 Start with the [English quickstart](docs/quickstart.md) for a Bash-to-yesh
 comparison and the rules behind the syntax.
@@ -206,8 +225,8 @@ comparison and the rules behind the syntax.
 The [Russian syntax tutorial](docs/syntax-guide.ru.md) gives a step-by-step
 path from the first script to a small administrative workflow.
 
-The [English syntax tutorial](docs/syntax-guide.md) is in progress. The Russian
-version is currently the complete tutorial.
+The [English syntax tutorial](docs/syntax-guide.md) covers the same syntax and
+examples. The Russian tutorial contains the fuller step-by-step narrative.
 
 See the [English roadmap](docs/TODO.md) for current project priorities.
 
@@ -272,6 +291,6 @@ SHell**. It was originally developed by [Brian Fox](https://www.gnu.org/people/p
 and is currently maintained by Chet Ramey.
 
 yesh is an independent implementation written in Go, with a smaller syntax
-around familiar POSIX/Linux commands. It takes inspiration from POSIX/Linux
-shell workflows, not from copying or embedding Bash source code. Its purpose
+around familiar Unix/Linux commands. It takes inspiration from Unix/Linux shell
+workflows, not from copying or embedding Bash source code. Its purpose
 is to make everyday administration scripts easier to read and safer to review.

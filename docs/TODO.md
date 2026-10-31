@@ -18,6 +18,15 @@ English documentation calls these **Real-World Examples** or **Practical
 Examples**. The phrase describes work with real tools or a controlled test
 fixture; it does not claim a formal proof or universal production safety.
 
+## Public README
+
+- [ ] Keep the README as the project's entry point: purpose, audience, quick
+  start, one minimal example, and links to detailed documentation.
+- [ ] Separate the portable yesh/runtime layer, ordinary Unix utilities, and
+  Linux-only features; state requirements and limits of the evidence.
+- [ ] Run every README quick-start command in a clean environment and label
+  examples that require Linux, systemd, root, or a dedicated fixture.
+
 ## Done in the current runtime
 
 - Go runtime with no Python dependency;
@@ -51,6 +60,8 @@ fixture; it does not claim a formal proof or universal production safety.
 - executable quickstart examples kept in sync across English, Russian and
   the service-check script, with checks for unavailable systemd, failed
   commands, complete pipeline input, predicates and plans.
+- every `examples/*.yesh` file is parsed by `TestAllExamplesParse`; execution
+  coverage remains explicit for environment-dependent examples.
 
 ## What yesh already simplifies
 
