@@ -85,3 +85,25 @@ func TestEnglishSyntaxGuideExamplesParse(t *testing.T) {
 		}
 	}
 }
+
+func TestAllExamplesParse(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "*.yesh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("examples directory has no yesh scripts")
+	}
+
+	for _, path := range paths {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			source, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := parse(string(source)+"\n", path); err != nil {
+				t.Fatalf("parse %s: %v", path, err)
+			}
+		})
+	}
+}
