@@ -221,9 +221,13 @@ Replace placeholders before using them against a real system; `web-1`,
 
 | Group | Examples | Required context |
 | --- | --- | --- |
-| Self-contained/fixture-tested | `hello`, `backup`, `config-apply`, `rsync-*`, `initrd-module-check` | temporary files or the documented fixture |
+| Self-contained/fixture-tested | `hello`, `backup`, `backup-with-progress`, `config-apply`, `rsync-*`, `initrd-module-check` | temporary files or the documented fixture |
 | Host read-only checks | `process-*`, `mount-check`, `storage-*`, `fstab-*`, `journal-report`, `service-check` | Linux `/proc`, mount/fstab, journal/systemd, or a real mounted path |
 | Remote/configured | `ssh-health`, `scp-copy`, `deploy`, `rsnapshot-local` | SSH trust/agent, remote target, or prepared config |
+
+The `backup-with-progress.yesh` example takes an explicit `YESH_PV` path. If
+that file is missing or not executable, yesh stops before starting the archive
+pipeline.
 
 The practical Linux suite uses ordinary tools including `tar`, `gzip`, `grep`,
 `install`, `mv`, `findmnt`, `rsync`, `pv`, and `rsnapshot`. Linux CI installs

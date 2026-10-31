@@ -1,0 +1,32 @@
+# Goal: create and publish one gzip-compressed tar archive with progress.
+# Required environment:
+#   YESH_ARCHIVE_SOURCE    source directory to archive
+#   YESH_ARCHIVE_PARTIAL   temporary archive path on the target filesystem
+#   YESH_ARCHIVE_PUBLISHED  final archive path
+#   YESH_PV                absolute path to the `pv` executable
+# Preconditions: the two archive paths are on the same filesystem; the final
+# name is absent or is a replaceable symlink.
+# Writes: the temporary archive first; publishes it only after the pipeline succeeds.
+# Failure: a missing source returns code 2; an external command error stops before publish.
+# pv reports progress on stderr. The archive data stays in the pipeline until gzip writes it.
+# Role of yesh: check the source, keep the pipeline visible, and publish only a complete archive.
+
+source = environment YESH_ARCHIVE_SOURCE
+partial = environment YESH_ARCHIVE_PARTIAL
+published = environment YESH_ARCHIVE_PUBLISHED
+pv = environment YESH_PV
+
+if test -x $pv:
+    if exists $source:
+        if test -d $source:
+            tar -C $source -cf - -- . | $pv --numeric --bytes | gzip > $partial
+            publish $partial to $published
+        else:
+            echo "archive source is not a directory"
+            exit 2
+    else:
+        echo "archive source is missing"
+        exit 2
+else:
+    echo "pv is missing or not executable"
+    exit 2

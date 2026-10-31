@@ -84,6 +84,7 @@ func TestPOSIXCorpusAdaptationSafetyContracts(t *testing.T) {
 		{name: "rsync destination preflight", file: "rsync-destination-preflight.yesh", must: []string{"findmnt --target $root", "stat -c", "df -P -h -- $root", "rsync retention plan in $root keep $keep"}, forbid: []string{"rsync -", "publish ", "delete ", "unlink "}},
 		{name: "rsnapshot preflight", file: "rsnapshot-preflight.yesh", must: []string{"rsnapshot -c $config configtest", "rsnapshot -c $config -t $level"}},
 		{name: "rsnapshot guarded apply", file: "rsnapshot-apply.yesh", must: []string{"findmnt --source $mount_source --target $root", "df -P -h -- $root", "free_space $root at_least 20MiB", "rsnapshot -c $config -t $level", "YESH_RSNAPSHOT_CONFIRM"}},
+		{name: "backup with progress", file: "backup-with-progress.yesh", must: []string{"tar -C $source -cf - -- . | $pv --numeric --bytes | gzip > $partial", "publish $partial to $published"}, forbid: []string{"sudo ", "--delete"}},
 		{name: "mount preflight", file: "storage-check.yesh", must: []string{"findmnt --target $mountpoint", "df -P -h -- $mountpoint"}},
 		{name: "ssh health", file: "ssh-health.yesh", must: []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ConnectTimeout=5"}, forbid: []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"}},
 	}
@@ -1203,6 +1204,152 @@ func TestPOSIXPracticalPVPreservesData(t *testing.T) {
 	}
 	if stdout.Len() != 0 || stderr.Len() == 0 {
 		t.Fatalf("progress streams: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+}
+
+func TestPOSIXPracticalBackupWithProgressRoundTrip(t *testing.T) {
+	practicalDependencies(t, "tar", "pv", "gzip")
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{
+		"settings.ini":     []byte("mode=production\n"),
+		"file with spaces": []byte("payload\n"),
+		"binary":           bytes.Repeat([]byte{0, 1, 10, 128, 255}, 20000),
+	}
+	for name, data := range files {
+		writeTestFile(t, filepath.Join(source, name), data, 0600)
+	}
+	partial := filepath.Join(dir, "backup.tar.gz.partial")
+	published := filepath.Join(dir, "backup.tar.gz")
+	pv, err := exec.LookPath("pv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup-with-progress.yesh"))
+	cmd.Env = append(cmd.Env,
+		"YESH_ARCHIVE_SOURCE="+source,
+		"YESH_ARCHIVE_PARTIAL="+partial,
+		"YESH_ARCHIVE_PUBLISHED="+published,
+		"YESH_PV="+pv,
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("backup with progress: %v\n%s", err, stderr.String())
+	}
+	if stdout.Len() != 0 || stderr.Len() == 0 {
+		t.Fatalf("progress streams: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	archive, err := os.Open(published)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	gz, err := gzip.NewReader(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+	reader := tar.NewReader(gz)
+	restored := map[string][]byte{}
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		data, err := io.ReadAll(io.LimitReader(reader, 2*1024*1024))
+		if err != nil {
+			t.Fatal(err)
+		}
+		restored[strings.TrimPrefix(header.Name, "./")] = data
+	}
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range files {
+		if !bytes.Equal(restored[name], want) {
+			t.Fatalf("restore mismatch for %q", name)
+		}
+	}
+	if _, err := os.Stat(partial); !os.IsNotExist(err) {
+		t.Fatalf("partial archive remains after publish: %v", err)
+	}
+}
+
+func TestPOSIXPracticalBackupWithProgressDoesNotPublishFailure(t *testing.T) {
+	practicalDependencies(t, "tar", "pv", "gzip")
+	if os.Geteuid() == 0 {
+		t.Skip("needs unprivileged permission failure")
+	}
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "data"), []byte("new\n"), 0600)
+	if err := os.Chmod(source, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(source, 0700)
+	partial := filepath.Join(dir, "backup.tar.gz.partial")
+	published := filepath.Join(dir, "backup.tar.gz")
+	pv, err := exec.LookPath("pv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, published, []byte("previous archive"), 0600)
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup-with-progress.yesh"))
+	cmd.Env = append(cmd.Env,
+		"YESH_ARCHIVE_SOURCE="+source,
+		"YESH_ARCHIVE_PARTIAL="+partial,
+		"YESH_ARCHIVE_PUBLISHED="+published,
+		"YESH_PV="+pv,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("expected pipeline failure: %v\n%s", err, out)
+	}
+	if got := string(readTestFile(t, published)); got != "previous archive" {
+		t.Fatalf("failed backup replaced archive: %q", got)
+	}
+}
+
+func TestPOSIXPracticalBackupWithProgressMissingPVStopsBeforePipeline(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "data"), []byte("input\n"), 0600)
+	partial := filepath.Join(dir, "backup.tar.gz.partial")
+	published := filepath.Join(dir, "backup.tar.gz")
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup-with-progress.yesh"))
+	cmd.Env = append(cmd.Env,
+		"YESH_ARCHIVE_SOURCE="+source,
+		"YESH_ARCHIVE_PARTIAL="+partial,
+		"YESH_ARCHIVE_PUBLISHED="+published,
+		"YESH_PV="+filepath.Join(dir, "missing-pv"),
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 {
+		t.Fatalf("expected missing pv failure: %v\n%s", err, out)
+	}
+	for _, name := range []string{partial, published} {
+		if _, err := os.Stat(name); !os.IsNotExist(err) {
+			t.Fatalf("archive path was created before pv check: %s (%v)", name, err)
+		}
 	}
 }
 
