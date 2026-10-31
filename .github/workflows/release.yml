@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build linux/${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      GOCACHE: ${{ github.workspace }}/.gocache
+      GOMODCACHE: ${{ github.workspace }}/.gomodcache
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27'
+          cache: false
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+      - name: Build and package
+        shell: bash
+        env:
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          package="yesh-${version}-linux-${GOARCH}"
+          stage="$RUNNER_TEMP/$package"
+          mkdir -p "$stage"
+
+          CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" \
+            go build -trimpath -ldflags "-X main.version=$GITHUB_REF_NAME" \
+            -o "$stage/yesh" ./cmd/yesh
+          cp LICENSE README.md README.ru.md "$stage/"
+
+          if [[ "$GOARCH" == amd64 ]]; then
+            [[ "$("$stage/yesh" --version)" == "yesh $GITHUB_REF_NAME" ]]
+          fi
+
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$package.tar.gz" "$package"
+          sha256sum "$RUNNER_TEMP/$package.tar.gz" > "$RUNNER_TEMP/$package.sha256"
+
+      - name: Upload release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/yesh-*.tar.gz
+            ${{ runner.temp }}/yesh-*.sha256
+          if-no-files-found: error
+
+  draft-release:
+    name: Create draft GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: release-*
+          path: release-files
+          merge-multiple: true
+
+      - name: Create checksums and release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-files
+          sha256sum yesh-*.tar.gz > SHA256SUMS
+          cat > RELEASE_NOTES.md <<EOF
+          # yesh $GITHUB_REF_NAME
+
+          First public development release of yesh for Linux amd64 and arm64.
+
+          This release is in the 0.x development line and is not an operating-system
+          isolation boundary or a guarantee that external commands, hosts, filesystems,
+          or hardware will succeed.
+          EOF
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "yesh $GITHUB_REF_NAME" \
+            --notes-file release-files/RELEASE_NOTES.md \
+            release-files/yesh-*.tar.gz \
+            release-files/SHA256SUMS
