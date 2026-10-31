@@ -59,6 +59,9 @@ storage-query output.
 These are language and runtime guarantees, not isolation. The current
 prototype does not protect against an arbitrary dangerous external program.
 
+The POSIX process model, signal and pipeline behavior, and the scope of the
+test corpus are documented in [POSIX runtime details](POSIX.md).
+
 ## Residual risks
 
 An external program can modify the system, start another shell internally,
@@ -89,8 +92,10 @@ allowlists.
 - Treat an rsnapshot configuration as executable policy and inspect its
   effective `rsync_long_args`, `sync_first`, `snapshot_root`, `no_create_root`,
   `lockfile`, and backup-script entries.
-- Keep secrets in the SSH agent, configuration, or an external secret store,
-  never in a yesh script.
+- Keep secrets in the SSH agent, protected configuration, or an external secret
+  store, never in a yesh script.
+- Do not put secrets in a script that will be planned or logged: `--plan` shows
+  expanded arguments, and command errors can expose bounded `stderr`.
 - Use `--plan` for review, remembering that a plan is not a transaction and
   does not eliminate races between checking and acting.
 
