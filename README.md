@@ -32,6 +32,26 @@ one of them fails.
 
 ![A system administrator having a Eureka moment in a data center](docs/yesh-eureka.png)
 
+## The point
+
+The useful difference appears at the boundary where a small Bash script starts
+mixing checks, file replacement, and failure handling:
+
+```bash
+if grep -q '^mode=production$' config.next; then
+    install -m 0640 config.next /etc/myapp.conf
+fi
+```
+
+```yesh
+if grep -q '^mode=production$' config.next:
+    publish config.next to /etc/myapp.conf
+```
+
+The yesh version keeps the check, the publication boundary, and the failure
+path visible. `publish` is a yesh operation with same-filesystem rename
+semantics; it does not silently fall back to copying.
+
 ## Try it in a minute
 
 From a checkout with Go 1.27 or newer:
