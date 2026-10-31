@@ -1,7 +1,7 @@
-# Goal: print the current routing table as JSON.
+# Goal: print the current routing table in the standard readable form.
 # Input: kernel route state, queried through `ip`.
 # Change: none; no route is added, changed, replaced, or flushed.
 # Failure: permission and utility errors remain visible and stop the example.
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
 
-ip -j route show
+ip route show

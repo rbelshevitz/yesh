@@ -48,8 +48,6 @@ run_report routes "$examples/network-route-report.yesh"
 run_report neighbours "$examples/network-neighbour-report.yesh"
 run_report listeners "$examples/network-listener-report.yesh"
 
-ip -br address show >"$base/ip-brief.out"
-
 test ! -e "$base/network.tar"
 
 fake_bin=$base/fake-bin
@@ -72,7 +70,6 @@ tar -cf "$base/network.tar" -C "$base" \
     report-routes.out report-routes.err \
     report-neighbours.out report-neighbours.err \
     report-listeners.out report-listeners.err \
-    ip-brief.out \
     negative-ip.out negative-ip.err
 tar -tf "$base/network.tar" | grep -Fx 'report-interfaces.out' >/dev/null
 tar -tf "$base/network.tar" | grep -Fx 'negative-ip.err' >/dev/null
@@ -80,8 +77,6 @@ test -s "$base/network.tar"
 cp -- "$base/network.tar" "$archive"
 
 echo 'RWE network observation plan, address/route/neighbour/listener reports, archive, and missing-ip negative passed'
-echo 'ip -j address show:'
+echo 'interface addresses:'
 cat "$base/report-interfaces.out"
-echo 'ip -br address show:'
-cat "$base/ip-brief.out"
 echo "archive: $archive"

@@ -1,10 +1,10 @@
 # Read-only interface and address report.
-# JSON keeps the external output machine-readable; yesh does not parse or
+# The brief form keeps the external output readable; yesh does not parse or
 # rewrite it. Permission errors remain errors and no fallback is attempted.
 #
 # Bash comparison:
-#   ip -j address show
+#   ip -br address show
 # The yesh form makes the exact read-only argv visible in --plan.
 # Role of yesh: make the read-only network check and failure path explicit; Linux networking tools provide the observation.
 
-ip -j address show
+ip -br address show
