@@ -1,6 +1,5 @@
 # yesh
 
-![status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -10,7 +9,7 @@ failure behavior.
 
 [Русская версия README](README.ru.md)
 
-yesh is an experiment: ordinary Unix utilities and external Linux
+yesh is an early-stage project: ordinary Unix utilities and external Linux
 administration tools remain visible commands, while the language around them is
 intentionally small and readable. yesh is a language and interpreter for Linux
 automation, not an interactive shell or a Bash-compatible replacement. A yesh

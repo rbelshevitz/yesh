@@ -5,6 +5,7 @@ yesh \- readable Linux automation with bounded process pipelines
 .B yesh
 .RB [ \-\-plan ]
 .RB [ \-\-diagnostic\ text|json ]
+.RB [ \-\-version ]
 .I SCRIPT.yesh
 .SH DESCRIPTION
 .B yesh
@@ -20,6 +21,13 @@ The project is under active development; the safety measures documented in
 SAFETY.md are mandatory requirements and must be implemented before a stable
 release. yesh is not an operating-system isolation boundary for untrusted code.
 .SH OPTIONS
+.TP
+.B \-\-version
+Print the yesh version and exit. A release build carries its release version;
+an ordinary local build reports `devel`.
+.TP
+.B \-h, \-\-help
+Print the version, short description, usage and available options, then exit.
 .TP
 .B \-\-plan
 Validate commands and print expanded argument vectors and redirections
@@ -426,3 +434,5 @@ man -l man/yesh.1
 .PP
 Project documents: docs/pipeline-safety.ru.md, docs/cron.ru.md,
 docs/packages.ru.md and docs/linux-integration.ru.md.
+.SH COPYRIGHT
+Copyright (C) 2026 Roman Belshevitz.
