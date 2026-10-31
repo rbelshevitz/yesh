@@ -30,11 +30,15 @@ yesh — это язык и интерпретатор, а не интеракт
 Польза становится заметна там, где небольшой Bash-сценарий уже смешивает
 проверку, замену файла и обработку ошибки:
 
+Bash:
+
 ```bash
 if grep -q '^mode=production$' config.next; then
     install -m 0640 config.next /etc/myapp.conf
 fi
 ```
+
+yesh:
 
 ```yesh
 if grep -q '^mode=production$' config.next:

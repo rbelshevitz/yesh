@@ -36,11 +36,15 @@ one of them fails.
 The useful difference appears at the boundary where a small Bash script starts
 mixing checks, file replacement, and failure handling:
 
+Bash:
+
 ```bash
 if grep -q '^mode=production$' config.next; then
     install -m 0640 config.next /etc/myapp.conf
 fi
 ```
+
+yesh:
 
 ```yesh
 if grep -q '^mode=production$' config.next:
