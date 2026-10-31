@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64]
     env:
       GOCACHE: ${{ github.workspace }}/.gocache
       GOMODCACHE: ${{ github.workspace }}/.gomodcache
@@ -89,11 +89,9 @@ jobs:
           cat > RELEASE_NOTES.md <<EOF
           # yesh $GITHUB_REF_NAME
 
-          First public development release of yesh for Linux amd64 and arm64.
+          First public development release of yesh for Linux amd64.
 
-          This release is in the 0.x development line and is not an operating-system
-          isolation boundary or a guarantee that external commands, hosts, filesystems,
-          or hardware will succeed.
+          Uses a practical Go 1.21 baseline instead of requiring the newest toolchain.
           EOF
 
       - name: Create draft release

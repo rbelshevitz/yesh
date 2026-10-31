@@ -1,6 +1,6 @@
 # yesh
 
-![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)
+![Go](https://img.shields.io/badge/Go-1.21-00ADD8.svg)
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
