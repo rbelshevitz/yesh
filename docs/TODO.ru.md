@@ -736,10 +736,10 @@ SCP и rsync, а не для замены `iproute2` или настройки �
 `ip` — большой набор управления сетью; yesh не зеркалит его интерфейс. В
 первый read-only allowlist входят только явно проверенные формы:
 
-- `ip -j address show` — интерфейсы и адреса;
-- `ip -j route show` и `ip route get ADDRESS` — таблица и выбор маршрута;
-- `ip -j neigh show` — таблица соседей;
-- при отдельной необходимости — `ip -j link show`, без `set`, `add`, `del`.
+- `ip -br address show` — интерфейсы и адреса;
+- `ip route show` и `ip route get ADDRESS` — таблица и выбор маршрута;
+- `ip neigh show` — таблица соседей;
+- при отдельной необходимости — `ip link show`, без `set`, `add`, `del`.
 
 Не включать в yesh network Р.П.П. `ip address add|change|replace|delete`,
 `ip route add|change|replace|delete|flush`, `ip link set`, `ip neigh add|change|
@@ -1272,8 +1272,8 @@ JSON journal, typed process snapshot, `findmnt`/`df`, отдельные stdout/
 
 ### Следующая область: B9 — архив наблюдений без изменений
 
-- [x] Добавить в архив снимок интерфейсов и адресов через явный
-  `ip ... address show`/JSON, без `add`, `change`, `replace` или `flush`.
+- [x] Добавить в архив читаемый снимок интерфейсов и адресов через явный
+  `ip -br address show`, без `add`, `change`, `replace` или `flush`.
 - [x] Добавить таблицу маршрутов через `ip ... route show`; не выполнять
   изменение маршрутов и не скрывать отказ доступа.
 - [x] Добавить ограниченный список слушающих сокетов через `ss`; отсутствие PID/
@@ -1639,8 +1639,8 @@ crash-durability и retention остаются отдельными задача
   адресов; явно отметить, что они не меняют сетевое состояние.
 - [x] Обновить `man/yesh-language.7` с формами ссылок `$name`, правилами
   семейств IPv4/IPv6, host bits, `/31`/`/32`, IPv6 zone и ошибками смешения.
-- [x] Добавить в обе yesh(1) практический сетевой пример: `ip -j address
-  show`, `ip -j route show`, `ip -j neigh show`, ограниченный `ss`.
+- [x] Добавить в обе yesh(1) практический сетевой пример: читаемый `ip -br
+  address show`, `ip route show`, `ip neigh show`, ограниченный `ss`.
 - [x] Добавить cron Р.П.П.: `env -i`, абсолютные пути, внешний `flock`/`timeout`,
   внутренний lock yesh, коды `75`/`124`, partial без публикации и запрет
   изменения crontab.

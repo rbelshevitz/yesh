@@ -202,7 +202,7 @@ if is loopback $address:
 Для наблюдения интерфейсов и адресов yesh оставляет `ip` внешней командой:
 
 ```yesh
-ip -j address show
+ip -br address show
 ```
 
 `--plan` показывает этот вызов, а отказ доступа или отсутствие `ip` остаются
@@ -211,7 +211,7 @@ ip -j address show
 Таблица маршрутов также остаётся внешним read-only вызовом:
 
 ```yesh
-ip -j route show
+ip route show
 ```
 
 Она не смешивается с `ip route get`: первый вызов показывает наблюдаемую
@@ -220,7 +220,7 @@ ip -j route show
 Соседей и слушающие сокеты также можно читать без встроенного сетевого API:
 
 ```yesh
-ip -j neigh show
+ip neigh show
 ss -H -n -l -t -u | head -n 200
 ```
 

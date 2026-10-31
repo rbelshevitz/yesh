@@ -290,9 +290,9 @@ Concurrent mount/device changes still require an external boundary.
 .SS Read-only network reports and checks (Linux)
 Read-only reports can call the external ip and ss commands explicitly:
 .nf
-ip -j address show
-ip -j route show
-ip -j neigh show
+ip -br address show
+ip route show
+ip neigh show
 ss -H -n -l -t -u
 .fi
 .PP

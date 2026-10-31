@@ -293,9 +293,9 @@ bind/rbind, loop, move/remount и опции btrfs subvolume пока не по�
 .SS Сетевые снимки и проверки (Linux)
 Для отчётов только для чтения можно явно вызвать внешние ip и ss:
 .nf
-ip -j address show
-ip -j route show
-ip -j neigh show
+ip -br address show
+ip route show
+ip neigh show
 ss -H -n -l -t -u
 .fi
 .PP

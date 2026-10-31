@@ -198,9 +198,9 @@ compute and validate values; they do not change network state. Invalid prefixes,
 IPv6 zones in CIDR values and mixed address families are errors.
 .SS External network reports
 .EX
-ip -j address show
-ip -j route show
-ip -j neigh show
+ip -br address show
+ip route show
+ip neigh show
 ss -H -n -l -t -u
 .EE
 .PP
