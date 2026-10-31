@@ -33,6 +33,9 @@ Print the version, short description, usage and available options, then exit.
 Validate commands and print expanded argument vectors and redirections
 without running commands or opening redirected files.
 Both branches of a command-based condition are shown.
+External command stages are shown with the exact `argv` yesh would pass to
+them; built-in yesh operations such as `publish` are shown as planned actions
+with their parameters, not as external `argv`.
 .TP
 .B \-\-diagnostic text|json
 Select the error format. The default is `text`.

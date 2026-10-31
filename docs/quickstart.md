@@ -159,9 +159,14 @@ inspect expanded commands and branches without running external programs:
 ./yesh --plan examples/service-check.yesh
 ```
 
-`--plan` is useful during review: it shows the argument vectors and planned
-branches while avoiding external command execution. It previews the plan; it
-does not run the script.
+`--plan` is useful during review: it shows the argument lists (`argv`) that yesh
+would pass to external command stages and the planned branches without executing
+external commands. Built-in yesh operations, such as `publish`, are shown as
+planned yesh actions with their parameters, not as external `argv`. It previews
+the plan; it does not run the script.
+
+The rule is simple: bracketed `PLAN [...]` lines are external command `argv`;
+named lines such as `PLAN publish ...` are built-in yesh operations.
 
 ## The boundary
 

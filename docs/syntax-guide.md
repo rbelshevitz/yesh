@@ -12,6 +12,24 @@ check and then introduces the rules needed to read and write small
 administrative scripts. For the complete guide, see the
 [Russian syntax guide](syntax-guide.ru.md).
 
+## The core idea
+
+yesh does not turn a command into one shell string. It keeps the program name
+and each argument separate, then passes that list directly to the external
+program. In Unix terminology, this list is an argument vector (`argv`): the
+first item is the program name and the remaining items are its arguments.
+
+For example:
+
+```yesh
+install -m 0640 -- config.next /etc/myapp.conf.next
+```
+
+The external `install` program receives `-m`, `0640`, `--`, and the two paths as
+separate arguments. yesh checks the expanded list and its boundaries; it does
+not decide what `install` means or whether the operation has sufficient
+permissions.
+
 ## Who this is for
 
 This tutorial is for a Linux administrator who can run ordinary commands and
@@ -234,6 +252,10 @@ systemctl is-active $options
 This passes three separate arguments to `systemctl` after the command name. A
 variable value is not reparsed as yesh code or shell text.
 
+This list is often called an argument vector, or `argv`: the first item is the
+program name and the remaining items are its separate arguments. It is not one
+shell command string, so spaces inside one value do not create extra arguments.
+
 Spaces inside a value stay inside one argument:
 
 ```yesh
@@ -295,7 +317,10 @@ Use `--plan` to inspect the action order and expanded arguments:
 ./yesh --plan check-source.yesh
 ```
 
-The plan does not run external commands or open redirected files. It cannot
+The plan does not run external commands or open redirected files. For an
+external command stage, it shows the exact `argv` yesh would pass to the
+program. A built-in yesh operation, such as `publish`, is shown as a planned
+yesh action with its parameters, not as an external `argv`. The plan cannot
 guarantee that the network, filesystem, service, or external program will still
 be available when the real run starts.
 

@@ -48,12 +48,25 @@ yesh:
 
 ```yesh
 if grep -q '^mode=production$' config.next:
-    publish config.next to /etc/myapp.conf
+    install -m 0640 -- config.next /etc/myapp.conf.next
+    publish /etc/myapp.conf.next to /etc/myapp.conf
 ```
 
 The yesh version keeps the check, the publication boundary, and the failure
-path visible. `publish` is a yesh operation with same-filesystem rename
-semantics; it does not silently fall back to copying.
+behavior visible. The external `install` command prepares the file and its mode;
+`publish` is a yesh operation with same-filesystem rename semantics. It does
+not silently fall back to copying.
+
+The corresponding `--plan` output makes the boundary explicit:
+
+```text
+PLAN IF ["grep" "-q" "^mode=production$" "config.next"]
+PLAN ["install" "-m" "0640" "--" "config.next" "/etc/myapp.conf.next"]
+PLAN publish "/etc/myapp.conf.next" to "/etc/myapp.conf"
+```
+
+The rule is simple: `PLAN [...]` is an external command's argument list
+(`argv`); `PLAN publish ...` is a yesh operation with its own parameters.
 
 ## Try it in a minute
 
@@ -157,7 +170,9 @@ steps built from ordinary Unix utilities and external Linux tools:
 
 The `--plan` mode shows the exact argument vector (`argv`) that each command
 stage would receive, including expanded lists and external conditions. It does
-not start commands or open redirected output files. For example:
+not start external commands or open redirected output files. Built-in yesh
+operations, such as `publish`, are shown as planned yesh actions with their
+parameters, not as external `argv`. For example:
 
 ```text
 PLAN ["scp" "-P" "2828" "-o" "BatchMode=yes" "-o" "ConnectTimeout=5" "--" "backup.tar.gz" "user@host:/srv/backup.tar.gz"]
