@@ -40,7 +40,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 [ "$(id -u)" -eq 0 ] || die "run explicitly as root (for example: sudo $0)"
-for command in losetup mkfs.ext4 mount umount findmnt rsnapshot rsync cp rm stat cmp; do
+for command in losetup mkfs.ext4 mount umount findmnt rsnapshot rsync cp rm stat cmp tee grep test; do
     command -v "$command" >/dev/null || die "missing command: $command"
 done
 [ -x "$yesh_bin" ] || die "yesh binary is not executable: $yesh_bin"
@@ -62,6 +62,7 @@ restore=$work/restore
 config=$work/rsnapshot.conf
 bad_config=$work/rsnapshot-bad.conf
 lockfile=$work/rsnapshot.pid
+report=$work/rsnapshot-test.log
 confirm=$work/approved
 published=$snapshot_root/daily.0
 bad_root=$mountpoint/bad-snapshots
@@ -90,6 +91,7 @@ common_env=(
     YESH_RSNAPSHOT_ROOT="$snapshot_root"
     YESH_RSNAPSHOT_SOURCE="$mount_source"
     YESH_RSNAPSHOT_LOCK="$lockfile"
+    YESH_RSNAPSHOT_REPORT="$report"
     YESH_RSNAPSHOT_PUBLISHED="$published"
     YESH_RSNAPSHOT_CONFIRM="$confirm"
 )
@@ -119,6 +121,8 @@ set -e
 touch -- "$confirm"
 
 env "${common_env[@]}" "$yesh_bin" "$yesh_script" > "$work/run1.out"
+[ -s "$report" ] || die "rsnapshot test report was not captured"
+grep -F 'rsnapshot' "$report" >/dev/null || die "rsnapshot test report was empty"
 cmp "$snapshot_root/daily.0/local/versioned.txt" <(printf 'version-one\n')
 
 printf 'version-two-changed\n' > "$source/versioned.txt"

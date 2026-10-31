@@ -16,6 +16,7 @@ source=$fixture/source
 restore=$fixture/restore
 config=$fixture/rsnapshot.conf
 confirm=$fixture/confirm
+report=$fixture/rsnapshot-test.log
 mount_source=$(findmnt -no SOURCE --target "$fixture")
 
 cleanup() {
@@ -49,6 +50,7 @@ YESH_RSNAPSHOT_LEVEL=daily \
 YESH_RSNAPSHOT_ROOT=$root \
 YESH_RSNAPSHOT_SOURCE=$mount_source \
 YESH_RSNAPSHOT_CONFIRM=$confirm \
+YESH_RSNAPSHOT_REPORT=$report \
 "$yesh_bin" --plan "$wrapper" >"$fixture/plan.out"
 test ! -e "$root/daily.0"
 test ! -e "$confirm"
@@ -60,10 +62,12 @@ run_snapshot() {
     YESH_RSNAPSHOT_ROOT=$root \
     YESH_RSNAPSHOT_SOURCE=$mount_source \
     YESH_RSNAPSHOT_CONFIRM=$confirm \
+    YESH_RSNAPSHOT_REPORT=$report \
     "$yesh_bin" "$wrapper"
 }
 
 run_snapshot
+test -s "$report"
 printf '%s\n' 'version two changed' >"$source/hello.txt"
 run_snapshot
 

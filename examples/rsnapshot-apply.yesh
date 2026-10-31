@@ -13,6 +13,7 @@
 #   YESH_RSNAPSHOT_SOURCE   expected mount source, preferably UUID=... or
 #                           PARTUUID=... rather than a mutable /dev name
 #   YESH_RSNAPSHOT_LOCK     expected lockfile path from rsnapshot.conf
+#   YESH_RSNAPSHOT_REPORT   path for the captured rsnapshot -t report
 #   YESH_RSNAPSHOT_PUBLISHED expected path of the new level.0 directory
 #   YESH_RSNAPSHOT_CONFIRM  path that the operator creates after reviewing
 #                           the test output; it is not created by this script
@@ -20,7 +21,8 @@
 # This wrapper does not parse or rewrite rsnapshot.conf. In particular, review
 # rsync_long_args, sync_first, retain, no_create_root, lockfile, backup_script,
 # and remote SSH entries in `rsnapshot -t` before creating the confirmation.
-# The fixed 20MiB floor is a conservative preflight guard, not a size estimate
+# The test output is shown and saved at YESH_RSNAPSHOT_REPORT. The fixed 20MiB
+# floor is a conservative preflight guard, not a size estimate
 # for a successful snapshot.
 # Order: check config/root/mount/free space, run `configtest`, show test mode,
 # then require the pre-created confirmation file before the mutating interval.
@@ -34,6 +36,7 @@ level = environment YESH_RSNAPSHOT_LEVEL
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
 lock = environment YESH_RSNAPSHOT_LOCK
+report = environment YESH_RSNAPSHOT_REPORT
 published = environment YESH_RSNAPSHOT_PUBLISHED
 confirm = environment YESH_RSNAPSHOT_CONFIRM
 
@@ -43,21 +46,29 @@ if exists $config:
             df -P -h -- $root
             if free_space $root at_least 20MiB:
                 rsnapshot -c $config configtest
-                rsnapshot -c $config -t $level
-                if exists $confirm:
-                    rsnapshot -c $config $level
-                    if exists $published:
-                        if exists $lock:
-                            echo "rsnapshot lockfile remains after successful interval"
-                            exit 6
-                        else:
-                            echo "rsnapshot interval completed"
+                rsnapshot -c $config -t $level | tee $report
+                if test -s $report:
+                    if grep -E -- '--(delete|delete-excluded|remove-source-files)([= ]|$)' $report:
+                        echo "review: test report contains deletion-related rsync flags"
                     else:
-                        echo "rsnapshot interval completed without publishing the expected snapshot"
-                        exit 6
+                        echo "review: test report contains no known deletion-related rsync flags"
+                    if exists $confirm:
+                        rsnapshot -c $config $level
+                        if exists $published:
+                            if exists $lock:
+                                echo "rsnapshot lockfile remains after successful interval"
+                                exit 6
+                            else:
+                                echo "rsnapshot interval completed"
+                        else:
+                            echo "rsnapshot interval completed without publishing the expected snapshot"
+                            exit 6
+                    else:
+                        echo "review rsnapshot test output and create the confirmation file"
+                        exit 4
                 else:
-                    echo "review rsnapshot test output and create the confirmation file"
-                    exit 4
+                    echo "rsnapshot test report is missing or empty"
+                    exit 6
             else:
                 echo "snapshot root has less than 20MiB free"
                 exit 5
