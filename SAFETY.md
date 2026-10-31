@@ -158,7 +158,7 @@ permissions, ACLs, capabilities, set-user-ID behavior, remote policy, and paths
 may change between checking and acting. A privileged script must have an
 explicitly reviewed command, account, environment, and operating-system policy.
 
-## Mandatory work before a stable release
+## Requirements for v1.0.0
 
 The following are required project work, not optional advice:
 
@@ -169,7 +169,8 @@ The following are required project work, not optional advice:
   the runtime using randomly generated data;
 - add `govulncheck` and dependency scanning to CI;
 - publish a threat model and release security checklist;
-- keep a privileged loopback/storage fixture in a disposable VM or on a
-  separate Rocky Linux host;
+- maintain an opt-in privileged loopback/storage fixture in a disposable Linux
+  VM or on a separate Linux host; its results must remain clearly scoped to
+  that fixture and environment;
 - either document and test isolation of untrusted scripts, or clearly state
   that yesh does not provide such an isolation mechanism.
