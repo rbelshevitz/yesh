@@ -1,144 +1,175 @@
 # Execution safety
 
-yesh is designed for readable Unix automation, including scripts that may run
-with administrative privileges. Ambiguous or unsafe runtime situations should
-fail before a child process is started whenever possible.
+yesh supports scripts that may require administrative privileges. Ambiguous or
+unsafe situations should fail before a process starts whenever possible.
+
+## Forbidden in ordinary mode
+
+```yesh
+while true:              # no: no demonstrable end
+    echo loop
+
+command &                # no: uncontrolled background process
+command |                # no: pipeline without a consumer
+| command                # no: pipeline without a producer
+bash -c text             # no: bypasses yesh parsing and runtime
+eval text                # no: text does not become code
+```
+
+## Runtime limits
+
+- `for` accepts only finite lists;
+- the number of iterations is bounded;
+- an external command has a time limit;
+- a pipeline timeout cancels the whole process group and then applies
+  SIGTERM → SIGKILL;
+- a stuck child process must not survive termination of the job's process
+  group;
+- a pipeline has at least two stages and is connected to standard output or a
+  redirection;
+- the runtime starts and waits for every pipeline stage;
+- a non-zero exit code is not lost;
+- an error identifies the file, line, command, and bounded `stderr`; this does
+  not mean that `stderr` is automatically scrubbed of secrets.
+
+Where possible, limits must be checked before execution. The runtime must not
+create a process that later becomes unreachable because a pipeline reader is
+missing.
+
+The `.yesh` source is limited to 4 MiB before parsing. Additional limits apply
+to loops, process snapshots, regular expressions, and Linux storage-query
+output.
 
 ## Current guarantees
 
-- Commands are executed as an argument vector, without reparsing a constructed
-  command string through a shell.
-- Variable values are not reparsed as operators, and lists expand only
-  explicitly.
-- `while`, implicit background execution, command substitution, `eval`, and
-  nested shell stages are rejected.
-- Pipelines are preflighted before execution; failures stop later work.
-- Pipeline timeouts terminate the owned process group and reap its children.
-- Redirect targets are checked before execution; unsafe special files and
-  read/truncate aliasing are rejected.
-- `--plan` displays expanded argv without starting external commands or opening
+- commands are started as argument vectors, without reparsing a command string
+  through a shell;
+- variable values are not reparsed as operators, and lists expand only
+  explicitly;
+- `while`, background execution, command substitution, `eval`, and nested
+  shells are rejected;
+- pipelines are checked before execution, and a failure stops later work;
+- a pipeline timeout terminates its owned process group and waits for child
+  processes;
+- redirects are checked before execution, and unsafe special files or input/
+  output aliasing are rejected;
+- `--plan` displays expanded arguments without starting commands or opening
   redirect files.
-- Script source is capped at 4 MiB before parsing; bounded loops, process
-  snapshots, regexes, and Linux storage-query output provide additional
-  resource limits.
 
-These are language and runtime guarantees, not a sandbox.
+These are language and runtime guarantees, not isolation. The current
+prototype does not protect against an arbitrary dangerous external program.
 
 ## Residual risks
 
-An external command can still modify the system, invoke another interpreter
-through its own implementation or shebang, follow a path changed after a
-preflight check, or interpret a syntactically valid argument dangerously.
-Direct argv execution prevents shell re-parsing; it does not validate the
-semantics or authority of every external program.
+An external program can modify the system, start another shell internally,
+follow a path changed after preflight, or interpret a syntactically valid
+argument dangerously. Direct argument execution prevents shell reparsing, but
+does not validate the meaning or authority of every program.
 
-The name-based rejection of shells, interpreters, and pipeline wrappers is a
-narrow execution policy, not an isolation boundary. Renamed programs, `awk
-system()`, `find -exec`, scripts written to disk, and programs creating new
-sessions can bypass such checks.
+Name checks for shells, interpreters, and wrappers are a narrow execution
+policy, not an isolation boundary. A renamed program, `awk system()`,
+`find -exec`, a script written to disk, or a program that creates a new session
+can bypass such checks.
 
-Do not run untrusted yesh scripts as root. Use a dedicated account, controlled
-`PATH` and environment, filesystem permissions, and operating-system controls
-such as namespaces, cgroups, seccomp, MAC policy, and executable allowlists
-when isolation is required.
+Do not run untrusted scripts as root. For isolation, use a dedicated account,
+controlled `PATH` and environment, filesystem permissions, and operating-system
+controls such as namespaces, cgroups, seccomp, MAC policy, and executable
+allowlists.
 
 ## Operational rules
 
-- Treat external command names and arguments as a policy decision, not merely
-  as syntax.
+- Treat an external command name and its arguments as policy, not merely as
+  syntax.
 - Put `--` before path operands when the external program supports it.
 - Validate destinations, identities, units, hosts, and numeric limits before
-  invoking tools such as `rsync`, `ssh`, `mount`, or `systemctl`.
-- Treat deletion flags as a separate approval boundary. The current rsync
-  examples do not use `--delete`; if a retention/mirror workflow needs it,
-  require a `--plan`/`--dry-run` review, an explicit destination and mount
-  identity, a bounded `--max-delete`, and a policy for excluded files and
-  missing sources. Never infer permission to delete from the presence of a
-  source path.
-- Treat an rsnapshot configuration as executable policy: inspect its effective
-  `rsync_long_args`, `sync_first`, `snapshot_root`, `no_create_root`,
-  `lockfile`, and backup-script entries before applying an interval. A clean
-  yesh wrapper cannot make a dangerous rsnapshot.conf safe by itself.
-- Keep credentials in the user's SSH agent/config or an external secret store;
-  never put passwords or private keys in a yesh script.
-- Use `--plan` for review, but remember that a plan is not a transaction and
-  does not eliminate TOCTOU races.
+  invoking `rsync`, `ssh`, `mount`, or `systemctl`.
+- Treat deletion flags as a separate approval boundary. For `rsync`, require a
+  plan review, an explicit destination and mount point, a `--max-delete` limit,
+  and a policy for excluded files and missing sources.
+- Treat an rsnapshot configuration as executable policy and inspect its
+  effective `rsync_long_args`, `sync_first`, `snapshot_root`, `no_create_root`,
+  `lockfile`, and backup-script entries.
+- Keep secrets in the SSH agent, configuration, or an external secret store,
+  never in a yesh script.
+- Use `--plan` for review, remembering that a plan is not a transaction and
+  does not eliminate races between checking and acting.
 
 ## High-impact Linux operations
 
-The following operations need an explicit review of the expanded arguments,
-the resolved paths, the current mount, and the account that will run them.
-This is a risk catalogue, not a complete detector: an arbitrary external
-program can hide the same effect behind different names or configuration.
+The following operations require a separate review of expanded arguments, real
+paths, the current mount point, and the account that will run them. This is a
+risk catalogue, not a complete detector: an external program can hide the same
+effect under another name or in its configuration.
 
 - `rm -r`, `rm --no-preserve-root`, `find -delete`, and similar recursive
-  removal can destroy a tree. A missing or wrong path is still dangerous;
-  `rm`'s own safeguards are not a yesh policy. See the [GNU `rm(1)` manual](https://www.man7.org/linux/man-pages/man1/rm.1.html).
+  removal can destroy a tree. A wrong or replaced path is still dangerous;
+  `rm` safeguards do not replace yesh policy. See the [GNU `rm(1)` manual](https://www.man7.org/linux/man-pages/man1/rm.1.html).
 - `mkfs.*`, `wipefs`, `dd` to a device, and block-device writes can destroy a
-  filesystem or its metadata. Verify the device identity and require a
-  disposable fixture before testing. See the [`mkfs(8)` manual](https://man7.org/linux/man-pages/man8/mkfs.8.html).
+  filesystem or its metadata. Verify the device first and test only on a
+  disposable fixture. See the [`mkfs(8)` manual](https://man7.org/linux/man-pages/man8/mkfs.8.html).
 - `mount --bind`/`--rbind`, `mount --move`, remounts, and propagation changes
-  alter which files are visible and where writes go. A read-only bind does not
-  necessarily make the underlying filesystem read-only. See the [`mount(8)` manual](https://www.man7.org/linux/man-pages/man8/mount.8.html).
-- `systemctl stop`, `restart`, `kill`, `clean`, `isolate`, and operations that
-  reload or replace service configuration can interrupt unrelated work. The
-  systemd manual explicitly calls `isolate` dangerous because it can stop
-  processes outside the requested target. See the [systemd `systemctl` manual](https://www.freedesktop.org/software/systemd/man/systemctl.html).
+  alter file visibility and where writes go. A read-only bind mount does not
+  necessarily make the source filesystem read-only. See the [`mount(8)` manual](https://www.man7.org/linux/man-pages/man8/mount.8.html).
+- `systemctl stop`, `restart`, `kill`, `clean`, `isolate`, and reloading or
+  replacing service configuration can interrupt unrelated work. The systemd
+  `systemctl` manual explicitly calls `isolate` dangerous because it can stop
+  processes outside the selected target. See the [systemd `systemctl` manual](https://www.freedesktop.org/software/systemd/man/systemctl.html).
 - `rsync --delete*`, `--delete-excluded`, `--delete-missing-args`, and
   `--remove-source-files` can remove destination or source entries.
-  `--inplace` can leave an existing destination file partially updated after
-  interruption; `--link-dest` creates hard-link relationships between trees;
-  `--partial`/`--partial-dir` leave or reuse transfer state and must not use a
-  directory writable by other users. `--delay-updates` changes when updated
+  `--inplace` can leave an existing destination file partially changed after
+  interruption; `--link-dest` creates hard links between trees;
+  `--partial`/`--partial-dir` leave or reuse transfer state, so their directory
+  must not be writable by other users. `--delay-updates` changes when updated
   files become visible. See the [official rsync manual](https://www.man7.org/linux/man-pages/man1/rsync.1.html).
 
 For these operations, yesh can make the command and failure boundary visible,
-but it cannot prove that a path, device, remote host, service unit, or external
-program means what the operator intended. A future command-specific policy
-should classify known high-impact arguments before start; it must not pretend
-that a blacklist is a sandbox.
+but cannot prove that a path, device, remote host, service, or external program
+means what the operator intended. The next separate step is policy for known
+commands and dangerous arguments before execution; a blacklist must not be
+presented as isolation.
 
-An `rsnapshot` interval is also a high-impact operation: it can rotate or
-remove older levels according to `retain` and create hard links between
-snapshots. Before applying one, inspect the effective configuration, snapshot
-root, mount identity, `lockfile`, `no_create_root`, `configtest`, and test mode
-`-t`. An approval file does not replace those checks.
+An rsnapshot interval is also a high-impact operation: `retain` can move or
+remove older levels and create hard links between snapshots. Before applying
+one, inspect the effective configuration, snapshot root, mount point,
+`lockfile`, `no_create_root`, `configtest`, and test mode `-t`. An approval file
+does not replace these checks.
 
 ## Privilege and `sudo`
 
-yesh must never add `sudo` implicitly. Whether a command needs extra privilege
-depends on the operation, ownership, ACLs, capabilities, mount options, service
-policy, and (for SSH/rsync) the remote account. `sudo` itself only runs a
-command as another user when the local security policy permits it; it is not a
-proof that the command is safe. See the [`sudo(8)` manual](https://www.man7.org/linux/man-pages/man8/sudo.8.html).
+yesh must never add `sudo` implicitly. Whether extra privilege is needed depends
+on the operation, owner, ACLs, process capabilities, mount options, service
+policy, and, for SSH/rsync, the remote account. `sudo` only runs a command as
+another user when the local policy permits it; it does not prove that the
+command is safe. See the [`sudo(8)` manual](https://www.man7.org/linux/man-pages/man8/sudo.8.html).
 
-The useful behavior is therefore:
+The correct yesh behavior is therefore to:
 
-- classify known operations as read-only, user-writable, privileged, or
-  environment-dependent;
-- check the current identity and the relevant local facts when that check is
-  reliable and read-only;
-- stop before a state-changing operation when a required privilege is absent;
-- show which stage requires privilege and which account will execute it;
-- never repair the situation by wrapping an arbitrary command in `sudo`.
+- classify known operations as read-only, writable in user-owned locations,
+  privilege-requiring, or environment-dependent;
+- check the current account and relevant facts when the check itself is safe
+  and read-only;
+- stop before changing state when required privilege is absent;
+- show which stage requires privilege and which account will run it;
+- never fix the situation by wrapping an arbitrary command in `sudo`.
 
-For an unknown external command, yesh must report that privilege requirements
-are unknown. A successful preflight cannot prove future access: permissions,
-ACLs, capabilities, set-user-ID programs, remote policy, and paths can change
-between the check and the operation. Privileged workflows should use an
+For an unknown external command, yesh must state that its privilege
+requirements are unknown. Successful preflight does not prove future access:
+permissions, ACLs, capabilities, set-user-ID behavior, remote policy, and paths
+may change between checking and acting. A privileged script must have an
 explicitly reviewed command, account, environment, and operating-system policy.
 
-## Mandatory security work before a stable release
+## Mandatory work before a stable release
 
-The following are required project work, not optional recommendations:
+The following are required project work, not optional advice:
 
-- define controlled `PATH` and environment policy for privileged/runbook
-  execution;
+- define controlled `PATH` and environment policies for privileged execution;
 - implement argument validation or typed wrappers for high-impact external
   commands;
-- maintain lexer, parser, value-expansion, redirect, and runtime fuzzing;
-- add `govulncheck` and dependency scanning in CI;
+- maintain fuzz checks for lexing, parsing, value expansion, redirects, and
+  the runtime using randomly generated data;
+- add `govulncheck` and dependency scanning to CI;
 - publish a threat model and release security checklist;
-- keep a privileged loopback/storage fixture in a disposable VM or Rocky host;
-- document and test full OS-level isolation for untrusted scripts, or clearly
-  state that yesh does not provide it.
+- keep a privileged loopback/storage fixture only in a disposable VM or on a
+  separate Rocky Linux host;
+- either document and test isolation of untrusted scripts, or clearly retain
+  the statement that yesh is not such an isolation mechanism.

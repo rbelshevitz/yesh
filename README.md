@@ -66,8 +66,6 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
-## Bash, but readable
-
 | Bash | yesh |
 | --- | --- |
 | `name=world; echo "$name"` | `name = world`<br>`echo $name` |
@@ -120,6 +118,8 @@ wrong:
 
 The result is a small Go-based language for scripts that should be easy to
 write and easy to review.
+
+## What the prototype supports
 
 The current prototype supports:
 
@@ -266,7 +266,7 @@ See the [English roadmap](docs/TODO.md) for current project priorities.
 
 ## Documentation and scope
 
-yesh is an experimental language focused on readable system administration and
+yesh is an early-stage language focused on readable system administration and
 operational scripts, not a general-purpose shell or an interactive command
 environment.
 The examples and design documents are the source of truth for its semantics.
