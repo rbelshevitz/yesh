@@ -32,6 +32,21 @@ one of them fails.
 
 ![A system administrator having a Eureka moment in a data center](docs/yesh-eureka.png)
 
+## Try it in a minute
+
+From a checkout with Go 1.27 or newer:
+
+```text
+go build -trimpath -o yesh ./cmd/yesh
+./yesh examples/hello.yesh
+./yesh --plan examples/hello.yesh
+```
+
+The second command runs a self-contained example. The third shows the same
+script's expanded commands without starting an external command. For a
+Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
+it requires a running systemd manager and only observes one service.
+
 ## Bash, but readable
 
 | Bash | yesh |
