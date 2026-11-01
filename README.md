@@ -102,13 +102,20 @@ yesh provides a readable, finite check when an administrator needs an answer
 about one service during one incident or maintenance window; it is not a
 replacement for continuous monitoring where that is justified.
 
+Many Linux services are started and supervised by systemd today. For that
+reason, the author started the resource-observation implementation with
+systemd: it gives us a common frame for tracking service identity, lifecycle
+state, cgroup, and journal data. This is the first backend, not a claim that
+every Linux
+service or every future diagnostic path must use systemd.
+
 ## How yesh measures service resources
 
 On Linux, yesh can observe a systemd service's resources for a fixed period
 without changing anything: it samples the cgroup, keeps a bounded history, and
-produces memory/CPU/I/O summaries. It
-requires a readable systemd manager and cgroup v2; unavailable controllers
-remain explicitly unavailable. See the [systemd guide](docs/systemd.md) and
+produces memory/CPU/I/O summaries. It requires a readable systemd manager and
+cgroup v2; unavailable controllers remain explicitly unavailable. See the
+[systemd guide](docs/systemd.md) and
 [syntax tutorial](docs/syntax-guide.md) for the directive rules.
 
 This is not a monitoring daemon. yesh helps an administrator answer one
