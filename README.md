@@ -92,6 +92,8 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
+## A lightweight diagnostic tool for small Linux systems
+
 Alongside the language, yesh is also intended as a lightweight diagnostic tool
 for small, temporary, or embedded Linux systems where CPU cycles and memory are
 scarce.
