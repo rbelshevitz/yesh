@@ -103,6 +103,9 @@ func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, sinc
 	if len(states) == 0 {
 		return fmt.Errorf("no resource measurements for %s in the requested period", unit)
 	}
+	if err := validateServiceResourceSummaryIdentity(states); err != nil {
+		return err
+	}
 	sort.Slice(states, func(i, j int) bool { return states[i].StartedAt.Before(states[j].StartedAt) })
 	summary := serviceResourceSummary{ioDeltas: make(map[string]serviceIODelta)}
 	for _, state := range states {
@@ -168,6 +171,29 @@ func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, sinc
 	summary.rssSlope, summary.rssTrend, summary.hasRSSSlope = rssAnalysis.slope, rssAnalysis.trend, rssAnalysis.ok
 	writeHumanServiceSummary(os.Stdout, unit, manager, summary, memoryAnalysis, rssAnalysis)
 	writeServiceProcessSummary(os.Stdout, unit, summary)
+	return nil
+}
+
+func validateServiceResourceSummaryIdentity(states []serviceResourceState) error {
+	if len(states) == 0 {
+		return nil
+	}
+	first := states[0]
+	for _, reason := range first.IncompleteReasons {
+		if reason == "identity_changed" {
+			return fmt.Errorf("resource measurements contain a measurement that crossed service identity")
+		}
+	}
+	for _, state := range states[1:] {
+		for _, reason := range state.IncompleteReasons {
+			if reason == "identity_changed" {
+				return fmt.Errorf("resource measurements contain a measurement that crossed service identity")
+			}
+		}
+		if state.Cgroup != first.Cgroup || state.InvocationID != first.InvocationID {
+			return fmt.Errorf("resource measurements span multiple service identities; use a narrower period")
+		}
+	}
 	return nil
 }
 

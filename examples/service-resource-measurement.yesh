@@ -1,15 +1,20 @@
-# A finite, read-only resource measurement for one exact systemd unit.
-# By default yesh stores records below ~/.local/.yesh/resources/<unit> and
-# creates only that user-owned directory tree when needed. An explicit
-# `save to $state_dir` path can be used for a different layout.
+# A finite, read-only resource measurement for an existing nginx service.
+# The explicit temporary directory makes the saved history easy to inspect
+# and remove after the exercise.
+# It contains measurements.jsonl and its lock file; summarize reads that
+# history. Use ~/.local/.yesh/resources/nginx.service for regular operation.
+# If `save to` is omitted, yesh uses that default user-owned directory and
+# never invokes sudo. An explicit state path must be writable by this user.
 #
-# Run with --plan first. The unit must already exist and be readable by the
-# selected systemd manager. A scheduled measurement can be repeated by an
-# external systemd timer; yesh itself remains a finite foreground command.
+# Run with --plan first. nginx must already exist and be readable by the system
+# manager. Replace it only with another exact service meaningful on the host.
+# yesh does not start nginx or create HTTP traffic; provide load separately.
 
-# The retention directive belongs to this measurement and keeps a 24-hour
-# sliding history for the selected unit.
-measure service user api.service for 10s every 2s:
-    save to state
+# The retention directive keeps a 24-hour sliding history for nginx.
+state_dir = "/tmp/yesh-nginx-resources"
+service status nginx.service
+measure service nginx.service for 30s every 5s:
+    save to $state_dir
     keep history for 24h
-summarize service user api.service from state since 1h
+summarize service nginx.service from $state_dir since 1h
+journal nginx.service since 15m lines 40

@@ -25,6 +25,7 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 	samples := []serviceResourceStateSample{serviceResourceStateSampleFromSnapshot(first)}
 	complete := true
 	reasons := []string{}
+	appendServiceMeasurementCompleteness(&complete, &reasons, first)
 	for index := 1; ; index++ {
 		target := started.Add(time.Duration(index) * interval)
 		if target.After(deadline) {
@@ -44,9 +45,10 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 			return err
 		}
 		samples = append(samples, serviceResourceStateSampleFromSnapshot(next))
+		appendServiceMeasurementCompleteness(&complete, &reasons, next)
 		if next.cgroup != first.cgroup || next.properties["InvocationID"] != first.properties["InvocationID"] {
 			complete = false
-			reasons = append(reasons, "identity_changed")
+			appendServiceMeasurementReason(&reasons, "identity_changed")
 			break
 		}
 		if !target.Before(deadline) {
@@ -80,6 +82,25 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 	}
 	fmt.Fprintf(os.Stdout, "SERVICE_MEASURE unit=%s state=%q samples=%d complete=%t history_keep=%s history_removed=%d\n", unit, path, len(samples), complete, keepText, removed)
 	return nil
+}
+
+func appendServiceMeasurementCompleteness(complete *bool, reasons *[]string, snapshot serviceResourceSnapshot) {
+	if snapshot.metrics["processes.incomplete"] == "yes" {
+		*complete = false
+		appendServiceMeasurementReason(reasons, "process_disappeared")
+	}
+}
+
+func appendServiceMeasurementReason(reasons *[]string, reason string) {
+	if reason == "" || reason == "none" {
+		return
+	}
+	for _, existing := range *reasons {
+		if existing == reason {
+			return
+		}
+	}
+	*reasons = append(*reasons, reason)
 }
 
 func (r *runtime) context() context.Context {

@@ -105,6 +105,20 @@ snapshot "$growth"
 snapshot "$cpu"
 snapshot "$restart"
 
+default_home="$tmp_dir/home"
+mkdir -p "$default_home"
+export HOME="$default_home"
+default_script="$tmp_dir/default-state.yesh"
+printf 'measure service user %s for 2s every 1s\nsummarize service user %s since 1h\n' \
+    "$stable" "$stable" >"$default_script"
+"$yesh_bin" "$default_script"
+default_state="$HOME/.local/.yesh/resources/$stable"
+if test "$(stat -c '%a' "$default_state")" != 700; then
+    echo "error: default state directory is not mode 700: $default_state" >&2
+    exit 1
+fi
+echo "FIXTURE default user state verified: $default_state mode 700"
+
 growth_script="$tmp_dir/growth-measurement.yesh"
 growth_state="$tmp_dir/growth-state"
 printf 'state_dir = "%s"\nmeasure service user %s for 20s every 2s save to $state_dir\nsummarize service user %s from $state_dir since 1h\n' \
@@ -112,8 +126,8 @@ printf 'state_dir = "%s"\nmeasure service user %s for 20s every 2s save to $stat
 growth_output="$tmp_dir/growth-measurement.out"
 "$yesh_bin" "$growth_script" >"$growth_output"
 cat "$growth_output"
-if ! grep -q 'memory_trend=rising' "$growth_output"; then
-    echo 'error: intentional memory-growth fixture did not produce memory_trend=rising' >&2
+if ! grep -q 'trend rising' "$growth_output"; then
+	echo 'error: intentional memory-growth fixture did not produce a rising memory trend' >&2
     exit 1
 fi
 echo 'FIXTURE snapshots completed; cleanup follows.'

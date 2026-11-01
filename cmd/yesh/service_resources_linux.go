@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -117,8 +118,13 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 	}
 
 	pids := make(map[int]bool)
+	processesIncomplete := false
 	err = filepath.WalkDir(path, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
+			if current != path && errors.Is(walkErr, os.ErrNotExist) {
+				processesIncomplete = true
+				return nil
+			}
 			return walkErr
 		}
 		if entry.IsDir() {
@@ -129,7 +135,11 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 		}
 		data, err := os.ReadFile(current)
 		if err != nil {
-			return err
+			if errors.Is(err, os.ErrNotExist) {
+				processesIncomplete = true
+				return nil
+			}
+			return cgroupProcessListError(current, err)
 		}
 		for _, field := range strings.Fields(string(data)) {
 			pid, err := strconv.Atoi(field)
@@ -148,7 +158,6 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 	}
 	processes := make([]processInfo, 0, len(pids))
 	var rss uint64
-	processesIncomplete := false
 	for pid := range pids {
 		process, err := readProcessInfo(pid)
 		if err != nil {
@@ -157,6 +166,13 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 				continue
 			}
 			return nil, nil, 0, fmt.Errorf("read process %d: %w", pid, err)
+		}
+		if !cgroupPathContains(controlGroup, process.cgroup) {
+			// The process moved after cgroup.procs was read. Do not include
+			// its RSS in this service snapshot; the membership is no longer
+			// proven, and a later process may reuse the PID.
+			processesIncomplete = true
+			continue
 		}
 		processes = append(processes, process)
 		if ^uint64(0)-rss < process.rssBytes {
@@ -221,6 +237,27 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 		}
 	}
 	return processes, metrics, rss, nil
+}
+
+func cgroupProcessListError(path string, err error) error {
+	if errors.Is(err, syscall.EOPNOTSUPP) {
+		return fmt.Errorf("read cgroup.procs %q: threaded cgroups are not supported", path)
+	}
+	return err
+}
+
+func cgroupPathContains(root, candidate string) bool {
+	if root == "" || candidate == "" || root[0] != '/' || candidate[0] != '/' {
+		return false
+	}
+	root = strings.TrimRight(root, "/")
+	if root == "" {
+		root = "/"
+	}
+	if root == "/" {
+		return true
+	}
+	return candidate == root || strings.HasPrefix(candidate, root+"/")
 }
 
 const maxCgroupIOStatDevices = 128

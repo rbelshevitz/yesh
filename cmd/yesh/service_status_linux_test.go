@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -203,7 +204,7 @@ func TestLinuxServiceResourcesPlanDoesNotQuerySystemctl(t *testing.T) {
 }
 
 func TestLinuxServiceMeasurementPlanDoesNotWriteState(t *testing.T) {
-	stateDir := filepath.Join(t.TempDir(), "state")
+	stateDir := filepath.Join(t.TempDir(), "missing", "state")
 	t.Setenv("PATH", t.TempDir())
 	r := &runtime{values: map[string]value{}, filename: "service.yesh", plan: true}
 	items, err := parse("measure service api.service for 2s every 1s save to \""+stateDir+"\"\n", "service.yesh")
@@ -486,6 +487,54 @@ func TestLinuxServiceSummaryPrintsVolatileEvents(t *testing.T) {
 	}
 }
 
+func TestLinuxServiceSummaryRejectsDifferentInvocationIDs(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now().UTC().Add(-time.Minute)
+	for index, invocation := range []string{"invocation-1", "invocation-2"} {
+		start := now.Add(time.Duration(index) * time.Second)
+		state := serviceResourceState{
+			Schema: serviceResourceStateSchema, Kind: "service-resource-measurement",
+			Manager: "user", Unit: "api.service", Cgroup: "/user.slice/api.service",
+			InvocationID: invocation, StartedAt: start, FinishedAt: start.Add(time.Second), Complete: true,
+			Samples: []serviceResourceStateSample{
+				{ObservedAt: start, Metrics: map[string]string{"memory.current": "10"}},
+				{ObservedAt: start.Add(time.Second), Metrics: map[string]string{"memory.current": "20"}},
+			},
+		}
+		data, err := json.Marshal(state)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, invocation+".json"), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := (&runtime{values: map[string]value{}, filename: "summary.yesh"}).runServiceResourceSummary("user", "api.service", dir, time.Hour)
+	if err == nil || !strings.Contains(err.Error(), "multiple service identities") {
+		t.Fatalf("summary error = %v, want identity refusal", err)
+	}
+}
+
+func TestCgroupPathContainsOnlySameNodeOrDescendants(t *testing.T) {
+	tests := []struct {
+		root, candidate string
+		want            bool
+	}{
+		{root: "/system.slice/api.service", candidate: "/system.slice/api.service", want: true},
+		{root: "/system.slice/api.service", candidate: "/system.slice/api.service/worker", want: true},
+		{root: "/system.slice/api.service", candidate: "/system.slice/other.service", want: false},
+		{root: "/system.slice/api.service", candidate: "/system.slice/api.service-old", want: false},
+		{root: "/", candidate: "/anything", want: true},
+		{root: "relative", candidate: "/relative", want: false},
+	}
+	for _, test := range tests {
+		if got := cgroupPathContains(test.root, test.candidate); got != test.want {
+			t.Errorf("cgroupPathContains(%q, %q) = %t, want %t", test.root, test.candidate, got, test.want)
+		}
+	}
+}
+
 func TestServiceProcessSummaryAttributesRSSByPIDAndStartTime(t *testing.T) {
 	state := serviceResourceState{
 		Samples: []serviceResourceStateSample{
@@ -550,6 +599,36 @@ func TestLinuxReadServiceCgroupIncludesCurrentProcess(t *testing.T) {
 func TestLinuxReadServiceCgroupRejectsEscapingPath(t *testing.T) {
 	if _, _, _, err := readServiceCgroup(t.TempDir(), "/../../proc"); err == nil {
 		t.Fatal("accepted cgroup path escaping root")
+	}
+}
+
+func TestLinuxReadServiceCgroupMarksMissingNestedProcFileIncomplete(t *testing.T) {
+	root := t.TempDir()
+	cgroup := filepath.Join(root, "system.slice", "api.service")
+	child := filepath.Join(cgroup, "worker")
+	if err := os.MkdirAll(child, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cgroup, "cgroup.procs"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(child, "removed"), filepath.Join(child, "cgroup.procs")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, metrics, _, err := readServiceCgroup(root, "/system.slice/api.service")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metrics["processes.incomplete"] != "yes" {
+		t.Fatalf("processes.incomplete = %q, want yes", metrics["processes.incomplete"])
+	}
+}
+
+func TestLinuxCgroupProcessListErrorExplainsThreadedCgroup(t *testing.T) {
+	err := cgroupProcessListError("/sys/fs/cgroup/api.service/worker/cgroup.procs", syscall.EOPNOTSUPP)
+	if !strings.Contains(err.Error(), "threaded cgroups are not supported") {
+		t.Fatalf("error = %q", err)
 	}
 }
 
@@ -682,10 +761,19 @@ func TestLinuxServiceMeasurementWritesIncompleteRecordOnInvocationChange(t *test
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
-	stateDir := filepath.Join(t.TempDir(), "state")
+	stateDir := filepath.Join(t.TempDir(), "missing", "state")
 	r := &runtime{values: map[string]value{}, filename: "identity-change.yesh", cgroupRoot: root}
 	if err := r.runServiceMeasurement("system", "api.service", 20*time.Millisecond, 1*time.Millisecond, 0, stateDir); err != nil {
 		t.Fatal(err)
+	}
+	for _, path := range []string{filepath.Dir(stateDir), stateDir} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("stat created state directory %q: %v", path, err)
+		}
+		if mode := info.Mode().Perm(); mode != 0700 {
+			t.Fatalf("state directory %q mode = %o, want 700", path, mode)
+		}
 	}
 	states, err := readServiceResourceJournal(filepath.Join(stateDir, serviceResourceJournalName))
 	if err != nil {
@@ -754,6 +842,21 @@ func TestServiceResourceObservationMessageIsOperatorReadable(t *testing.T) {
 	got := serviceResourceObservationMessage("unavailable", "metric_unavailable")
 	if got != "some resource files were unavailable; unavailable values are not zero" {
 		t.Fatalf("message = %q", got)
+	}
+}
+
+func TestServiceMeasurementDoesNotFailForUnavailableOptionalMetric(t *testing.T) {
+	complete := true
+	reasons := []string{}
+	snapshot := serviceResourceSnapshot{
+		properties: map[string]string{"LoadState": "loaded"},
+		cgroup:     "/api.service",
+		metrics:    map[string]string{"memory.current": "unavailable", "processes.incomplete": "no"},
+	}
+	appendServiceMeasurementCompleteness(&complete, &reasons, snapshot)
+	appendServiceMeasurementCompleteness(&complete, &reasons, snapshot)
+	if !complete || len(reasons) != 0 {
+		t.Fatalf("complete=%t reasons=%v", complete, reasons)
 	}
 }
 
