@@ -1,0 +1,5 @@
+# Run while scripts/start-io-mock-service.sh is active.
+measure service yesh-io-mock.service for 10s every 2s:
+    save to "/tmp/yesh-io-state"
+    keep history for 24h
+summarize service yesh-io-mock.service from "/tmp/yesh-io-state" since 1h

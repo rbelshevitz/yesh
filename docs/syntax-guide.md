@@ -522,6 +522,92 @@ It uses an ext4 loopback device and checks two rotations, restore, hard links,
 an invalid configuration, missing confirmation, a held lock, and resource
 cleanup. It does not use real disks or `/etc/rsnapshot.conf`.
 
+## 13b. Finite systemd service measurement
+
+The goal is to answer more than “what is wrong with the service right now?” We
+also want to know: “what happened during the last hour or day?”
+
+The practical chain is:
+
+```text
+measure → save snapshots → summarize → see the change
+```
+
+For example, we can see whether memory grew, how much CPU time and disk I/O were
+used, whether OOM (Out Of Memory) events occurred, and whether the strange
+behavior began after a restart. One snapshot answers only “what is happening
+now.” `measure` takes
+several snapshots over a finite interval and saves them as one result.
+
+Here is a complete example:
+
+```yesh
+state_dir = "/tmp/yesh-api-state"
+
+measure service user api.service for 10s every 2s:
+    save to $state_dir
+    keep history for 24h
+summarize service user api.service from $state_dir since 1h
+```
+
+The `measure` line contains the settings for the measurement:
+
+- `service` says that the subject is a service managed by systemd;
+- `user` selects the user systemd manager;
+- `api.service` is the exact service name;
+- `for 10s` limits the whole measurement to ten seconds;
+- `every 2s` requests a snapshot every two seconds.
+
+There is no separate `unit` keyword: the service name simply follows `service`
+and, when present, `user` or `system`. `save to` selects the history directory.
+In this example both commands use the same `$state_dir`: the first writes there
+and the second reads there. After a successful write, the `keep history for 24h`
+directive removes results older than one day from that journal.
+
+The colon after the first line means that the following indented lines are
+settings for that measurement. This is the extended form. If you do not need to
+set the directory or retention window explicitly, use the short form:
+
+```yesh
+measure service api.service for 10s every 2s
+```
+
+The short form still saves the result in the default directory, but it does not
+set a retention policy. For long-term use, specify how long to keep the history.
+
+The measurement is finite: the first snapshot is immediate, later snapshots
+use the requested interval, and the record is appended only after collection
+finishes. `summarize` only reads the history; it does not start the service or
+take new snapshots. Start by inspecting the plan:
+
+```text
+yesh --plan service-measurement.yesh
+```
+
+The next run can read the old history. `summarize ... since 1h` selects records
+from the last hour, compares the beginning and end of each measurement, combines
+them into one report, and shows changes in memory, RSS, CPU, OOM, and I/O. It
+does not continue an interrupted measurement and does not combine records from
+different service invocations. To continue, start a new explicit `measure`.
+
+In Bash, the same task usually needs a manual loop, timer, temporary file, and
+separate cleanup:
+
+```bash
+for i in 1 2 3 4 5; do
+    systemctl show api.service
+    sleep 2
+done
+```
+
+This loop only prints the state several times. History, comparison, and cleanup
+would have to be added separately.
+
+The Bash loop alone does not say where to keep the result, how long to keep it,
+or how to avoid mixing different service invocations. These boundaries are
+explicit in yesh. Linux, an available systemd manager, and readable cgroup v2
+are required.
+
 ## 14. Reading an unfamiliar script
 
 Ask five questions before you run a yesh script:

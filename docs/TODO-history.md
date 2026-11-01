@@ -48,6 +48,10 @@ filesystem.
 - disposable Debian, WSL2, Rocky Linux, loopback-ext4, and isolated KVM
   environments. Real devices, production paths, and power-loss durability are
   not covered by these fixtures.
+- local service resource history: finite `measure`/`summarize`, a JSON Lines
+  journal, `keep history` retention, memory/RSS/CPU/OOM and block-I/O comparison,
+  incomplete tails, corrupt records, lock conflicts, and segmentation after an
+  `InvocationID` change.
 
 The repository contains more than 200 automated test functions and four fuzz
 targets. A test skip for a missing external tool is not evidence that the
@@ -84,7 +88,7 @@ support is not claimed until a real ARM64 smoke test is completed.
 - controlled `PATH` and environment for privileged execution;
 - durable job identity and resume protocol;
 - broader systemd/cgroup, TTY/PTY, boot, NFS/FUSE, and real-device testing;
-- independent review of the tutorial and a real ARM64 execution check.
+- a real ARM64 execution check.
 
 Older speculative designs, duplicated milestone lists, and completed
 intermediate checklists were removed from this archive when the short roadmap

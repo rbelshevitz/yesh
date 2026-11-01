@@ -1,0 +1,15 @@
+# A finite, read-only resource measurement for one exact systemd unit.
+# By default yesh stores records below ~/.local/.yesh/resources/<unit> and
+# creates only that user-owned directory tree when needed. An explicit
+# `save to $state_dir` path can be used for a different layout.
+#
+# Run with --plan first. The unit must already exist and be readable by the
+# selected systemd manager. A scheduled measurement can be repeated by an
+# external systemd timer; yesh itself remains a finite foreground command.
+
+# The retention directive belongs to this measurement and keeps a 24-hour
+# sliding history for the selected unit.
+measure service user api.service for 10s every 2s:
+    save to state
+    keep history for 24h
+summarize service user api.service from state since 1h

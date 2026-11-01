@@ -84,6 +84,22 @@ with lock /var/lib/yesh/backup.lock:
 .PP
 On Linux this takes an exclusive non-blocking advisory lock for the indented
 body and releases it on every exit path. In plan mode it is only displayed.
+.SS Systemd service measurement (Linux)
+.EX
+state_dir = "/tmp/yesh-api-state"
+measure service user api.service for 10s every 2s:
+    save to $state_dir
+    keep history for 24h
+summarize service user api.service from $state_dir since 1h
+.EE
+.PP
+The block header names one exact systemd unit and finite sampling interval.
+The indented directives select the state directory and the required sliding
+retention window. `save to` is optional, but `keep history for DURATION` is
+required in the block. `service` is the operation namespace; `unit` is not a
+separate keyword in this syntax. The unit name is the positional value after
+the operation, for example `api.service`. The short measurement form without
+the block remains valid when no state or retention directive is needed.
 .SS publish
 .EX
 publish temporary to current

@@ -240,6 +240,30 @@ count, total RSS, available memory/task/CPU counters, OOM events, and a process
 table. It does not signal the service or change resource limits. Missing fields
 are reported as unavailable; the result is a point-in-time observation and
 requires Linux, systemd, and readable cgroup v2 state.
+.SS Finite service measurement (Linux)
+.nf
+state_dir = "/tmp/yesh-api-state"
+measure service user api.service for 10s every 2s:
+    save to $state_dir
+    keep history for 24h
+summarize service user api.service from $state_dir since 1h
+.fi
+.PP
+The block form takes the first resource snapshot immediately, samples until the
+finite deadline, and appends one completed JSON Lines record only after the
+measurement finishes. `save to` is optional; without it, state is stored below
+`~/.local/.yesh/resources/`. The block must contain `keep history for DURATION`;
+after a successful append it removes only records older than that sliding window. A
+failed measurement leaves existing history unchanged. `summarize` reads matching
+records and does not start a service or take new snapshots. The short form
+`measure service UNIT for DURATION every DURATION` remains available when no
+state path or retention policy is needed.
+.PP
+The journal is one bounded JSON Lines file per state directory, not one JSON
+array. A final incomplete line is ignored during reading; a malformed complete
+line is an error. Records from another manager, unit, cgroup, or invocation are
+not combined. This is local finite history, not a daemon or a Prometheus
+replacement.
 .SS Read-only storage (Linux)
 .nf
 backup = device by uuid "replace-with-real-uuid"

@@ -92,6 +92,9 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
+In development: service resource measurement by cgroup, history storage, and
+memory/I/O summaries. The tutorial will explain the directive syntax.
+
 | Bash | yesh |
 | --- | --- |
 | `name=world; echo "$name"` | `name = world`<br>`echo $name` |

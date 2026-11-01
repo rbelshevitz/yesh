@@ -24,6 +24,12 @@ The shorter forms `service api`, `service.status api`, `service.restart api`,
 and `service.wait api running within 30s` are design sketches, not accepted
 syntax. The documented forms above are the current interface.
 
+Here `service` is the operation keyword; there is no separate `unit` keyword.
+The systemd unit is the following positional value, as in
+`service resources api.service`. In tutorial examples, `unit` may also be an
+ordinary variable name such as `unit = nginx.service`; it is not special service
+syntax.
+
 `service status`, `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION`, and
 bounded `journal UNIT since DURATION lines N` are implemented. Restart uses
@@ -35,13 +41,101 @@ permission-warning result is not presented as success. Cursor/boot filters and
 follow mode remain design targets; bounded `wait` is implemented.
 
 `service resources UNIT` is a read-only snapshot of a Linux unit and its cgroup:
-`ControlGroup`, the main PID, process count, total RSS, available memory/task/CPU
-counters, OOM events, and a process table. The main PID is not treated as the
-whole service: child processes come from the unit cgroup and its subgroups.
-Unavailable fields are printed as `unavailable`, and a process that disappears
-during the snapshot may be omitted. The operation sends no signals and changes
-no limits. It requires Linux, an available systemd manager, and cgroup v2; it is
-a point-in-time observation, not a guarantee of future service behavior.
+`ControlGroup`, the unit `InvocationID` when available, the main PID, cgroup type and available controllers, process
+count, total RSS, selected cgroup v2 memory/task/CPU counters, `memory.stat`
+values, memory/CPU/I/O pressure windows where available, local and hierarchical
+OOM events, `populated`/`frozen` state, and a process table. The main PID is not
+treated as the whole service: child
+processes come from the unit cgroup and its subgroups. `processes_incomplete=yes`
+means that a process disappeared while the finite snapshot was being collected;
+it is not silently treated as a complete process list.
+The report also includes host-wide PSI windows where `/proc/pressure` is
+readable, so service pressure can be compared with pressure on the machine.
+The operation never invokes `sudo`, changes credentials, sends signals, or
+writes limits. It reads only what the current user and systemd manager expose:
+unavailable fields are printed as `unavailable`; the report also includes an
+`observation` state and `observation_reason` such as `unit_not_found`,
+`no_cgroup`, `metric_unavailable`, or `process_disappeared`. A process that disappears
+during the snapshot is marked as an incomplete observation. Permission denied,
+an absent controller, and an unsupported file are not reported as zero or as
+success. The operation requires Linux, an available systemd manager, and cgroup
+v2; it is a point-in-time observation, not a guarantee of future service
+behavior.
+The preceding `RESOURCE_OBSERVATION` line is a plain operator-facing sentence;
+it explicitly says when unavailable values are not zero.
+
+The first finite measurement and summary forms are:
+
+```yesh
+state_dir = "/tmp/yesh-api-state"
+
+measure service user api.service for 10s every 2s:
+    save to $state_dir
+    keep history for 24h
+summarize service user api.service from $state_dir since 1h
+```
+
+`measure` takes the first snapshot immediately, samples until its finite
+deadline, and appends one completed JSON Lines record only after collection
+finishes. `keep history for 24h` removes only records older than that window
+after a successful measurement; a failed measurement leaves the old history
+unchanged.
+The block requires the retention directive; `save to` may be omitted to use the
+default state directory. If no retention policy is needed, use the short
+one-line form without a block.
+`summarize` reads matching records from the state directory; it does not start
+a service, sample cgroups, or repair state. The state path is a directory and
+is created below `~/.local/.yesh/resources/` with restrictive permissions when
+it does not exist. An explicit `save to $state_dir` / `from $state_dir` path is
+available for a different layout. A restart or
+cgroup identity change ends the current record as incomplete rather than
+combining different service invocations.
+
+The saved JSON records retain exact byte values and derived fields such as
+`memory_start`, `memory_end`, `memory_max`, `memory_delta`, and the measured
+trend and slope. `summarize` renders those records as an operator report rather
+than printing a `key=value` table. It opens with the unit, observed duration,
+memory direction, and observation completeness, then describes memory, RSS,
+CPU/OOM counters, process RSS growth, process churn, scope, and limitations.
+Process attribution compares adjacent complete samples only within one
+`InvocationID` and cgroup; a PID reuse is a new process. This is measured
+evidence, not a causal diagnosis.
+
+For overnight history, keep scheduling in systemd and keep each yesh run
+finite. The measurement script can contain the two statements above; a user
+service and timer can invoke it like this:
+
+```ini
+# ~/.config/systemd/user/yesh-api-resources.service
+[Unit]
+Description=Bounded yesh resource measurement for api.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/yesh /home/ops/yesh-api-resources.yesh
+```
+
+```ini
+# ~/.config/systemd/user/yesh-api-resources.timer
+[Unit]
+Description=Periodic yesh resource measurement for api.service
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=1s
+Persistent=true
+Unit=yesh-api-resources.service
+
+[Install]
+WantedBy=timers.target
+```
+
+The measurement duration must be shorter than the timer interval so runs do
+not overlap. `Persistent=true` can trigger a missed calendar run after the
+timer was inactive; it cannot reconstruct samples that were never collected.
+The timer records scheduling history, while yesh JSON records resource
+samples. A system-manager installation needs an explicit system-owned state
+path instead of the user default.
 
 `DURATION` currently uses the Go duration form accepted by yesh, such as
 `300ms`, `2s`, `15m`, or `1h30m`; it is intentionally narrower than the full
@@ -197,6 +291,7 @@ read-only fleet report.
 | bounded polling | `examples/service-wait.yesh` | transition to active, timeout, failed-state fast error |
 | bounded journal output | `examples/service-journal.yesh` | JSON validation, stderr failure, empty output success |
 | unit resource snapshot | `examples/service-resources.yesh` | cgroup/process correlation and bounded resource fields |
+| bounded service-memory diagnosis | `examples/service-memory-diagnosis.yesh` | cgroup memory/OOM counters, processes, and journal context |
 
 For an opt-in check against a real systemd manager, use
 [`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh). It creates

@@ -1,0 +1,25 @@
+# Goal: collect a bounded, read-only memory diagnosis for one exact systemd
+# service. Replace the unit with the service under investigation.
+#
+# The report connects unit state, the service cgroup, process RSS, cgroup
+# memory counters, OOM counters, and a short journal window. It does not claim
+# to identify the root cause of an incident: cgroup membership is not semantic
+# ownership, counters are observations, and the journal may be incomplete.
+#
+# Environment: Linux, a running systemd manager, readable cgroup v2 state, and
+# permission to read the selected unit and its user/system journal. This file
+# does not start, stop, signal, throttle, or limit the service.
+#
+# Bash comparison:
+#   systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState \
+#     api.service
+#   systemctl show --no-pager --property=ControlGroup,MemoryCurrent,MemoryMax \
+#     api.service
+#   journalctl --no-pager --unit api.service --since=-15m --lines=40
+#
+# Role of yesh: keep the unit identity, bounded observations, and failure
+# boundary visible; systemd, cgroup v2, /proc, and journald remain the sources.
+
+service status systemd-journald.service
+service resources systemd-journald.service
+journal systemd-journald.service since 15m lines 40

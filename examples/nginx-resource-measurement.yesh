@@ -1,0 +1,5 @@
+# Finite collector for a user-owned systemd timer on a host with nginx.
+# The timer starts this script periodically; yesh itself remains finite.
+
+measure service nginx.service for 10s every 2s:
+    keep history for 24h

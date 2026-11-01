@@ -1,0 +1,3 @@
+# Read the saved nginx resource history without taking a new snapshot.
+
+summarize service nginx.service since 24h
