@@ -23,6 +23,20 @@ Confirmed:
   ext4 scenarios;
 - more than 200 automated tests and four fuzz targets.
 
+Resource observation is now a systemd-first, read-only capability for Linux
+systems with cgroup v2. `service resources` reads a bounded cgroup subtree and
+its observed processes; `measure service` takes finite samples, writes bounded
+JSONL history, and `summarize service` reports changes without combining
+different service identities. RSS, CPU, memory, I/O, PSI, OOM events, process
+churn, restarts, unavailable fields, and incomplete observations are kept
+explicit. The Debian stand confirmed a complete finite measurement even when
+optional block-I/O accounting was unavailable.
+
+This is deliberately a diagnostic slice, not a monitoring daemon, alerting
+system, or Prometheus replacement. The author started with systemd because many
+Linux services are started and supervised there; broader service backends and
+continuous observation remain future work.
+
 The first public development release, `v0.1.0`, is published on GitHub for
 Linux amd64 with the binary and checksums. ARM64 is not part of the release
 until the binary has been run on real ARM64 hardware or an ARM64 virtual

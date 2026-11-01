@@ -246,9 +246,18 @@ steps built from ordinary Unix utilities and external Linux tools:
   mode, and host-key policy;
 - mount, filesystem, UUID/PARTUUID, and free-space preflight checks;
 - rsync preview and copy examples without implicit `--delete`;
+- typed IPv4/IPv6 address and CIDR checks such as containment and overlap;
+- read-only network reports for interfaces, routes, neighbours, and listening ports;
 - Linux process snapshots by exact kernel name, including PID, UID, state, RSS,
   process group, session, and cgroup;
 - readable RSS totals, maximums, averages, and budget checks.
+
+On Linux with cgroup v2, the prototype also provides read-only service resource
+snapshots and finite measurements with bounded JSONL history. These reports can
+include CPU, memory, RSS, I/O, PSI, OOM events, process membership changes,
+restarts, and explicitly unavailable or incomplete fields. This is an
+experimental diagnostic capability, not a monitoring daemon or a replacement
+for Prometheus.
 
 The `--plan` mode shows the exact argument vector (`argv`) that each command
 stage would receive, including expanded lists and external conditions. It does
