@@ -814,6 +814,62 @@ func TestPOSIXPracticalIncrementalRsyncHeldLockStopsRsync(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalIncrementalRsyncPlanDoesNotMutate(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "input.txt"), []byte("payload\n"), 0600)
+	previous := filepath.Join(root, "snapshot.0")
+	if err := os.Mkdir(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "rsync.trace")
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\nexit 99\n"), 0700)
+
+	plan := posixCLI(t, context.Background(), "--plan", practicalExample(t, "rsync-incremental.yesh"))
+	plan.Dir = dir
+	plan.Env = append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_SOURCE="+source+string(os.PathSeparator),
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_PREVIOUS="+previous,
+		"YESH_RSYNC_CURRENT="+filepath.Join(root, "snapshot.1"),
+		"YESH_RSYNC_TEMPORARY="+filepath.Join(root, "snapshot.1.tmp"),
+		"YESH_RSYNC_LOCK="+filepath.Join(root, ".rsync.lock"),
+	)
+	out, err := plan.CombinedOutput()
+	if err != nil {
+		t.Fatalf("incremental plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{"PLAN", "rsync", "publish"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("incremental plan missing %q: %s", want, out)
+		}
+	}
+	if _, err := os.Stat(trace); !os.IsNotExist(err) {
+		t.Fatalf("plan started rsync: %v", err)
+	}
+	for _, name := range []string{"snapshot.1", "snapshot.1.tmp", ".rsync.lock"} {
+		if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Fatalf("plan created %s: %v", name, err)
+		}
+	}
+}
+
 func TestPOSIXPracticalIncrementalRsyncRetentionPlanDoesNotMutate(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, "snapshots")
