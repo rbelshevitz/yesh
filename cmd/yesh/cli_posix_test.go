@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -327,9 +328,36 @@ func TestPOSIXCLISIGTERMKillsExternalDescendant(t *testing.T) {
 	if ctx.Err() != nil {
 		t.Fatal("SIGTERM handling stalled")
 	}
-	if err := syscall.Kill(-parent, 0); err != syscall.ESRCH {
-		t.Fatalf("external descendant process group survived: %v", err)
+	until = time.Now().Add(2 * time.Second)
+	for time.Now().Before(until) {
+		alive, err := posixProcessIsAlive(child)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !alive {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
+	t.Fatalf("external descendant remained alive after process-group cancellation: pid=%d", child)
+}
+
+func posixProcessIsAlive(pid int) (bool, error) {
+	if goruntime.GOOS == "linux" {
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		close := strings.LastIndexByte(string(data), ')')
+		if close < 0 || close+2 >= len(data) {
+			return false, fmt.Errorf("invalid /proc/%d/stat", pid)
+		}
+		return data[close+2] != 'Z', nil
+	}
+	return syscall.Kill(pid, 0) == nil, nil
 }
 
 func TestPOSIXCLICancelsMultiProcessPipeline(t *testing.T) {
