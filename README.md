@@ -98,6 +98,59 @@ systemd manager and cgroup v2; unavailable controllers remain explicitly
 unavailable. See the [systemd guide](docs/systemd.md) and
 [syntax tutorial](docs/syntax-guide.md) for the directive rules.
 
+Alongside the language, yesh is also intended as a lightweight diagnostic tool
+for small, temporary, or embedded Linux systems where CPU cycles and memory are
+scarce.
+In such an environment, continuous metric collection with Prometheus may
+require a separate collector, storage, and ongoing maintenance that are not
+worth the cost for a small system.
+yesh provides a readable, finite check when an administrator needs an answer
+about one service during one incident or maintenance window; it is not a
+replacement for continuous monitoring where that is justified.
+
+## How yesh measures service resources
+
+This is bounded resource observation, not a monitoring daemon. yesh helps an
+administrator answer one concrete question about one systemd service: what
+processes were observed in its cgroup during a fixed period, how its memory and
+CPU changed, and what the service reported in the journal during the same
+incident window.
+
+The useful result is the connected workflow, not another isolated number:
+
+```yesh
+state_dir = "/tmp/yesh-nginx-resources"
+
+service status nginx.service
+measure service nginx.service for 30s every 5s:
+    save to $state_dir
+    keep history for 24h
+summarize service nginx.service from $state_dir since 1h
+journal nginx.service since 15m lines 40
+```
+
+The resource snapshot reads the service's cgroup and its descendant cgroups,
+then records the processes found there, RSS, available memory/CPU/I/O counters,
+PSI and OOM information. A missing controller or field is reported as
+`unavailable`, not silently changed to zero. The finite measurement takes its
+first snapshot immediately, writes one completed JSONL record after the period
+ends, and refuses to combine different service identities across a restart.
+
+This removes a common Bash burden: keeping the service name, cgroup traversal,
+process table, sampling interval, history file, retention rule and journal
+window consistent by hand. The Linux commands and the observation boundary stay
+visible in the yesh script, while the runtime handles the finite loop, state
+file locking, stable service identity, and incomplete observations.
+
+The current evidence is deliberately limited. The feature is read-only and
+finite; it does not alert, enforce cgroup limits, discover application
+ownership, explain the cause of a change, or replace Prometheus and other
+continuous monitoring systems. On the Debian Linux stand, a two-second user
+service measurement completed even when block I/O accounting was unavailable;
+the result marked that optional field unavailable. A disappearing cgroup or
+process makes the saved measurement incomplete instead of presenting a false
+complete result.
+
 | Bash | yesh |
 | --- | --- |
 | `name=world; echo "$name"` | `name = world`<br>`echo $name` |
