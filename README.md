@@ -92,12 +92,6 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
-Linux service resource observation is available as a read-only feature: cgroup
-sampling, finite history, and memory/CPU/I/O summaries. It requires a readable
-systemd manager and cgroup v2; unavailable controllers remain explicitly
-unavailable. See the [systemd guide](docs/systemd.md) and
-[syntax tutorial](docs/syntax-guide.md) for the directive rules.
-
 Alongside the language, yesh is also intended as a lightweight diagnostic tool
 for small, temporary, or embedded Linux systems where CPU cycles and memory are
 scarce.
@@ -110,11 +104,17 @@ replacement for continuous monitoring where that is justified.
 
 ## How yesh measures service resources
 
-This is bounded resource observation, not a monitoring daemon. yesh helps an
-administrator answer one concrete question about one systemd service: what
-processes were observed in its cgroup during a fixed period, how its memory and
-CPU changed, and what the service reported in the journal during the same
-incident window.
+On Linux, yesh can observe a systemd service's resources for a fixed period
+without changing anything: it samples the cgroup, keeps a bounded history, and
+produces memory/CPU/I/O summaries. It
+requires a readable systemd manager and cgroup v2; unavailable controllers
+remain explicitly unavailable. See the [systemd guide](docs/systemd.md) and
+[syntax tutorial](docs/syntax-guide.md) for the directive rules.
+
+This is not a monitoring daemon. yesh helps an administrator answer one
+concrete question about one systemd service: what processes were observed in
+its cgroup during a fixed period, how its memory and CPU changed, and what the
+service reported in the journal during the same incident window.
 
 The useful result is the connected workflow, not another isolated number:
 
