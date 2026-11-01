@@ -29,6 +29,10 @@ the binary has been run on real ARM64 hardware or an ARM64 virtual machine.
 
 ## Next after the pause
 
+The next milestone is polish of the implemented core. Do not expand the syntax
+or start `observe`, `resume`, or new typed modules until rough edges in the
+code, tests, examples, and manuals have been addressed.
+
 1. Publish the existing `v0.1.0` GitHub draft.
 2. Consolidate three canonical single-host workflows: backup/restore,
    configuration publication with a service postcondition, and incident
@@ -47,10 +51,11 @@ The networked `rsync` preflight, partial-transfer, failure, and retry scenarios
 have already been exercised on the disposable Debian stand. Do not add a new
 network language layer or repeat those checks without a specific new failure.
 
-## Later: process and resource diagnostics
+## Further work: process and resource diagnostics
 
-After the backup/rsync corpus is stable, define bounded read-only process and
-cgroup diagnostics: explicit observation scope, PID plus Linux start time,
+The bounded `measure` and `summarize` first slice is implemented and described
+in the decision archive and the [systemd guide](systemd.md). Further work is
+bounded read-only process and cgroup diagnostics: explicit observation scope, PID plus Linux start time,
 process membership versus semantic ownership, resource counters, and cleanup
 evidence for yesh-owned jobs.
 
@@ -71,7 +76,7 @@ timeouts, restart bursts, or dependency failures. yesh should make that
 evidence easy to collect and compare; it should not invent an anomaly score or
 claim that one log line proves the cause.
 
-### Finite behaviour measurement
+### Extend finite behaviour measurement
 
 The useful result is a bounded statement about an interval, not a single
 snapshot: “during this period this unit or process behaved this way”. The
@@ -81,7 +86,7 @@ values, counter deltas, resource-pressure changes, process churn, restarts, and
 OOM events. The raw points may remain available for verification, but the main
 output should summarize direction and observed evidence.
 
-The first implementation should use existing read-only sources: cgroup v2
+The next extension should use existing read-only sources: cgroup v2
 `memory.current`, selected `memory.stat`, `memory.events`, `cpu.stat`,
 `pids.*`, `memory.pressure`, `cpu.pressure`, `io.stat`, and the corresponding
 host PSI files where readable; `/proc` process records must use PID plus
@@ -142,14 +147,14 @@ instructions reconstructed from stored strings. A missing, corrupt, stale, or
 identity-mismatched record is a diagnostic result or an error according to the
 operation, never an invitation to guess.
 
-To complete the model check, use one disposable systemd
+For extended model coverage, use one disposable systemd
 fixture and three snapshots: stable control, intentional memory growth, and a
 resource-pressure case. The positive and negative checks must verify deltas,
 counter handling, process identity across PID reuse, restart segmentation,
 bounded completion, persisted JSON round-trips, missing-state handling, and
 that `--plan` performs no sampling or state writes.
 
-Implemented first-slice syntax:
+The implemented first slice has this syntax:
 
 ```yesh
 state = "/tmp/yesh-api-state"
@@ -273,7 +278,7 @@ result `oom-kill` and was recorded in the user journal. The host has no Go
 toolchain, so it is an execution fixture for a locally built Linux binary, not
 the place to run Go tests.
 
-The first implementation slice should extend the existing Linux
+The implemented first slice extends the existing Linux
 `service resources` snapshot without adding syntax: preserve the full cgroup
 scope, record cgroup type and available controllers, distinguish local and
 hierarchical events, parse selected `memory.stat` fields, and report
@@ -284,7 +289,7 @@ cause of an OOM event.
 The current slice records the selected cgroup path, type, available
 controllers, and whether a process disappeared during collection. It also
 exposes read-only cumulative CPU, memory, swap, and PID-limit counters needed
-for later interval deltas. It still does not claim that the cgroup is
+for interval deltas. It still does not claim that the cgroup is
 application ownership or that an OOM cause has been established. It also
 exposes read-only cgroup PSI
 windows for memory, CPU, and I/O when the kernel provides them; missing PSI

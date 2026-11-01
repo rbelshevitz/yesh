@@ -92,8 +92,9 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
-In development: service resource measurement by cgroup, history storage, and
-memory/I/O summaries. The tutorial will explain the directive syntax.
+Experimental service resource measurement is in development: cgroup sampling,
+history storage, and memory/I/O summaries. See the [syntax tutorial](docs/syntax-guide.md)
+for the directive rules.
 
 | Bash | yesh |
 | --- | --- |
