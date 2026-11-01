@@ -63,6 +63,17 @@ type summarizeStmt struct {
 
 func (summarizeStmt) stmt() {}
 
+type serviceSummarizeStmt struct {
+	line      int
+	manager   string
+	unit      commandToken
+	statePath commandToken
+	since     time.Duration
+	sinceText string
+}
+
+func (serviceSummarizeStmt) stmt() {}
+
 type serviceStatusStmt struct {
 	line    int
 	manager string
@@ -78,6 +89,19 @@ type serviceResourcesStmt struct {
 }
 
 func (serviceResourcesStmt) stmt() {}
+
+type serviceMeasureStmt struct {
+	line                       int
+	manager                    string
+	unit                       commandToken
+	duration, interval         time.Duration
+	durationText, intervalText string
+	statePath                  commandToken
+	keepFor                    time.Duration
+	keepForText                string
+}
+
+func (serviceMeasureStmt) stmt() {}
 
 type serviceRestartStmt struct {
 	line          int
@@ -272,6 +296,15 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 				return nil, index, p.err(l.number, "expected ':' after for values")
 			}
 		}
+		if strings.HasPrefix(text, "measure service ") && strings.HasSuffix(text, ":") {
+			item, next, err := p.parseServiceMeasureBlock(index, indent)
+			if err != nil {
+				return nil, index, err
+			}
+			result = append(result, item)
+			index = next
+			continue
+		}
 		if text == "else:" || text == "else" || strings.HasPrefix(text, "else ") {
 			return nil, index, p.err(l.number, "else: must follow an if block at the same indentation")
 		}
@@ -365,6 +398,28 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 		}
 		if strings.HasPrefix(text, "summarize ") {
 			tokens, err := words(text)
+			if err == nil && len(tokens) >= 2 && tokens[1].text == "service" {
+				manager, offset := systemdManager(tokens, 2)
+				if len(tokens) == offset+3 && !tokens[offset].operator && tokens[offset+1].text == "since" && !tokens[offset+1].operator && !tokens[offset+2].operator {
+					since, sinceErr := time.ParseDuration(tokens[offset+2].text)
+					if sinceErr != nil || since <= 0 {
+						return nil, index, p.err(l.number, "service summarize requires a positive since duration")
+					}
+					result = append(result, serviceSummarizeStmt{line: l.number, manager: manager, unit: tokens[offset], since: since, sinceText: tokens[offset+2].text})
+					index++
+					continue
+				}
+				if len(tokens) == offset+5 && !tokens[offset].operator && tokens[offset+1].text == "from" && !tokens[offset+1].operator &&
+					!tokens[offset+2].operator && tokens[offset+3].text == "since" && !tokens[offset+3].operator && !tokens[offset+4].operator {
+					since, sinceErr := time.ParseDuration(tokens[offset+4].text)
+					if sinceErr != nil || since <= 0 {
+						return nil, index, p.err(l.number, "service summarize requires a positive since duration")
+					}
+					result = append(result, serviceSummarizeStmt{line: l.number, manager: manager, unit: tokens[offset], statePath: tokens[offset+2], since: since, sinceText: tokens[offset+4].text})
+					index++
+					continue
+				}
+			}
 			name, ok := "", false
 			if len(tokens) > 1 {
 				name, ok = variableReference(tokens[1].text)
@@ -377,7 +432,7 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 			index++
 			continue
 		}
-		if text == "service" || strings.HasPrefix(text, "service ") {
+		if text == "service" || strings.HasPrefix(text, "service ") || text == "measure" || strings.HasPrefix(text, "measure ") {
 			item, err := p.parseService(text, l.number)
 			if err != nil {
 				return nil, index, err
@@ -409,6 +464,68 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 	return result, index, nil
 }
 
+func (p parser) parseServiceMeasureBlock(index, indent int) (statement, int, error) {
+	line := p.lines[index]
+	header := strings.TrimSuffix(line.text, ":")
+	tokens, err := words(header)
+	if err != nil {
+		return nil, index, p.err(line.number, err.Error())
+	}
+	manager, offset := systemdManager(tokens, 2)
+	if len(tokens) != offset+5 || tokens[0].text != "measure" || tokens[1].text != "service" ||
+		tokens[offset].operator || tokens[offset+1].text != "for" || tokens[offset+2].operator ||
+		tokens[offset+3].text != "every" || tokens[offset+4].operator {
+		return nil, index, p.err(line.number, "expected: measure service unit for duration every interval:")
+	}
+	duration, durationErr := time.ParseDuration(tokens[offset+2].text)
+	interval, intervalErr := time.ParseDuration(tokens[offset+4].text)
+	if durationErr != nil || duration <= 0 || intervalErr != nil || interval <= 0 {
+		return nil, index, p.err(line.number, "measure requires positive duration and interval")
+	}
+	bodyStart := index + 1
+	if bodyStart >= len(p.lines) || p.lines[bodyStart].indent <= indent {
+		return nil, index, p.err(line.number, "measure block requires directives")
+	}
+	childIndent := p.lines[bodyStart].indent
+	stmt := serviceMeasureStmt{line: line.number, manager: manager, unit: tokens[offset], duration: duration, interval: interval,
+		durationText: tokens[offset+2].text, intervalText: tokens[offset+4].text}
+	haveKeep := false
+	index = bodyStart
+	for index < len(p.lines) && p.lines[index].indent >= childIndent {
+		child := p.lines[index]
+		if child.indent != childIndent {
+			return nil, index, p.err(child.number, "unexpected indentation in measure directives")
+		}
+		parts, err := words(child.text)
+		if err != nil {
+			return nil, index, p.err(child.number, err.Error())
+		}
+		switch {
+		case len(parts) == 3 && parts[0].text == "save" && parts[1].text == "to" && !parts[2].operator:
+			if stmt.statePath.text != "" {
+				return nil, index, p.err(child.number, "measure save directive may appear only once")
+			}
+			stmt.statePath = parts[2]
+		case len(parts) == 4 && parts[0].text == "keep" && parts[1].text == "history" && parts[2].text == "for" && !parts[3].operator:
+			if haveKeep {
+				return nil, index, p.err(child.number, "measure keep history directive may appear only once")
+			}
+			keep, keepErr := time.ParseDuration(parts[3].text)
+			if keepErr != nil || keep <= 0 {
+				return nil, index, p.err(child.number, "keep history requires a positive duration")
+			}
+			stmt.keepFor, stmt.keepForText, haveKeep = keep, parts[3].text, true
+		default:
+			return nil, index, p.err(child.number, "expected: save to path or keep history for duration")
+		}
+		index++
+	}
+	if !haveKeep {
+		return nil, index, p.err(line.number, "measure block requires keep history for duration")
+	}
+	return stmt, index, nil
+}
+
 func (p parser) parseStorage(text string, line int) (storageStmt, error) {
 	terms, err := words(text)
 	if err != nil {
@@ -423,6 +540,22 @@ func (p parser) parseService(text string, line int) (statement, error) {
 		return nil, p.err(line, err.Error())
 	}
 	manager, offset := systemdManager(tokens, 2)
+	if (len(tokens) == offset+5 || len(tokens) == offset+8) && builtinKeyword(tokens[0], "measure") && builtinKeyword(tokens[1], "service") &&
+		!tokens[offset].operator && builtinKeyword(tokens[offset+1], "for") && !tokens[offset+2].operator &&
+		builtinKeyword(tokens[offset+3], "every") && !tokens[offset+4].operator &&
+		(len(tokens) == offset+5 || (builtinKeyword(tokens[offset+5], "save") && builtinKeyword(tokens[offset+6], "to") && !tokens[offset+7].operator)) {
+		duration, durationErr := time.ParseDuration(tokens[offset+2].text)
+		interval, intervalErr := time.ParseDuration(tokens[offset+4].text)
+		if durationErr != nil || duration <= 0 || intervalErr != nil || interval <= 0 {
+			return nil, p.err(line, "measure requires positive duration and interval")
+		}
+		stmt := serviceMeasureStmt{line: line, manager: manager, unit: tokens[offset], duration: duration, interval: interval,
+			durationText: tokens[offset+2].text, intervalText: tokens[offset+4].text}
+		if len(tokens) == offset+8 {
+			stmt.statePath = tokens[offset+7]
+		}
+		return stmt, nil
+	}
 	if len(tokens) == offset+1 && builtinKeyword(tokens[0], "service") &&
 		builtinKeyword(tokens[1], "resources") && !tokens[offset].operator {
 		return serviceResourcesStmt{line: line, manager: manager, unit: tokens[offset]}, nil

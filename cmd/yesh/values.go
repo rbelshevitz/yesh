@@ -31,6 +31,8 @@ type runtime struct {
 	filename string
 	plan     bool
 	steps    int
+	// cgroupRoot is empty for normal execution and is injectable for Linux tests.
+	cgroupRoot string
 }
 
 const maxLoopIterations = 10000

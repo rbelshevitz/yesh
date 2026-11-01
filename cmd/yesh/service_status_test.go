@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 func TestParserAcceptsServiceStatus(t *testing.T) {
@@ -84,6 +85,68 @@ func TestParserAcceptsExplicitSystemdManagers(t *testing.T) {
 	journal, ok := items[1].(journalStmt)
 	if !ok || journal.manager != "system" {
 		t.Fatalf("unexpected system manager statement: %#v", items[1])
+	}
+}
+
+func TestParserAcceptsBoundedMeasurement(t *testing.T) {
+	items, err := parse("measure service user api.service for 10s every 2s save to state\n", "measure.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, ok := items[0].(serviceMeasureStmt)
+	if !ok || stmt.manager != "user" || stmt.unit.text != "api.service" || stmt.duration != 10*time.Second || stmt.interval != 2*time.Second || stmt.statePath.text != "state" {
+		t.Fatalf("unexpected measurement statement: %#v", items[0])
+	}
+}
+
+func TestParserAcceptsMeasuredHistoryDirective(t *testing.T) {
+	source := "measure service user api.service for 10s every 2s:\n    save to state\n    keep history for 24h\n"
+	items, err := parse(source, "measure-history.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, ok := items[0].(serviceMeasureStmt)
+	if !ok || stmt.manager != "user" || stmt.statePath.text != "state" || stmt.keepFor != 24*time.Hour || stmt.keepForText != "24h" {
+		t.Fatalf("unexpected measurement history statement: %#v", items[0])
+	}
+}
+
+func TestParserRejectsInvalidMeasuredHistoryDirective(t *testing.T) {
+	for _, source := range []string{
+		"measure service api.service for 10s every 2s:\n    keep history for 0s\n",
+		"measure service api.service for 10s every 2s:\n    keep history for 24h\n    keep history for 48h\n",
+		"measure service api.service for 10s every 2s:\n    save state\n    keep history for 24h\n",
+		"measure service api.service for 10s every 2s:\n    save to state\n",
+	} {
+		if _, err := parse(source, "invalid-measure-history.yesh"); err == nil {
+			t.Fatalf("expected parser error for %q", source)
+		}
+	}
+}
+
+func TestParserAcceptsServiceSummary(t *testing.T) {
+	items, err := parse("summarize service user api.service from state since 1h\n", "summary.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, ok := items[0].(serviceSummarizeStmt)
+	if !ok || stmt.manager != "user" || stmt.unit.text != "api.service" || stmt.statePath.text != "state" || stmt.since != time.Hour {
+		t.Fatalf("unexpected service summary statement: %#v", items[0])
+	}
+}
+
+func TestParserAcceptsDefaultServiceResourceStatePath(t *testing.T) {
+	items, err := parse("measure service api.service for 10s every 2s\nsummarize service api.service since 1h\n", "default-state.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	measure, ok := items[0].(serviceMeasureStmt)
+	if !ok || measure.statePath.text != "" {
+		t.Fatalf("unexpected default measurement statement: %#v", items[0])
+	}
+	summary, ok := items[1].(serviceSummarizeStmt)
+	if !ok || summary.statePath.text != "" {
+		t.Fatalf("unexpected default summary statement: %#v", items[1])
 	}
 }
 

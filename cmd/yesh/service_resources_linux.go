@@ -19,6 +19,7 @@ import (
 type serviceResourceSnapshot struct {
 	properties map[string]string
 	cgroup     string
+	observedAt time.Time
 	metrics    map[string]string
 	processes  []processInfo
 	rssBytes   uint64
@@ -56,11 +57,15 @@ func (r *runtime) queryServiceResources(manager, unit string) (serviceResourceSn
 	if properties["Id"] != unit {
 		return serviceResourceSnapshot{}, fmt.Errorf("systemctl returned canonical unit %q; aliases are not supported", properties["Id"])
 	}
-	snapshot := serviceResourceSnapshot{properties: properties, cgroup: properties["ControlGroup"]}
+	snapshot := serviceResourceSnapshot{properties: properties, cgroup: properties["ControlGroup"], observedAt: time.Now().UTC(), metrics: unavailableServiceResourceMetrics()}
 	if snapshot.cgroup == "" {
 		return snapshot, nil
 	}
-	processes, metrics, rss, err := readServiceCgroup("/sys/fs/cgroup", snapshot.cgroup)
+	root := r.cgroupRoot
+	if root == "" {
+		root = "/sys/fs/cgroup"
+	}
+	processes, metrics, rss, err := readServiceCgroup(root, snapshot.cgroup)
 	if err != nil {
 		return serviceResourceSnapshot{}, err
 	}
@@ -143,10 +148,12 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 	}
 	processes := make([]processInfo, 0, len(pids))
 	var rss uint64
+	processesIncomplete := false
 	for pid := range pids {
 		process, err := readProcessInfo(pid)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
+				processesIncomplete = true
 				continue
 			}
 			return nil, nil, 0, fmt.Errorf("read process %d: %w", pid, err)
@@ -158,14 +165,118 @@ func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]str
 		rss += process.rssBytes
 	}
 	sort.Slice(processes, func(i, j int) bool { return processes[i].pid < processes[j].pid })
-	metrics := map[string]string{}
-	for _, name := range []string{"memory.current", "memory.max", "pids.current", "pids.max"} {
+	metrics := unavailableServiceResourceMetrics()
+	metrics["cgroup.type"] = readCgroupMetric(path, "cgroup.type")
+	metrics["cgroup.controllers"] = readCgroupMetric(path, "cgroup.controllers")
+	if processesIncomplete {
+		metrics["processes.incomplete"] = "yes"
+	} else {
+		metrics["processes.incomplete"] = "no"
+	}
+	for _, name := range []string{"memory.current", "memory.max", "memory.swap.current", "memory.swap.max", "pids.current", "pids.max"} {
 		metrics[name] = readCgroupMetric(path, name)
 	}
-	metrics["cpu.usage_usec"] = readCgroupMetric(path, "cpu.stat", "usage_usec")
-	metrics["memory.events.oom"] = readCgroupMetric(path, "memory.events", "oom")
-	metrics["memory.events.oom_kill"] = readCgroupMetric(path, "memory.events", "oom_kill")
+	for _, name := range []string{"populated", "frozen"} {
+		metrics["cgroup.events."+name] = readCgroupMetric(path, "cgroup.events", name)
+	}
+	for _, name := range []string{"usage_usec", "user_usec", "system_usec", "nr_periods", "nr_throttled", "throttled_usec"} {
+		metrics["cpu.stat."+name] = readCgroupMetric(path, "cpu.stat", name)
+	}
+	metrics["cpu.stat.local.throttled_usec"] = readCgroupMetric(path, "cpu.stat.local", "throttled_usec")
+	for _, name := range []string{"low", "high", "max", "oom", "oom_kill", "oom_group_kill", "sock_throttled"} {
+		metrics["memory.events."+name] = readCgroupMetric(path, "memory.events", name)
+		metrics["memory.events.local."+name] = readCgroupMetric(path, "memory.events.local", name)
+	}
+	metrics["memory.swap.events.high"] = readCgroupMetric(path, "memory.swap.events", "high")
+	metrics["memory.swap.events.max"] = readCgroupMetric(path, "memory.swap.events", "max")
+	metrics["memory.swap.events.fail"] = readCgroupMetric(path, "memory.swap.events", "fail")
+	metrics["pids.events.max"] = readCgroupMetric(path, "pids.events", "max")
+	for _, name := range []string{"anon", "file", "kernel"} {
+		metrics["memory.stat."+name] = readCgroupMetric(path, "memory.stat", name)
+	}
+	ioMetrics, err := readCgroupIOStat(path)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if ioMetrics == nil {
+		metrics["io.stat.available"] = "unavailable"
+	} else {
+		metrics["io.stat.available"] = "yes"
+	}
+	for key, value := range ioMetrics {
+		metrics[key] = value
+	}
+	for _, resource := range []string{"memory", "cpu", "io"} {
+		for _, state := range []string{"some", "full"} {
+			for _, window := range []string{"avg10", "avg60", "avg300"} {
+				key := resource + ".pressure." + state + "." + window
+				metrics[key] = readCgroupPressureMetric(path, resource+".pressure", state, window)
+			}
+		}
+	}
+	for _, resource := range []string{"memory", "cpu", "io"} {
+		for _, window := range []string{"avg10", "avg60", "avg300"} {
+			key := "host." + resource + ".pressure.some." + window
+			metrics[key] = readCgroupPressureMetric("/proc/pressure", resource, "some", window)
+		}
+	}
 	return processes, metrics, rss, nil
+}
+
+const maxCgroupIOStatDevices = 128
+
+// readCgroupIOStat preserves the device identity because io.stat is keyed by
+// major:minor and the kernel does not promise line order. Values are counters;
+// callers must compare the same device across snapshots before calculating a
+// delta.
+func readCgroupIOStat(path string) (map[string]string, error) {
+	data, err := os.ReadFile(filepath.Join(path, "io.stat"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	metrics := make(map[string]string)
+	devices := 0
+	for lineNumber, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 || !validCgroupDevice(fields[0]) {
+			return nil, fmt.Errorf("invalid io.stat line %d", lineNumber+1)
+		}
+		devices++
+		if devices > maxCgroupIOStatDevices {
+			return nil, fmt.Errorf("cgroup io.stat exceeds %d devices", maxCgroupIOStatDevices)
+		}
+		for _, field := range fields[1:] {
+			key, value, ok := strings.Cut(field, "=")
+			if !ok || key == "" || value == "" {
+				return nil, fmt.Errorf("invalid io.stat field on line %d", lineNumber+1)
+			}
+			if _, err := strconv.ParseUint(value, 10, 64); err != nil {
+				return nil, fmt.Errorf("invalid io.stat value %q on line %d", value, lineNumber+1)
+			}
+			metrics["io.stat."+fields[0]+"."+key] = value
+		}
+	}
+	return metrics, nil
+}
+
+func validCgroupDevice(value string) bool {
+	major, minor, ok := strings.Cut(value, ":")
+	if !ok || major == "" || minor == "" {
+		return false
+	}
+	if _, err := strconv.ParseUint(major, 10, 32); err != nil {
+		return false
+	}
+	if _, err := strconv.ParseUint(minor, 10, 32); err != nil {
+		return false
+	}
+	return true
 }
 
 func readCgroupMetric(path string, names ...string) string {
@@ -180,6 +291,26 @@ func readCgroupMetric(path string, names ...string) string {
 		fields := strings.Fields(line)
 		if len(fields) == 2 && fields[0] == names[1] {
 			return fields[1]
+		}
+	}
+	return "unavailable"
+}
+
+func readCgroupPressureMetric(path, filename, state, window string) string {
+	data, err := os.ReadFile(filepath.Join(path, filename))
+	if err != nil {
+		return "unavailable"
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || fields[0] != state {
+			continue
+		}
+		for _, field := range fields[1:] {
+			key, value, ok := strings.Cut(field, "=")
+			if ok && key == window {
+				return value
+			}
 		}
 	}
 	return "unavailable"
