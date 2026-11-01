@@ -33,6 +33,38 @@ The next milestone is polish of the implemented core. Do not expand the syntax
 or start `observe`, `resume`, or new typed modules until rough edges in the
 code, tests, examples, and manuals have been addressed.
 
+### Next practical example: clean old logs and restart a service
+
+Implement the scenario using the current yesh syntax, without new `task`,
+`preflight`, `step`, or `postflight` directives:
+
+1. check the log directory and the systemd unit state;
+2. delete only regular files older than the selected age in an explicit directory;
+3. check free space after cleanup;
+4. restart the service with a finite wait for `active`;
+5. show the final service state.
+
+The example needs parser and `--plan` coverage, positive and negative fixture
+cases, protection against concurrent runs, and a clear failure at each step.
+Deletion remains a visible external `find` command; yesh does not add a hidden
+file-cleanup operation. Interaction with `logrotate`, including reading its
+policy or managing its configuration, is a separate future task and is outside
+this milestone.
+
+## Main direction
+
+Focus on safe, repeatable maintenance operations on one Linux machine. These
+are one problem family, not three separate products:
+
+1. backup → result verification → restore;
+2. file cleanup or maintenance → free-space check → service;
+3. configuration publication → restart → state verification.
+
+First bring backup with result verification and locking to an exemplary state:
+partial failure, rerun, `--plan`, restore, and no false success. Then polish
+file cleanup and configuration publication. Do not plan new directives or new
+domain modules until this corpus is complete.
+
 1. Publish the existing `v0.1.0` GitHub draft.
 2. Consolidate three canonical single-host workflows: backup/restore,
    configuration publication with a service postcondition, and incident
