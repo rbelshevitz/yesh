@@ -23,9 +23,10 @@ Confirmed:
   ext4 scenarios;
 - more than 200 automated tests and four fuzz targets.
 
-The first public development release is `v0.1.0` for Linux amd64. Its GitHub
-draft contains the binary and checksums. ARM64 is not part of the release until
-the binary has been run on real ARM64 hardware or an ARM64 virtual machine.
+The first public development release, `v0.1.0`, is published on GitHub for
+Linux amd64 with the binary and checksums. ARM64 is not part of the release
+until the binary has been run on real ARM64 hardware or an ARM64 virtual
+machine.
 
 ## Next after the pause
 
@@ -65,19 +66,18 @@ partial failure, rerun, `--plan`, restore, and no false success. Then polish
 file cleanup and configuration publication. Do not plan new directives or new
 domain modules until this corpus is complete.
 
-1. Publish the existing `v0.1.0` GitHub draft.
-2. Consolidate three canonical single-host workflows: backup/restore,
+1. Consolidate three canonical single-host workflows: backup/restore,
    configuration publication with a service postcondition, and incident
    diagnostics.
-3. Optionally prepare a production-like rsnapshot/storage scenario on a
+2. Optionally prepare a production-like rsnapshot/storage scenario on a
    separate filesystem if a concrete question remains that the existing Linux
    checks do not answer; keep durability limits explicit.
-4. Run an ARM64 smoke test and decide whether to add ARM64 to a later release;
+3. Run an ARM64 smoke test and decide whether to add ARM64 to a later release;
    use the [ARM64 plan](arm64.md).
-5. Design a separate external-command policy with explicit `allowed`, `denied`,
+4. Design a separate external-command policy with explicit `allowed`, `denied`,
    and `unknown` outcomes; `allowed` means policy match, not execution success.
-6. Consider controlled `PATH` and environment policy for privileged execution.
-7. Consider durable job identity and resume rules only after a concrete use case.
+5. Consider controlled `PATH` and environment policy for privileged execution.
+6. Consider durable job identity and resume rules only after a concrete use case.
 
 The networked `rsync` preflight, partial-transfer, failure, and retry scenarios
 have already been exercised on the disposable Debian stand. Do not add a new
