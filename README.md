@@ -92,6 +92,10 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
+`examples/hello.yesh` prints `hello world` and the three list items. When run
+from the repository root, it also reports that `README.md` exists. It only
+prints text and performs that existence check; it does not change files.
+
 ## A lightweight diagnostic tool for small Linux systems
 
 Alongside the language, yesh is also intended as a lightweight diagnostic tool
@@ -144,6 +148,12 @@ PSI and OOM information. A missing controller or field is reported as
 `unavailable`, not silently changed to zero. The finite measurement takes its
 first snapshot immediately, writes one completed JSONL record after the period
 ends, and refuses to combine different service identities across a restart.
+
+`summarize` is the reading step that follows a measurement: it does not take a
+new snapshot. It reads the history written by `measure` from the same state
+directory and summarizes records in the requested time window. For a separate
+run, use the same `save to` path with `from`, as in
+`summarize service nginx.service from $state_dir since 1h`.
 
 This removes a common Bash burden: keeping the service name, cgroup traversal,
 process table, sampling interval, history file, retention rule and journal

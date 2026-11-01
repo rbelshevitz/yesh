@@ -148,8 +148,20 @@ yesh --plan examples/nginx-logrotate-maintenance.yesh
 go build -trimpath -o yesh ./cmd/yesh
 ```
 
-Чтобы запускать скрипт как исполняемый файл Linux, установите интерпретатор и
-добавьте в начало файла shebang с абсолютным путём:
+Запускайте сценарий через интерпретатор. Это обычный способ; shebang и право
+на выполнение не нужны:
+
+```text
+./yesh examples/hello.yesh
+```
+
+Сценарий печатает `hello world`, затем три элемента списка. При запуске из
+корня репозитория он также печатает `the interpreter is here`, потому что
+проверяет наличие `README.md` в текущем каталоге. Пример только печатает текст
+и проверяет существование файла; он ничего не изменяет.
+
+Если нужно запускать сценарий командой `./job.yesh`, установите `yesh` по
+известному пути и добавьте в свой сценарий первой строкой:
 
 ```text
 #!/usr/local/bin/yesh
@@ -157,22 +169,17 @@ go build -trimpath -o yesh ./cmd/yesh
 echo "hello from yesh"
 ```
 
-Затем добавьте право на выполнение:
+Сохраните файл под именем `job.yesh`, добавьте ему право на выполнение и
+запустите:
 
 ```text
-chmod +x examples/hello.yesh
-./examples/hello.yesh
+chmod +x job.yesh
+./job.yesh
 ```
 
 `#!/usr/bin/env yesh` подходит, если `yesh` намеренно установлен в пользовательский
 `PATH`. Для systemd-службы лучше явно написать `ExecStart=/usr/local/bin/yesh
 /opt/ops/job.yesh`: systemd не предоставляет такое же окружение, как оболочка входа.
-
-Запуск автономного примера, которому не нужны systemd и службы:
-
-```text
-./yesh examples/hello.yesh
-```
 
 На машине с systemd после выбора имён служб можно выполнить
 `./yesh examples/service-check.yesh`. Это проверка состояния, не запуск служб.

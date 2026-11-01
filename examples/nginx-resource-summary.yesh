@@ -1,3 +1,8 @@
-# Read the saved nginx resource history without taking a new snapshot.
+# Read the nginx resource history saved by an earlier measurement.
+# This script does not measure nginx and does not start the service.
+# Run it after service-resource-measurement.yesh, using the same state directory.
+# The directory contains measurements.jsonl and its lock file.
 
-summarize service nginx.service since 24h
+state_dir = "/tmp/yesh-nginx-resources"
+
+summarize service nginx.service from $state_dir since 1h

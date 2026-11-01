@@ -145,8 +145,20 @@ Build the interpreter from the repository root:
 go build -trimpath -o yesh ./cmd/yesh
 ```
 
-To run a script as a Linux executable, install the interpreter and use a
-shebang with its absolute path:
+Run a script through the interpreter. This is the normal form; no shebang or
+executable permission is needed:
+
+```text
+./yesh examples/hello.yesh
+```
+
+It prints `hello world`, then the three items in the list. When run from the
+repository root, it also prints `the interpreter is here` because the script
+checks whether `README.md` exists in the current directory. The example only
+prints text and performs that existence check; it does not change files.
+
+If you want to run a script as `./job.yesh`, install `yesh` at a known path and
+put this first line in your own script:
 
 ```text
 #!/usr/local/bin/yesh
@@ -154,23 +166,17 @@ shebang with its absolute path:
 echo "hello from yesh"
 ```
 
-Then make the file executable:
+Save the file as `job.yesh`, then make it executable and run it:
 
 ```text
-chmod +x examples/hello.yesh
-./examples/hello.yesh
+chmod +x job.yesh
+./job.yesh
 ```
 
 `#!/usr/bin/env yesh` is also suitable when `yesh` is intentionally installed
 in the user's `PATH`. For systemd units, prefer an explicit command such as
 `ExecStart=/usr/local/bin/yesh /opt/ops/job.yesh`; systemd does not provide the
 same interactive shell environment as a login session.
-
-Run a self-contained example that does not need systemd or installed services:
-
-```text
-./yesh examples/hello.yesh
-```
 
 On a systemd host, after choosing your service names, run
 `./yesh examples/service-check.yesh`. This checks state; it does not start services.
