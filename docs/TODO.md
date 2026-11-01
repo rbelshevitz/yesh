@@ -28,34 +28,74 @@ Linux amd64 with the binary and checksums. ARM64 is not part of the release
 until the binary has been run on real ARM64 hardware or an ARM64 virtual
 machine.
 
+## Target: `v0.2.0`
+
+`v0.2.0` is the first substantive feature release after the development
+prototype. It adds practical read-only service and resource observation while
+keeping the language small. Its acceptance boundary is Linux amd64:
+
+- one clear backup/restore workflow with verification, locking, rerun, failure,
+  and `--plan` coverage;
+- one clear `rsync`/`rsnapshot` workflow with visible external arguments and
+  explicit limits;
+- one clear logrotate/journald workflow with separate ownership and no hidden
+  duplicate rotation;
+- configuration publication followed by service state and bounded journal
+  checks;
+- a documented `service resources` snapshot for systemd and cgroup v2;
+- finite service measurement with bounded history and `summarize`, including
+  explicit unit/invocation/cgroup identity and incomplete observations;
+- process and cgroup evidence covering RSS, CPU, memory, I/O, PSI, restarts,
+  and nested service cgroups without claiming application ownership;
+- consistent English examples, Russian explanations, manuals, and links;
+- reproducible Linux checks, release build, checksum generation, and a clear
+  list of Linux-only and experimental resource-observation limits.
+
+The following are explicitly outside the `v0.2.0` boundary: a new general
+monitoring subsystem, durable resume and long-running job identity, direct
+cgroup management, threaded-cgroup support, ARM64 support, and a D-Bus or
+cgroup library unless a concrete release blocker requires one. New syntax is
+allowed only when one of these workflows cannot be made clear with the existing
+language and the new rule has parser, runtime, plan, positive, and negative
+coverage.
+
 ## Next after the pause
 
 The next milestone is polish of the implemented core. Do not expand the syntax
 or start `observe`, `resume`, or new typed modules until rough edges in the
 code, tests, examples, and manuals have been addressed.
 
-### Next practical example: clean old logs and restart a service
+### Recorded decision for log maintenance
 
-Implement the scenario using the current yesh syntax, without new `task`,
-`preflight`, `step`, or `postflight` directives:
+For ordinary text logs, the main practical path is a visible `logrotate` call
+with its actual configuration and state file, as in
+[`nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh).
+Direct `find` is not the general log-maintenance mechanism: it is acceptable
+only for an explicitly dedicated application-file directory and must be
+described as file cleanup, not as a replacement for `logrotate`.
 
-1. check the log directory and the systemd unit state;
-2. delete only regular files older than the selected age in an explicit directory;
-3. check free space after cleanup;
-4. restart the service with a finite wait for `active`;
-5. show the final service state.
+Use `journalctl` for journald, visible `logrotate` for files covered by its
+policy, and direct `find` only for a separate, explicitly owned text-file
+directory. Mixed journald and text-file output requires separate operations;
+one yesh flag or lock cannot coordinate the two owners. Do not hide an
+ownership detector, duplicate rotation, compression, removal, or `postrotate`,
+or restart a service merely because files were removed. Treat `copytruncate` as
+an explicit fallback with a warning about possible record loss.
 
-The example needs parser and `--plan` coverage, positive and negative fixture
-cases, protection against concurrent runs, and a clear failure at each step.
-Deletion remains a visible external `find` command; yesh does not add a hidden
-file-cleanup operation. Interaction with `logrotate`, including reading its
-policy or managing its configuration, is a separate future task and is outside
-this milestone. The scenario must use an explicit directory and `find -P`,
-avoid following symlinks, select only regular rotated files, and document the
-remaining race between selection and unlink. It must not claim that a file is
-unused merely because an open-file check passed: an unlinked file can continue
-to consume space until its descriptors are closed. Free space and service
-state must be checked after cleanup.
+Use a documented reload/reopen action for text logs; journald does not need a
+service reopen. Ambiguous ownership must fail, and each operation needs
+positive, negative, and `--plan` coverage.
+
+Do not try to prove arbitrary text-path ownership with a hidden logrotate
+detector: configuration is assembled through includes, patterns, `olddir`, and
+multiple files, while applications may open additional logs outside systemd's
+`StandardOutput=`/`StandardError=` settings. Implement only finite boundary
+checks: reject `/run/log/journal` and `/var/log/journal`, check the explicitly
+named directory, owner, and mode, and treat incomplete evidence as refusal.
+For files from a logrotate policy, run visible `logrotate` and do not duplicate
+its rotation, compression, removal, or `postrotate` actions. The open work is
+polishing the verified scenario, its messages, documentation, and negative
+fixtures—not adding a new language operation or syntax construct.
 
 ## Main direction
 
@@ -63,14 +103,14 @@ Focus on safe, repeatable maintenance operations on one Linux machine. These
 are one problem family, not three separate products:
 
 1. backup → result verification → restore;
-2. file cleanup or maintenance → free-space check → service;
+2. log maintenance → free-space check → service;
 3. configuration publication → restart → state verification.
 
 Keep the practical sequence explicit in each workflow:
 
-- cleanup: validate the directory and available space, select only old regular
-  rotated files without following symlinks, remove them, then recheck space,
-  service state, and the journal;
+- logrotate maintenance: validate the policy and available space, run its
+  preview, require explicit confirmation, apply it, then recheck space, service
+  state, and the bounded journal;
 - backup: acquire the lock, validate source and destination, copy to a
   temporary tree, verify the result, publish the completed tree, and test
   restoration;
@@ -184,7 +224,7 @@ record size; retention must rewrite through a temporary file and atomic rename,
 never truncate the live history in place. Do not use a JSON array as an append
 log: an interrupted final write can leave the whole document malformed.
 
-Reuse the state rules in `docs/long-running-and-state.ru.md`: each resource
+Reuse the state rules in `docs/underthehood/long-running-and-state.md`: each resource
 state record is a versioned JSON document. The current prototype appends
 completed records to one bounded JSON Lines file per state directory; separate
 JSON files remain a transition format accepted while reading. The record should contain the

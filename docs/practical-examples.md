@@ -37,6 +37,41 @@ partial files, and lock cleanup.
 | Selected-snapshot restore | [`rsync-selected-restore.yesh`](../examples/rsync-selected-restore.yesh) | symlink source or non-empty target |
 | rsnapshot with confirmation | [`rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh) | missing confirmation or failed config test |
 | Scheduled backup | [`cron-backup-rwe.yesh`](../examples/cron-backup-rwe.yesh) | cancellation, timeout, or held lock |
+| nginx text-log maintenance | [`nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh) | missing confirmation or failed service/logrotate check |
+
+## nginx text logs: logrotate and journald stay separate
+
+The nginx service has two independent message streams. Service output is read
+from `systemd-journald`, while `/var/log/nginx/*.log` is managed by the active
+`logrotate` policy. The yesh scenario does not discover ownership, delete files
+itself, or restart nginx. It checks the service and disk space, runs
+`logrotate -d -v`, requires an operator-created confirmation file, applies the
+same policy and state file, and finally reads a bounded journal window.
+
+The central order is visible in the script:
+
+```yesh
+with lock $lock:
+    service status nginx.service
+    df -P -h -- /var/log
+    $binary -d -v -s $state $config
+
+    if exists $confirm:
+        $binary -s $state $config
+    else:
+        echo "nginx logrotate plan reviewed; confirmation file is missing"
+        exit 5
+
+    df -P -h -- /var/log
+    service status nginx.service
+    journal nginx.service since 5m lines 40
+```
+
+The final `journal` query is observation only; it does not rotate or vacuum
+journald. Journal cleanup is a separate operation using `journalctl --rotate`
+and `--vacuum-*`, with its own plan and confirmation. The complete script and
+the Debian verification record are linked from the example and the [Linux
+integration evidence](underthehood/linux-integration.md).
 
 ## Exit-code rules
 

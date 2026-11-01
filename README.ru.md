@@ -90,9 +90,10 @@ go build -trimpath -o yesh ./cmd/yesh
 см. [`service-status.yesh`](examples/service-status.yesh): ему нужен работающий
 systemd, а сам пример только наблюдает одну службу.
 
-Экспериментальная возможность в разработке: измерение ресурсов службы по её
-cgroup, сохранение истории и сводка изменения памяти и ввода-вывода. Подробный
-синтаксис — в [учебнике](docs/syntax-guide.ru.md).
+Наблюдение ресурсов службы доступно только для чтения: yesh снимает cgroup,
+конечную историю и сводку памяти, CPU и I/O. Нужны доступные systemd и cgroup v2;
+отсутствующие контроллеры остаются явно `unavailable`. Правила директив описаны
+в [руководстве по systemd](docs/systemd.ru.md) и [учебнике](docs/syntax-guide.ru.md).
 
 ## Почему yesh проще читать, чем Bash
 
@@ -223,8 +224,9 @@ Linux-стенды и дополнительные прогоны на отде�
 эксплуатации.
 
 Карта запускаемых примеров и их ограничений находится в
-[`docs/example-map.ru.md`](docs/example-map.ru.md), а подробные сценарии описаны
-в [`docs/practical-examples.ru.md`](docs/practical-examples.ru.md). Для локальной
+[`docs/example-map.ru.md`](docs/example-map.ru.md), а длинные операционные
+сценарии — в [`docs/real-world-workflows.ru.md`](docs/real-world-workflows.ru.md).
+Для локальной
 проверки используются кэши внутри рабочего каталога:
 
 Каждый файл `examples/*.yesh` разбирается тестовым набором. Но не каждый файл
@@ -312,8 +314,12 @@ yesh предназначен для Linux. Для его примеров ну�
 на английском языке.
 
 Подробности systemd/journal собраны в
-[`docs/systemd.ru.md`](docs/systemd.ru.md), а практическая карта проверок — в
-[`docs/practical-examples.ru.md`](docs/practical-examples.ru.md).
+[`docs/systemd.ru.md`](docs/systemd.ru.md), а результаты Linux-проверок — в
+[`docs/underthehood/linux-integration.ru.md`](docs/underthehood/linux-integration.ru.md).
+
+Технические заметки и результаты проверок собраны в [техническом разделе](docs/underthehood/README.ru.md).
+С первого раза его можно не читать: там объясняется, как проверялось поведение
+Linux и почему у реализации есть нынешние границы.
 
 Принципы языка описаны в [`DESIGN.ru.md`](DESIGN.ru.md) и
 [`DESIGN.md`](DESIGN.md).

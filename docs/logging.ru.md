@@ -56,7 +56,7 @@ format: text | json
 
 «Не найдено» и «источник не хранит историю» — разные результаты.
 
-## Backend systemd
+## Источник systemd
 
 Для первой версии безопаснее вызывать `journalctl` через argv:
 
@@ -74,7 +74,7 @@ priority, unit, kernel-only messages и regex-фильтр MESSAGE. [journalctl]
 Позже возможен native backend через `go-systemd`/D-Bus или `sdjournal`, но
 `sdjournal` требует CGO. Это Linux-specific оптимизация, не MVP.
 
-## Backend classic syslog
+## Источник классического syslog
 
 Не обещать единую структуру там, где её нет. Для `/var/log/syslog`,
 `/var/log/messages` и `/var/log/boot.log` MVP возвращает records:

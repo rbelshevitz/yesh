@@ -92,9 +92,11 @@ script's expanded commands without starting an external command. For a
 Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
 it requires a running systemd manager and only observes one service.
 
-Experimental service resource measurement is in development: cgroup sampling,
-history storage, and memory/I/O summaries. See the [syntax tutorial](docs/syntax-guide.md)
-for the directive rules.
+Linux service resource observation is available as a read-only feature: cgroup
+sampling, finite history, and memory/CPU/I/O summaries. It requires a readable
+systemd manager and cgroup v2; unavailable controllers remain explicitly
+unavailable. See the [systemd guide](docs/systemd.md) and
+[syntax tutorial](docs/syntax-guide.md) for the directive rules.
 
 | Bash | yesh |
 | --- | --- |
@@ -236,6 +238,9 @@ The runnable examples and their limitations are documented in
 [Practical Examples](docs/practical-examples.md). A local verification run
 uses workspace-local caches:
 
+Linux-specific process, service, and real-host evidence is recorded in
+[Linux integration evidence](docs/underthehood/linux-integration.md).
+
 Every `examples/*.yesh` file is parsed by the test suite. Not every file runs in
 every default test job: syntax-guide and quickstart examples are exercised by
 named tests, while environment-dependent examples are covered by their Linux
@@ -293,6 +298,11 @@ path from the first script to a small administrative workflow.
 
 The [English syntax tutorial](docs/syntax-guide.md) covers the same syntax and
 examples. The Russian tutorial contains the fuller step-by-step narrative.
+
+Technical notes and test results are collected in the
+[technical reference](docs/underthehood/README.md). You can skip it on a first
+read; it explains how the Linux behavior was checked and why the implementation
+has its current limits.
 
 See the [English roadmap](docs/TODO.md) for current project priorities.
 

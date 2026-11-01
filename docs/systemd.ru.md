@@ -1,45 +1,43 @@
-# systemd и journalctl: план упрощайзера
+# Как yesh упрощает работу с systemd и журналом
 
 Цель — не заменить `systemctl` и `journalctl`, а убрать повторяющийся
 административный шум и сделать опасные операции заметными при чтении.
 
 Полезная граница — небольшой типизированный адаптер над systemd, а не второй
 язык конфигурации systemd. yesh должен коротко выражать частые вопросы:
-«этот точный unit исправен?», «перезапуск завершился?», «покажи последние
-ограниченные записи журнала?» — сохраняя в скрипте имя unit, manager, timeout и
-изменяющее действие.
+«этот точный служебный блок исправен?», «перезапуск завершился?», «покажи
+последние ограниченные записи журнала?» — сохраняя в сценарии имя блока,
+диспетчер systemd, срок ожидания и изменяющее действие.
 
 ## Реализованный синтаксис
 
 ```yesh
-service status api.service
-service start api.service until active within 30s
-service restart api.service until active within 30s
-service wait api.service until active within 30s
-journal api.service since 15m lines 100
-service resources api.service
+service status nginx.service
+service restart nginx.service until active within 30s
+service wait nginx.service until active within 30s
+journal nginx.service since 15m lines 100
+service resources nginx.service
 service status user api.service
 journal user api.service since 15m lines 100
 ```
 
 Короткие формы `service api`, `service.status api`, `service.restart api` и
 `service.wait api running within 30s` — пока только эскизы дизайна и не входят
-в поддерживаемый синтаксис. Выше показан текущий интерфейс.
+в поддерживаемый синтаксис. Выше показан текущий синтаксис.
 
 В этих конструкциях `service` — ключевое слово операции, а отдельного ключевого
 слова `unit` нет. Имя системного юнита передаётся следующим значением:
-`service resources api.service`. В учебных примерах `unit` может встречаться
+`service resources nginx.service`. В учебных примерах `unit` может встречаться
 как обычное имя переменной, например `unit = nginx.service`; это не особый
 синтаксис службы.
 
-`service status`, `service start UNIT until active within DURATION`,
-`service restart UNIT until active within DURATION`,
+`service status`, `service restart UNIT until active within DURATION`,
 `service wait UNIT until active within DURATION` и
 ограниченный `journal UNIT since DURATION lines N` уже реализованы. Перезапуск
 использует единый конечный бюджет клиента и опрашивает состояние точной службы
-до требуемого состояния или крайнего срока; `systemctl --wait` не используется, потому что
-для долгоживущей службы он может ждать её завершения. Журнал выдаёт строки JSON, ограничен
-четырьмя MiB и отклоняет диагностику в stderr, чтобы предупреждение о правах
+до требуемого состояния или крайнего срока; `systemctl --wait` не используется,
+потому что для долгоживущей службы он может ждать её завершения. Журнал выдаёт
+строки JSON, ограничен четырьмя MiB и отклоняет диагностику в stderr, чтобы предупреждение о правах
 или частичный результат не выглядели успехом. Фильтры загрузки и чтение потока
 пока остаются целевым дизайном; ограниченное ожидание уже реализовано.
 
@@ -59,26 +57,65 @@ CPU, окна PSI, OOM-события и таблица процессов. Гл
 Первые формы конечного измерения и сводки выглядят так:
 
 ```yesh
-state_dir = "/tmp/yesh-api-state"
+# В этом каталоге будут measurements.jsonl и файл блокировки; summarize читает
+# оттуда сохранённую историю. Для постоянной работы нужен закрытый каталог
+# пользователя, а /tmp используется только в этом упражнении.
+state_dir = "/tmp/yesh-nginx-resources"
 
-measure service user api.service for 10s every 2s:
+service status nginx.service
+measure service nginx.service for 30s every 5s:
     save to $state_dir
     keep history for 24h
-summarize service user api.service from $state_dir since 1h
+summarize service nginx.service from $state_dir since 1h
+journal nginx.service since 15m lines 40
 ```
+
+Это только для чтения: yesh наблюдает уже работающий nginx, его основной и
+рабочие процессы, затем ставит рядом с трендом ресурсов ограниченное окно
+журнала. yesh не запускает nginx и не создаёт HTTP-нагрузку; если нужна
+сравнимая нагрузка, её подают отдельно и только по решению оператора.
+
+Если `save to` не указан, yesh использует пользовательский каталог
+`~/.local/.yesh/resources/<unit>/`; для этого примера это
+`~/.local/.yesh/resources/nginx.service/`. yesh создаёт только недостающие
+каталоги внутри домашнего каталога пользователя с правами `0700` (доступ только
+владельцу). Он не вызывает `sudo`, не создаёт и не исправляет родительский
+системный каталог и не меняет владельца. Явно указанный путь `save to` должен
+быть доступен для записи текущему пользователю; существующие права yesh не
+меняет.
+
+Польза здесь не в получении ещё одного числа. В одном понятном сценарии yesh
+собирает службу, период наблюдения, сохранённую историю, изменения памяти и RSS
+и окно журнала за тот же период. Администратор может прочитать проверку сверху
+вниз и сразу увидеть, что именно наблюдается, куда попадёт результат и что
+считается неполным наблюдением. Linux-команды остаются видимыми, а yesh задаёт
+им понятный порядок и общие правила. Сравнение с Bash ниже показывает
+задействованные команды и не является частью сценария yesh.
 
 `measure` сразу делает первый снимок, собирает данные до конечного срока и
 дописывает один завершённый результат в JSONL только после завершения сбора.
 Директива `keep history for 24h` после успешной записи удаляет из журнала только
 записи старше этого окна; при ошибке замера старая история не изменяется.
+Здесь `complete=true` означает, что запланированный интервал завершён и
+идентичность службы не менялась. Это не означает, что доступен каждый
+необязательный контроллер: отсутствующие `io`, PSI или отдельное поле остаются
+`unavailable` в точках и явно указываются в сводке.
+Это намеренно отличается от состояния `observation=partial` у отдельного
+снимка: оно сообщает о недоступных полях именно в этой точке, а `complete=true`
+сообщает о завершённости конечного интервала и стабильности идентичности службы.
+Например, на Debian-стенде ввод-вывод блока был недоступен, но двухсекундный
+замер всё равно получился полным; исчезнувшая cgroup или процесс во время сбора
+сделали бы сохранённый результат неполным.
 В расширенной форме эта директива обязательна; `save to` можно опустить и оставить
 каталог состояния по умолчанию. Если политика хранения не нужна, используйте
 короткую однострочную форму без блока.
 `summarize` читает
 подходящие записи из каталога состояния; он не запускает службу, не снимает
 новые данные cgroup и не исправляет состояние. По умолчанию каталог создаётся
-в `~/.local/.yesh/resources/` с закрытыми правами, если его нет. Для другой
-раскладки можно явно указать `save to $state_dir` и `from $state_dir`.
+в `~/.local/.yesh/resources/` с правами `0700`, если его нет. yesh не вызывает
+`sudo` и не создаёт привилегированных родителей. Для другой раскладки можно
+явно указать `save to $state_dir` и `from $state_dir`; такой каталог должен быть
+доступен текущему пользователю, а его существующие права yesh не меняет.
 Перезапуск или смена идентичности cgroup завершает
 текущую запись как неполную, а снимки разных запусков не объединяются.
 
@@ -98,25 +135,25 @@ summarize service user api.service from $state_dir since 1h
 служба и таймер могут выглядеть так:
 
 ```ini
-# ~/.config/systemd/user/yesh-api-resources.service
+# ~/.config/systemd/user/yesh-nginx-resources.service
 [Unit]
-Description=Конечный замер ресурсов api.service через yesh
+Description=Конечный замер ресурсов nginx.service через yesh
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/yesh /home/ops/yesh-api-resources.yesh
+ExecStart=/usr/local/bin/yesh /home/ops/yesh-nginx-resources.yesh
 ```
 
 ```ini
-# ~/.config/systemd/user/yesh-api-resources.timer
+# ~/.config/systemd/user/yesh-nginx-resources.timer
 [Unit]
-Description=Периодический замер ресурсов api.service через yesh
+Description=Периодический замер ресурсов nginx.service через yesh
 
 [Timer]
 OnCalendar=*:0/5
 AccuracySec=1s
 Persistent=true
-Unit=yesh-api-resources.service
+Unit=yesh-nginx-resources.service
 
 [Install]
 WantedBy=timers.target
@@ -133,21 +170,21 @@ WantedBy=timers.target
 `300ms`, `2s`, `15m` или `1h30m`. Полный синтаксис `systemd.time` намеренно
 не принимается.
 
-Перед unit можно указать manager: `system` или `user`. Если профиль опущен,
-используется системный manager для совместимости со старым синтаксисом.
+Перед именем блока можно указать диспетчер: `system` или `user`. Если профиль
+опущен, используется системный диспетчер для совместимости со старым синтаксисом.
 Профиль `user` добавляет `--user` и для `systemctl`, и для `journalctl`;
 это не означает наличие persistent user journal или достаточных прав чтения.
 
 `service wait` ничего не запускает и не перезапускает: он сразу читает
-состояние, затем опрашивает его до конечного срока. При timeout выводится
-последний `ActiveState`/`SubState`. Это состояние manager, а не readiness
-приложения. Для `Type=oneshot` postcondition `active` имеет ожидаемый смысл
+состояние, затем опрашивает его до конечного срока. При превышении срока
+выводится последний `ActiveState`/`SubState`. Это состояние диспетчера, а не
+готовность приложения. Для `Type=oneshot` условие результата `active` имеет ожидаемый смысл
 только при `RemainAfterExit=yes`; без него успешный oneshot обычно становится
-`inactive/dead`, и yesh не угадывает это как успех. После `start` или `restart`
-такое terminal-состояние сразу считается невозможным postcondition, без
-ожидания всего timeout.
+`inactive/dead`, и yesh не угадывает это как успех. После `restart` такое
+конечное состояние сразу считается невыполненным условием результата, без
+ожидания всего срока.
 Состояния `failed`, `not-found` и `masked` сообщаются сразу, без ожидания
-всего timeout; переходные `inactive`, `activating` и `deactivating` могут
+всего срока; переходные `inactive`, `activating` и `deactivating` могут
 измениться внешним актором и поэтому опрашиваются.
 
 ## Что именно упрощается
@@ -157,13 +194,13 @@ WantedBy=timers.target
 | Повторяющаяся работа с systemd | Упрощение в yesh |
 | --- | --- |
 | `systemctl show` и ручной список свойств | один ограниченный снимок службы с именованными полями |
-| start/restart и отдельный цикл опроса | одно действие с обязательным postcondition и timeout |
-| разбор текста `systemctl status` | структурированное состояние по allowlist свойств |
+| restart и отдельный цикл опроса | одно действие с обязательным условием результата и сроком ожидания |
+| разбор текста `systemctl status` | структурированное состояние по разрешённому списку свойств |
 | `journalctl` с pager и неограниченным выводом | ограниченные записи, явный интервал, без pager |
-| разный вызов system/user manager | явный выбор manager в операции |
+| разный вызов системного и пользовательского диспетчера | явный выбор диспетчера в операции |
 
-Адаптер не должен скрывать `sudo`, выбор unit, изменения или ошибки. Он не
-принимает glob и не действует молча на нескольких unit. `daemon-reload`,
+Адаптер не должен скрывать `sudo`, выбор блока, изменения или ошибки. Он не
+принимает glob и не действует молча на нескольких блоках. `daemon-reload`,
 `reload`, `restart`, `enable`, `disable`, `mask` и `unmask` — разные операции и
 должны оставаться разными в yesh.
 
@@ -171,87 +208,88 @@ WantedBy=timers.target
 
 Это границы дизайна, а не мелкие детали реализации:
 
-- Alias — допустимая явная цель systemd, но `systemctl show` может вернуть
-  canonical `Id`. Текущий MVP явно отклоняет такой mismatch и сообщает, что
-  aliases не поддержаны; принятие alias требует отдельной политики identity.
-- `foo@.service` — template, а `foo@blue.service` — конкретный instance.
-  Первый отклоняется как цель, а concrete instance остаётся явным именем.
+- Псевдоним — допустимая явная цель systemd, но `systemctl show` может вернуть
+  канонический `Id`. Текущий MVP явно отклоняет такое несовпадение; принятие
+  псевдонимов требует отдельной политики идентичности.
+- `foo@.service` — шаблон, а `foo@blue.service` — конкретный экземпляр.
+  Первый отклоняется как цель, а конкретный экземпляр остаётся явным именем.
 - `Type=oneshot` без `RemainAfterExit=yes` после успешного завершения переходит
-  в inactive/dead. Поэтому `active` не означает успех для любого типа unit.
-- `systemctl restart` ждёт job manager, если не указан `--no-block`, но это не
+  в inactive/dead. Поэтому `active` не означает успех для любого типа блока.
+- `systemctl restart` ждёт задание диспетчера, если не указан `--no-block`, но это не
   доказательство готовности приложения. После него могут потребоваться
-  `Result`, exit status процесса, readiness probe или предметный postcondition.
-- `--system` и `--user` обращаются к разным manager. Доступ к journal также
-  зависит от прав, а `--user` ограничен при отключённом persistent journal.
-- `journalctl --unit=foo.slice` включает записи дочерних unit. Это нельзя
+  `Result`, код завершения процесса, проверка готовности или предметное условие
+  результата.
+- `--system` и `--user` обращаются к разным диспетчерам. Доступ к журналу также
+  зависит от прав, а `--user` ограничен при отключённом постоянном журнале.
+- `journalctl --unit=foo.slice` включает записи дочерних блоков. Это нельзя
   описывать как фильтр одной службы.
 - Пустой journal — нормальный результат. Его нужно отличать от отказа доступа,
-  недоступного manager, ротации старых записей и повреждённого/частичного JSON.
+  недоступного диспетчера, ротации старых записей и повреждённого/частичного JSON.
 
-## Минимальный полезный интерфейс
+## Минимальный полезный набор
 
 Первый слой должен быть небольшим:
 
 ```yesh
-service status api.service
-service start api.service until active within 30s
-service restart api.service until active within 30s
-service wait api.service until active within 30s
-journal api.service since 15m lines 100
+service status nginx.service
+service restart nginx.service until active within 30s
+service wait nginx.service until active within 30s
+journal nginx.service since 15m lines 100
 ```
 
 `service status` должен различать как минимум `active`, `inactive`, `failed`,
-`activating`, `deactivating`, `masked`, `not-found`, недоступный manager и
+`activating`, `deactivating`, `masked`, `not-found`, недоступный диспетчер и
 отказ в доступе. `service restart` должен сообщать и результат команды, и
 проверенное итоговое состояние. Успешный возврат клиента `systemctl` сам по
 себе не доказывает, что служба достигла нужного состояния.
 
-Грамматика этих четырёх форм уже проверяется parser/runtime-тестами. Важнее
+Грамматика этих четырёх форм уже проверяется тестами разбора и исполнения. Важнее
 семантическое правило:
-каждая изменяющая операция со службой имеет явное postcondition либо явно
-возвращает только результат manager; timeout никогда не выдаётся за доказанную
+каждая изменяющая операция со службой имеет явное условие результата либо явно
+возвращает только результат диспетчера; срок ожидания никогда не выдаётся за доказанную
 остановку.
 
-## Карта примеров и fixture
+## Карта примеров и стенд
 
-| Нюанс | Пример | Что доказывает fixture |
+| Нюанс | Пример | Что доказывает стенд |
 | --- | --- | --- |
-| точная unit и фиксированные поля | `examples/service-status.yesh` | allowlist, canonical Id, отсутствие изменения |
-| restart не равен readiness | `examples/service-restart.yesh` (fixture-backed) | отказ postcondition останавливает скрипт |
-| конечный polling | `examples/service-wait.yesh` | переход в active, timeout, быстрый failed-state |
+| точный служебный блок и фиксированные поля | `examples/service-status.yesh` | разрешённый список, канонический Id, отсутствие изменения |
+| restart не равен готовности | `examples/service-restart.yesh` (стендовый) | невыполненное условие результата останавливает сценарий |
+| конечный опрос | `examples/service-wait.yesh` | переход в active, срок ожидания, быстрый отказ |
 | ограниченный journal | `examples/service-journal.yesh` | JSON, ошибка stderr, успешный пустой результат |
 | ресурсный снимок службы | `examples/service-resources.yesh` | связь cgroup с процессами и ограниченные счётчики |
 
-Для проверки настоящего systemd есть отдельный opt-in-скрипт
+Для проверки настоящего systemd есть отдельный скрипт по явному запросу
 [`scripts/yesh-fixture-test.sh`](../scripts/yesh-fixture-test.sh). Он создаёт
 уникальные временные юниты только в `/run/systemd/system`, проверяет реальные
 `status`, `restart` и `wait`, отдельно подтверждает `oneshot` без
-`RemainAfterExit` и timeout во время `activating`, а затем удаляет только свои
+`RemainAfterExit` и превышение срока во время `activating`, а затем удаляет только свои
 файлы через `trap`. Скрипт требует интерактивный `sudo` и не должен запускаться
-на production-службах.
+на рабочих службах.
 
-Примеры намеренно подробно прокомментированы. У каждого есть Bash-сравнение,
-а practical fixture запускает сам файл с fake `systemctl`/`journalctl` и
+Примеры намеренно подробно прокомментированы. У каждого есть сравнение с Bash,
+а стенд запускает сам файл с подставными `systemctl`/`journalctl` и
 проверяет argv, вывод, порядок, остановку после ошибки и `--plan` без
-обращения к настоящему manager.
+обращения к настоящему диспетчеру.
 
-## Masked unit — это состояние, а не ошибка parser-а
+## Замаскированный служебный блок (`masked`) — это состояние, а не ошибка разбора
 
 `LoadState=masked` — допустимое наблюдение. `service status` его показывает,
-а `service wait` сразу завершается ошибкой и не тратит весь timeout. yesh не
+а `service wait` сразу завершается ошибкой и не тратит весь срок. yesh не
 добавляет скрытый `systemctl unmask`; если unmask появится, это должна быть
 отдельная явная изменяющая операция.
 
 ## Текущая граница и следующий поиск
 
-В MVP уже реализованы `service status` только для чтения, ограниченное
-`service wait`, start и restart с требуемым состоянием, ограниченный журнал в
+В MVP уже реализованы `service status` только для чтения, ограниченные
+`service wait` и `service restart` с требуемым состоянием, ограниченный журнал в
 JSON и `service resources` для снимка cgroup. Они используют фиксированный
-allowlist `systemctl show`, точную identity unit, профиль system/user, конечные
+разрешённый список `systemctl show`, точную идентичность блока, профиль system/user, конечные
 сроки и прозрачный argv в `--plan`.
 
-Отдельно остаются: stop/reload, queued job и readiness после start/restart,
-cursor/boot и allowlist полей journal, политика ротации/cursor, follow/streaming
+Отдельно остаются: stop/reload, задания в очереди и готовность после restart,
+cursor/boot и разрешённый список полей journal, политика ротации/cursor,
+follow/streaming
 и backend transient
 service через `systemd-run`. Текущий MVP этого не обещает.
 
@@ -262,25 +300,25 @@ service через `systemd-run`. Текущий MVP этого не обеща�
 Текущая граница subprocess — обычные команды, которые можно увидеть в плане:
 
 ```text
-systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState api.service
-systemctl restart api.service
-journalctl --no-pager --output=json --unit api.service --since -15m --lines 100
+systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState nginx.service
+systemctl restart nginx.service
+journalctl --no-pager --output=json --unit nginx.service --since -15m --lines 100
 ```
 
 `service restart` выполняет вторую команду, а затем снова читает первый снимок
-для проверки postcondition. Точные argv и профиль manager остаются видны в
+для проверки условия результата. Точные argv и профиль диспетчера остаются видны в
 `--plan`; это граница текущей реализации, а не обещание навсегда оставить все
 будущие операции systemd на subprocess.
 
 ## Защита от ошибок
 
-- имя unit проверяется как одно значение, без скрытого shell-разбора;
+- имя блока проверяется как одно значение, без скрытого shell-разбора;
 - `restart`, `stop`, `disable` и `mask` явно считаются изменяющими операциями;
-- `--plan` показывает команду и unit, но не меняет состояние;
-- `wait` имеет обязательный timeout и конечное число проверок;
+- `--plan` показывает команду и блок, но не меняет состояние;
+- `wait` имеет обязательный срок и конечное число проверок;
 - `journal` ограничивает время, число строк и отключает pager;
 - не добавлять `sudo` автоматически: право видно в исходнике;
-- диагностика сохраняет exit status, signal, timeout и stderr;
+- диагностика сохраняет код завершения, сигнал, срок и stderr;
 - не читать бесконечный journal-поток без явного `follow`-режима;
 - `follow` в MVP запрещён, пока нет отдельной модели отмены и закрытия TTY.
 
@@ -288,5 +326,5 @@ journalctl --no-pager --output=json --unit api.service --since -15m --lines 100
 
 `service` и `journal` — встроенные типизированные операции, а не текстовые
 макросы над `systemctl` и `journalctl`. Позднее transport можно заменить на
-native D-Bus, но identity, состояния, timeout, диагностика и postcondition
+native D-Bus, но идентичность, состояния, сроки, диагностика и условия результата
 должны остаться наблюдаемыми и эквивалентными.

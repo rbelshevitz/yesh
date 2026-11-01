@@ -11,11 +11,11 @@ keeping the unit name, manager, timeout, and mutation visible in the script.
 ## Implemented syntax
 
 ```yesh
-service status api.service
-service restart api.service until active within 30s
-service wait api.service until active within 30s
-journal api.service since 15m lines 100
-service resources api.service
+service status nginx.service
+service restart nginx.service until active within 30s
+service wait nginx.service until active within 30s
+journal nginx.service since 15m lines 100
+service resources nginx.service
 service status user api.service
 journal user api.service since 15m lines 100
 ```
@@ -26,7 +26,7 @@ syntax. The documented forms above are the current interface.
 
 Here `service` is the operation keyword; there is no separate `unit` keyword.
 The systemd unit is the following positional value, as in
-`service resources api.service`. In tutorial examples, `unit` may also be an
+`service resources nginx.service`. In tutorial examples, `unit` may also be an
 ordinary variable name such as `unit = nginx.service`; it is not special service
 syntax.
 
@@ -67,19 +67,57 @@ it explicitly says when unavailable values are not zero.
 The first finite measurement and summary forms are:
 
 ```yesh
-state_dir = "/tmp/yesh-api-state"
+# This directory contains measurements.jsonl and its lock file; summarize
+# reads the saved history from there. Use a persistent user-owned directory
+# for regular operation; /tmp is only for this exercise.
+state_dir = "/tmp/yesh-nginx-resources"
 
-measure service user api.service for 10s every 2s:
+service status nginx.service
+measure service nginx.service for 30s every 5s:
     save to $state_dir
     keep history for 24h
-summarize service user api.service from $state_dir since 1h
+summarize service nginx.service from $state_dir since 1h
+journal nginx.service since 15m lines 40
 ```
+
+This is a read-only incident check for an existing nginx service: yesh measures
+the master and worker processes already assigned to nginx, then places the
+resource trend beside a bounded journal window. It does not start nginx or
+generate HTTP traffic; use a separate, operator-approved load source if the
+comparison needs traffic.
+
+If `save to` is omitted, yesh uses the user-owned directory
+`~/.local/.yesh/resources/<unit>/`; for this example that is
+`~/.local/.yesh/resources/nginx.service/`. yesh creates only the missing
+directories below the user's home with mode `0700` (owner access only). It does
+not invoke `sudo`, create or repair a privileged parent, or change ownership.
+An explicit `save to` path must already be writable by the current user; yesh
+does not change its existing permissions.
+
+The useful part is not collecting one more number. In one readable script, yesh
+keeps together the service, the observation period, the saved history, the
+changes in memory and RSS, and the journal window for the same period. An
+administrator can read the check from top to bottom and see what it observes,
+where it saves the result, and what counts as an incomplete observation. The
+Linux commands remain visible; yesh gives them a clear order and shared rules.
+A Bash comparison below shows the commands involved; it is not part of the
+yesh scenario.
 
 `measure` takes the first snapshot immediately, samples until its finite
 deadline, and appends one completed JSON Lines record only after collection
 finishes. `keep history for 24h` removes only records older than that window
 after a successful measurement; a failed measurement leaves the old history
 unchanged.
+Here, `complete=true` means that the scheduled interval finished and the unit
+identity remained stable. It does not mean that every optional controller was
+available: an absent `io` controller, PSI file, or accounting field remains
+`unavailable` in the samples and is called out by the summary.
+This is deliberately different from the one-snapshot `observation=partial`
+line: that line reports missing fields in that snapshot, while `complete=true`
+reports that the finite interval and service identity were valid. For example,
+the Debian user-service fixture had unavailable block I/O but still produced a
+complete two-second measurement; a missing cgroup or a process disappearing
+during collection makes the saved measurement incomplete.
 The block requires the retention directive; `save to` may be omitted to use the
 default state directory. If no retention policy is needed, use the short
 one-line form without a block.
@@ -106,25 +144,25 @@ finite. The measurement script can contain the two statements above; a user
 service and timer can invoke it like this:
 
 ```ini
-# ~/.config/systemd/user/yesh-api-resources.service
+# ~/.config/systemd/user/yesh-nginx-resources.service
 [Unit]
-Description=Bounded yesh resource measurement for api.service
+Description=Bounded yesh resource measurement for nginx.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/yesh /home/ops/yesh-api-resources.yesh
+ExecStart=/usr/local/bin/yesh /home/ops/yesh-nginx-resources.yesh
 ```
 
 ```ini
-# ~/.config/systemd/user/yesh-api-resources.timer
+# ~/.config/systemd/user/yesh-nginx-resources.timer
 [Unit]
-Description=Periodic yesh resource measurement for api.service
+Description=Periodic yesh resource measurement for nginx.service
 
 [Timer]
 OnCalendar=*:0/5
 AccuracySec=1s
 Persistent=true
-Unit=yesh-api-resources.service
+Unit=yesh-nginx-resources.service
 
 [Install]
 WantedBy=timers.target
@@ -204,10 +242,10 @@ These are part of the design boundary, not implementation trivia:
 The first useful layer is deliberately small:
 
 ```yesh
-service status api.service
-service restart api.service until active within 30s
-service wait api.service until active within 30s
-journal api.service since 15m lines 100
+service status nginx.service
+service restart nginx.service until active within 30s
+service wait nginx.service until active within 30s
+journal nginx.service since 15m lines 100
 ```
 
 The result of `service status` should distinguish at least `active`, `inactive`,
@@ -241,9 +279,9 @@ These operations should be typed runtime commands with the same transparent
 The current subprocess boundary is ordinary, inspectable commands:
 
 ```text
-systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState api.service
-systemctl restart api.service
-journalctl --no-pager --output=json --unit api.service --since -15m --lines 100
+systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState nginx.service
+systemctl restart nginx.service
+journalctl --no-pager --output=json --unit nginx.service --since -15m --lines 100
 ```
 
 `service restart` runs the second command and polls the restart snapshot until

@@ -1,6 +1,6 @@
 # Карта практических примеров yesh
 
-В каталоге `examples/` находятся 56 исполняемых примеров. Эта карта помогает
+В каталоге `examples/` находятся 60 исполняемых примеров. Эта карта помогает
 выбрать учебный маршрут и не смешивать простые правила языка с испытаниями,
 которым нужны systemd, сеть, дополнительные права или отдельный стенд.
 
@@ -56,7 +56,6 @@
 - `fstab-mount-check.yesh` — связь записи `fstab` с активной файловой системой;
 - `initrd-module-check.yesh` — проверка содержимого образа initrd;
 - `service-status.yesh` — точное состояние службы systemd;
-- `service-start.yesh` — запуск службы с требуемым состоянием;
 - `service-wait.yesh` — ограниченное ожидание состояния;
 - `service-restart.yesh` — перезапуск с проверкой результата;
 - `service-journal.yesh` — ограниченный запрос журнала;
@@ -123,7 +122,7 @@
 
 - **Диагностика службы:** `service-status.yesh` → `service-wait.yesh` →
   `service-journal.yesh` → `service-resources.yesh` → `incident-report-rwe.yesh`.
-  `service-start.yesh` и `service-restart.yesh` запускать только во временном
+  `service-restart.yesh` запускать только во временном
   окружении с systemd.
 - **Сеть и удалённый узел:** `network-interface-report.yesh` →
   `network-route-report.yesh` → `network-neighbour-report.yesh` →

@@ -114,6 +114,29 @@ else:
 `exists path` is a yesh predicate. It is not a hidden shell test and does not
 claim that the file will remain accessible after the check.
 
+## A real-world service-log scenario
+
+After the basic syntax, look at a common Linux maintenance task: rotating
+nginx's text logs. There are two separate sources: service output is read from
+`systemd-journald`, while `/var/log/nginx/*.log` is managed by `logrotate`.
+yesh connects the checks and order; it is not a third rotation system.
+
+The scenario checks the service and disk space, previews the real `logrotate`
+policy, requires an explicit confirmation file before changing anything, and
+then reads a bounded journal window. The full tutorial explanation and Bash
+comparison are in the [Russian syntax guide](syntax-guide.ru.md); the script is
+[`examples/nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh).
+
+Start with the plan:
+
+```text
+yesh --plan examples/nginx-logrotate-maintenance.yesh
+```
+
+`--plan` shows expanded arguments for external `logrotate`, `systemctl`, and
+`df`, while `journal` appears as a separate planned yesh action. None of them
+is run and no redirection is opened.
+
 ## Run it
 
 Build the interpreter from the repository root:

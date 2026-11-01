@@ -3,7 +3,7 @@
 Статус: предметный интерфейс ниже пока проектируется. Уже исполняемый
 пример обычных команд — [rsnapshot-local.yesh](../examples/rsnapshot-local.yesh).
 Реальные Go-тесты двух ротаций, восстановления версий и повторного
-использования hard links описаны в [Р.П.П.](practical-examples.ru.md).
+использования hard links описаны в [длинных практических сценариях](real-world-workflows.ru.md).
 
 rsnapshot уже умеет сложную и полезную часть: incremental snapshots на базе
 rsync и hard links, включая backup удалённых машин через SSH. yesh не должен

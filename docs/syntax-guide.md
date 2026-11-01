@@ -1,7 +1,6 @@
 # yesh syntax tutorial
 
-> The English version is still being expanded. The Russian version is currently
-> the complete tutorial.
+> This tutorial covers the core language and the Linux tasks we have tested.
 
 yesh is a small language for Linux scripts where you need to see the order of
 actions, the arguments passed to external commands, and what happens when a
@@ -9,8 +8,8 @@ command fails.
 
 This tutorial is not a complete language reference. It starts with a safe path
 check and then introduces the rules needed to read and write small
-administrative scripts. For the complete guide, see the
-[Russian syntax guide](syntax-guide.ru.md).
+administrative scripts. For exact syntax and implementation limits, see the
+[language manual](../man/yesh-language.7).
 
 ## The core idea
 
@@ -184,7 +183,7 @@ If a command starts and returns a non-zero code, yesh takes the `else` branch.
 If it cannot start, is cancelled, is killed by a signal, or exceeds its time
 limit, yesh reports an execution error instead.
 
-## 5. Finite loops
+## 5. Loops with a fixed number of repetitions
 
 `for` iterates over a finite list:
 
@@ -352,7 +351,7 @@ else:
 
 `else` is selected only when a command started and returned a non-zero code.
 
-### What yesh can check
+### What yesh checks, and what remains outside it
 
 Separate what yesh checks from what the external system knows:
 
@@ -522,12 +521,12 @@ It uses an ext4 loopback device and checks two rotations, restore, hard links,
 an invalid configuration, missing confirmation, a held lock, and resource
 cleanup. It does not use real disks or `/etc/rsnapshot.conf`.
 
-## 13b. Finite systemd service measurement
+## 13b. Measuring a systemd service over a fixed period
 
-The goal is to answer more than “what is wrong with the service right now?” We
-also want to know: “what happened during the last hour or day?”
+The question is not only “what is wrong with the service right now?” We also
+want to know what happened during the last hour or day.
 
-The practical chain is:
+The idea is simple:
 
 ```text
 measure → save snapshots → summarize → see the change
@@ -536,27 +535,28 @@ measure → save snapshots → summarize → see the change
 For example, we can see whether memory grew, how much CPU time and disk I/O were
 used, whether OOM (Out Of Memory) events occurred, and whether the strange
 behavior began after a restart. One snapshot answers only “what is happening
-now.” `measure` takes
-several snapshots over a finite interval and saves them as one result.
+now.” `measure` takes several snapshots over a finite interval and saves them
+as one result.
 
 Here is a complete example:
 
 ```yesh
-state_dir = "/tmp/yesh-api-state"
+# The directory contains measurements.jsonl and its lock file. summarize reads
+# the saved history from there; /tmp is used only for this short exercise.
+state_dir = "/tmp/yesh-nginx-resources"
 
-measure service user api.service for 10s every 2s:
+measure service nginx.service for 30s every 5s:
     save to $state_dir
     keep history for 24h
-summarize service user api.service from $state_dir since 1h
+summarize service nginx.service from $state_dir since 1h
 ```
 
 The `measure` line contains the settings for the measurement:
 
 - `service` says that the subject is a service managed by systemd;
-- `user` selects the user systemd manager;
-- `api.service` is the exact service name;
-- `for 10s` limits the whole measurement to ten seconds;
-- `every 2s` requests a snapshot every two seconds.
+- `nginx.service` is the exact service name;
+- `for 30s` limits the whole measurement to thirty seconds;
+- `every 5s` requests a snapshot every five seconds.
 
 There is no separate `unit` keyword: the service name simply follows `service`
 and, when present, `user` or `system`. `save to` selects the history directory.
@@ -564,12 +564,19 @@ In this example both commands use the same `$state_dir`: the first writes there
 and the second reads there. After a successful write, the `keep history for 24h`
 directive removes results older than one day from that journal.
 
+When `save to` is omitted, the default state directory is
+`~/.local/.yesh/resources/<unit>/`. yesh creates only that user-owned directory
+tree with mode `0700` and does not require or invoke `sudo`; it does not create
+or repair a privileged parent. Reading a system service or its journal may
+still require permissions granted by the host. An explicit state path must be
+writable by the current user, and yesh does not change its existing permissions.
+
 The colon after the first line means that the following indented lines are
 settings for that measurement. This is the extended form. If you do not need to
 set the directory or retention window explicitly, use the short form:
 
 ```yesh
-measure service api.service for 10s every 2s
+measure service nginx.service for 30s every 5s
 ```
 
 The short form still saves the result in the default directory, but it does not
@@ -584,18 +591,54 @@ take new snapshots. Start by inspecting the plan:
 yesh --plan service-measurement.yesh
 ```
 
+This is what yesh simplifies: one readable check keeps the service, the
+observation period, the saved history, the resource changes, and the relevant
+journal window together. The Linux commands remain visible, but their scope,
+order, and limits no longer have to be reconstructed from a collection of
+separate shell commands.
+
+Do not confuse a partial snapshot with an incomplete measurement. A snapshot can
+be partial because an optional field such as block I/O is unavailable; the
+saved interval can still be `complete=true` when its deadline finished and the
+service identity stayed stable. A missing cgroup or a process disappearing
+during collection makes the saved interval incomplete.
+
 The next run can read the old history. `summarize ... since 1h` selects records
 from the last hour, compares the beginning and end of each measurement, combines
 them into one report, and shows changes in memory, RSS, CPU, OOM, and I/O. It
 does not continue an interrupted measurement and does not combine records from
 different service invocations. To continue, start a new explicit `measure`.
 
+Here RSS means resident memory: the amount of a process's memory currently held
+in RAM. Shared pages may be counted for more than one process, and swapped-out
+pages are not part of RSS. The kernel's RSS value is itself an estimate, so this
+is a per-process observation, not the service's exact unique memory cost.
+
+The result has important boundaries:
+
+- it observes the selected service's cgroup and, where applicable, its nested
+  cgroup subtree at a point in time; it does not prove the cause of growth or
+  failure;
+- `memory.current` is the memory value reported for the observed cgroup scope,
+  while RSS describes processes; a sum of RSS values must not be presented as
+  `memory.current`;
+- memory and RSS are gauges, while CPU and I/O are counters that need deltas
+  between samples;
+- an unavailable metric is reported as `unavailable`, not as zero;
+- history is a bounded JSON Lines journal: an incomplete final line is ignored,
+  while a malformed complete record is an error.
+
+Each record is tied to the systemd manager, exact unit, cgroup path, and the
+unit invocation identity (`InvocationID` when available). A service restart must
+not silently merge two invocations into one history. The report describes
+measured evidence; it does not invent a causal explanation.
+
 In Bash, the same task usually needs a manual loop, timer, temporary file, and
 separate cleanup:
 
 ```bash
 for i in 1 2 3 4 5; do
-    systemctl show api.service
+    systemctl show nginx.service
     sleep 2
 done
 ```
@@ -607,6 +650,51 @@ The Bash loop alone does not say where to keep the result, how long to keep it,
 or how to avoid mixing different service invocations. These boundaries are
 explicit in yesh. Linux, an available systemd manager, and readable cgroup v2
 are required.
+
+## 13c. Rotating a service's text logs
+
+Consider a realistic maintenance task: nginx has two independent message
+streams. Service output is read from `systemd-journald`, while
+`/var/log/nginx/*.log` is managed by `logrotate`. They are not one shared log,
+so one command must not silently manage both sources.
+
+yesh does not delete old files or guess who owns a path. Its role is to make the
+order visible: check the service and disk space, preview the active `logrotate`
+policy, require confirmation before changing anything, apply that same policy,
+and check the result. Policy, state, compression, removal, and `postrotate`
+remain the responsibility of `logrotate`.
+
+The complete script is
+[`examples/nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh).
+Its central order is:
+
+```yesh
+with lock $lock:
+    service status nginx.service
+    df -P -h -- /var/log
+    $binary -d -v -s $state $config
+
+    if exists $confirm:
+        $binary -s $state $config
+    else:
+        echo "nginx logrotate plan reviewed; confirmation file is missing"
+        exit 5
+
+    df -P -h -- /var/log
+    service status nginx.service
+    journal nginx.service since 5m lines 40
+```
+
+`-d -v` is `logrotate`'s preview: it reads the policy and state file but does
+not rotate logs. Only an operator-created confirmation file allows the changing
+call. The file's contents are not a secret and are not read. Without it, the
+script stops before changing logs.
+
+The final `journal` query is observation only; it does not rotate or vacuum
+journald. Journal cleanup is a separate operation using `journalctl --rotate`
+and `--vacuum-*`, with its own plan and confirmation. The scenario applies only
+when `$config` is the active policy for these files; yesh does not prove that
+ownership automatically.
 
 ## 14. Reading an unfamiliar script
 
@@ -629,9 +717,9 @@ The word “check” covers several different mechanisms here:
 | --- | --- |
 | Parsing | Correct syntax and supported constructs |
 | `--plan` | Intended actions and arguments without execution; both conditional branches are shown as possibilities |
-| Preconditions | System state at the time of the check, such as an existing path or the expected filesystem |
-| Postcondition | An observable result after an action, such as service state or a published file |
-| Fixture test | Behavior of a particular script in a tested environment |
+| Check before an action | System state at that moment, such as an existing path or the expected filesystem |
+| Result after an action | An observable result, such as service state or a published file |
+| Test on a temporary stand | Behavior of a particular script in one tested environment |
 
 None of these replaces the others: successful parsing does not check the host,
 the plan does not run commands, and a fixture test does not promise identical
