@@ -50,7 +50,12 @@ cases, protection against concurrent runs, and a clear failure at each step.
 Deletion remains a visible external `find` command; yesh does not add a hidden
 file-cleanup operation. Interaction with `logrotate`, including reading its
 policy or managing its configuration, is a separate future task and is outside
-this milestone.
+this milestone. The scenario must use an explicit directory and `find -P`,
+avoid following symlinks, select only regular rotated files, and document the
+remaining race between selection and unlink. It must not claim that a file is
+unused merely because an open-file check passed: an unlinked file can continue
+to consume space until its descriptors are closed. Free space and service
+state must be checked after cleanup.
 
 ## Main direction
 
@@ -60,6 +65,18 @@ are one problem family, not three separate products:
 1. backup → result verification → restore;
 2. file cleanup or maintenance → free-space check → service;
 3. configuration publication → restart → state verification.
+
+Keep the practical sequence explicit in each workflow:
+
+- cleanup: validate the directory and available space, select only old regular
+  rotated files without following symlinks, remove them, then recheck space,
+  service state, and the journal;
+- backup: acquire the lock, validate source and destination, copy to a
+  temporary tree, verify the result, publish the completed tree, and test
+  restoration;
+- configuration: validate the candidate, prepare it separately, publish the
+  completed result atomically, restart the service, wait for `active`, and
+  inspect its state and journal.
 
 First bring backup with result verification and locking to an exemplary state:
 partial failure, rerun, `--plan`, restore, and no false success. Then polish
