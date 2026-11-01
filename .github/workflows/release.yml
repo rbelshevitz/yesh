@@ -89,7 +89,7 @@ jobs:
           cat > RELEASE_NOTES.md <<EOF
           # yesh $GITHUB_REF_NAME
 
-          First public development release of yesh for Linux amd64.
+          Development release of yesh for Linux amd64.
 
           Uses a practical Go 1.21 baseline instead of requiring the newest toolchain.
           EOF
