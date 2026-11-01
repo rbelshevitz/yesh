@@ -73,6 +73,24 @@ allowed only when one of these workflows cannot be made clear with the existing
 language and the new rule has parser, runtime, plan, positive, and negative
 coverage.
 
+## Open questions before further growth
+
+These are release-quality tasks, not a request for more features.
+
+- Freeze language growth until each existing typed operation has a clear reason
+  to be a language construct rather than an ordinary external command or a
+  library helper. `measure`, `summarize`, `service`, `journal`, `publish`, and
+  `lock` must each state what operational complexity they remove.
+- Measure the small-system claim on a reproducible Linux host: startup time,
+  peak memory, CPU overhead of ordinary scripts, and overhead of resource
+  measurement, with a comparable Bash/read-only baseline.
+- Build reproducible failure tests for a service restart during measurement,
+  cgroup-tree changes, a process disappearing between samples, unavailable
+  controllers, truncated JSONL, corrupted history, and rerunning after failure.
+- Select five to ten real administrative tasks and compare Bash with yesh by
+  readability, required checks, failure clarity, and accidental side effects.
+  The number of examples alone is not evidence of simplicity.
+
 ## Next after the pause
 
 The next milestone is polish of the implemented core. Do not expand the syntax
