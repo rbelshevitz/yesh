@@ -86,6 +86,7 @@ func TestPOSIXCorpusAdaptationSafetyContracts(t *testing.T) {
 		{name: "rsnapshot guarded apply", file: "rsnapshot-apply.yesh", must: []string{"findmnt --source $mount_source --target $root", "df -P -h -- $root", "free_space $root at_least 20MiB", "rsnapshot -c $config -t $level", "YESH_RSNAPSHOT_CONFIRM"}},
 		{name: "backup with progress", file: "backup-with-progress.yesh", must: []string{"tar -C $source -cf - -- . | $pv --numeric --bytes | gzip > $partial", "publish $partial to $published"}, forbid: []string{"sudo ", "--delete"}},
 		{name: "mount preflight", file: "storage-check.yesh", must: []string{"findmnt --target $mountpoint", "df -P -h -- $mountpoint"}},
+		{name: "nginx logrotate maintenance", file: "nginx-logrotate-maintenance.yesh", must: []string{"service status nginx.service", "$binary -d -v -s $state $config", "$binary -s $state $config", "journal nginx.service since 5m lines 40"}, forbid: []string{"find -P", "service restart", "--force"}},
 		{name: "ssh health", file: "ssh-health.yesh", must: []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ConnectTimeout=5"}, forbid: []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"}},
 	}
 	for _, tc := range cases {
@@ -520,6 +521,163 @@ func TestPOSIXPracticalTypedSystemdFailureAndPlan(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(planDir, "trace")); !os.IsNotExist(err) {
 		t.Fatalf("plan ran an external systemd command: %v", err)
+	}
+}
+
+func TestPOSIXPracticalLogrotateMaintenance(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte("#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'Id=nginx.service' 'LoadState=loaded' 'ActiveState=active' 'SubState=running'\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "journalctl"), []byte("#!/bin/sh\nprintf 'journalctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nprintf '%s\\n' '{\"MESSAGE\":\"rotation complete\"}'\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "logrotate"), []byte("#!/bin/sh\nprintf 'logrotate %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 0\n"), 0700)
+	config := filepath.Join(dir, "nginx.logrotate")
+	state := filepath.Join(dir, "logrotate.status")
+	confirm := filepath.Join(dir, "confirm")
+	writeTestFile(t, config, []byte("/var/log/nginx/*.log { rotate 7 }\n"), 0600)
+	writeTestFile(t, confirm, []byte("reviewed\n"), 0600)
+	env := []string{
+		"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"TRACE_FILE=" + trace,
+		"YESH_NGINX_LOGROTATE_CONFIG=" + config,
+		"YESH_NGINX_LOGROTATE_STATE=" + state,
+		"YESH_NGINX_LOGROTATE_LOCK=" + filepath.Join(dir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM=" + confirm,
+		"YESH_NGINX_LOGROTATE_BIN=" + filepath.Join(bin, "logrotate"),
+	}
+	cmd := practicalCommand(t, dir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("logrotate apply: %v %s", err, out)
+	}
+	traceText := string(readTestFile(t, trace))
+	if !strings.Contains(traceText, "logrotate -d -v -s "+state+" "+config) || !strings.Contains(traceText, "logrotate -s "+state+" "+config) {
+		t.Fatalf("missing logrotate check/apply: %q", traceText)
+	}
+	if strings.Contains(traceText, "systemctl restart") {
+		t.Fatalf("logrotate workflow restarted service: %q", traceText)
+	}
+
+	planDir := t.TempDir()
+	planTrace := filepath.Join(planDir, "trace")
+	plan := posixCLI(t, context.Background(), "--plan", practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	plan.Env = append(plan.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+planTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(planDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(planDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+confirm,
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(bin, "logrotate"),
+	)
+	out, err := plan.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("PLAN")) {
+		t.Fatalf("logrotate plan: %v %s", err, out)
+	}
+	if _, err := os.Stat(planTrace); !os.IsNotExist(err) {
+		t.Fatalf("plan ran an external command: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(planDir, "logrotate.lock")); !os.IsNotExist(err) {
+		t.Fatalf("plan created lock: %v", err)
+	}
+
+	failingDir := t.TempDir()
+	failingBin := filepath.Join(failingDir, "bin")
+	if err := os.Mkdir(failingBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	failingTrace := filepath.Join(failingDir, "trace")
+	for _, name := range []string{"systemctl", "journalctl"} {
+		data, err := os.ReadFile(filepath.Join(bin, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestFile(t, filepath.Join(failingBin, name), data, 0700)
+	}
+	writeTestFile(t, filepath.Join(failingBin, "logrotate"), []byte("#!/bin/sh\nprintf 'logrotate %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 23\n"), 0700)
+	failingConfirm := filepath.Join(failingDir, "confirm")
+	writeTestFile(t, failingConfirm, []byte("reviewed\n"), 0600)
+	cmd = practicalCommand(t, failingDir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env,
+		"PATH="+failingBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+failingTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(failingDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(failingDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+failingConfirm,
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(failingBin, "logrotate"),
+	)
+	out, err = cmd.CombinedOutput()
+	if err == nil || !bytes.Contains(out, []byte("logrotate")) {
+		t.Fatalf("logrotate failure was hidden: %v %s", err, out)
+	}
+	failingTraceText := string(readTestFile(t, failingTrace))
+	if strings.Count(failingTraceText, "logrotate ") != 1 || strings.Contains(failingTraceText, "journalctl ") {
+		t.Fatalf("logrotate failure continued: %q", failingTraceText)
+	}
+
+	serviceDir := t.TempDir()
+	serviceBin := filepath.Join(serviceDir, "bin")
+	if err := os.Mkdir(serviceBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	serviceTrace := filepath.Join(serviceDir, "trace")
+	writeTestFile(t, filepath.Join(serviceBin, "systemctl"), []byte("#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 7\n"), 0700)
+	writeTestFile(t, filepath.Join(serviceBin, "logrotate"), []byte("#!/bin/sh\nprintf 'logrotate %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(serviceBin, "journalctl"), []byte("#!/bin/sh\nprintf 'journalctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 0\n"), 0700)
+	serviceConfirm := filepath.Join(serviceDir, "confirm")
+	writeTestFile(t, serviceConfirm, []byte("reviewed\n"), 0600)
+	cmd = practicalCommand(t, serviceDir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env,
+		"PATH="+serviceBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+serviceTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(serviceDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(serviceDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+serviceConfirm,
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(serviceBin, "logrotate"),
+	)
+	if out, err = cmd.CombinedOutput(); err == nil {
+		t.Fatalf("service failure was hidden: %s", out)
+	}
+	serviceTraceText := string(readTestFile(t, serviceTrace))
+	if strings.Contains(serviceTraceText, "logrotate ") {
+		t.Fatalf("logrotate ran after service failure: %q", serviceTraceText)
+	}
+
+	negativeDir := t.TempDir()
+	negativeBin := filepath.Join(negativeDir, "bin")
+	if err := os.Mkdir(negativeBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"systemctl", "journalctl", "logrotate"} {
+		data, err := os.ReadFile(filepath.Join(bin, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestFile(t, filepath.Join(negativeBin, name), data, 0700)
+	}
+	negativeTrace := filepath.Join(negativeDir, "trace")
+	cmd = practicalCommand(t, negativeDir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env,
+		"PATH="+negativeBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+negativeTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(negativeDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(negativeDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+filepath.Join(negativeDir, "missing-confirm"),
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(negativeBin, "logrotate"),
+	)
+	out, err = cmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 5 || !bytes.Contains(out, []byte("confirmation file is missing")) {
+		t.Fatalf("logrotate confirmation refusal: %v %s", err, out)
+	}
+	negativeTraceText := string(readTestFile(t, negativeTrace))
+	if strings.Count(negativeTraceText, "logrotate ") != 1 || strings.Contains(negativeTraceText, "journalctl ") {
+		t.Fatalf("confirmation refusal ran extra actions: %q", negativeTraceText)
 	}
 }
 

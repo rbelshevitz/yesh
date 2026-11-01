@@ -1,0 +1,76 @@
+# Maintain nginx text logs through the system logrotate policy.
+#
+# Why this scenario exists:
+# nginx has two independent message streams. Service output is read from
+# journald, while /var/log/nginx/*.log is rotated by logrotate. This file
+# connects service and disk checks to one logrotate operation without becoming
+# a second rotation system.
+#
+# yesh's role is to make the maintenance order, argv, confirmation boundary,
+# and failure behavior visible in one readable script. It removes the need to
+# remember which prechecks, logrotate invocation, service check, and bounded
+# journal query belong together. logrotate remains responsible for policy,
+# state, rotation, compression, removal, and postrotate.
+#
+# This scenario does not discover ownership, interpret arbitrary logrotate
+# policy, guarantee rollback, or prove that an external service is healthy.
+# It makes those boundaries explicit and stops when a command reports an error.
+#
+# nginx.service also writes stdout/stderr to journald. This scenario does not
+# clean the journal or issue a separate restart. Reopening text logs remains in
+# logrotate's postrotate configuration.
+# The final journal query is observation only: it reports recent evidence about
+# nginx and does not rotate, vacuum, or otherwise change journald storage.
+#
+# When to use it:
+# only when $config is the logrotate policy that actually owns nginx's text
+# logs. Do not pass an arbitrary file: yesh does not interpret foreign policy
+# or prove that it belongs to nginx.
+#
+# Before the first apply:
+# 1. check the policy and state-file paths;
+# 2. make sure the lock directory exists and is writable by this user;
+# 3. create confirm only after reviewing --plan.
+# A missing confirm is a safe refusal before apply. Only file existence is
+# checked; its contents are not a secret and are not inspected.
+#
+# Example environment:
+#   export YESH_NGINX_LOGROTATE_CONFIG=/etc/logrotate.d/nginx
+#   export YESH_NGINX_LOGROTATE_STATE=/var/lib/logrotate/status
+#   export YESH_NGINX_LOGROTATE_LOCK=/run/lock/yesh/nginx-logrotate.lock
+#   export YESH_NGINX_LOGROTATE_CONFIRM=/run/yesh/confirm-nginx-logrotate
+#   export YESH_NGINX_LOGROTATE_BIN=/usr/sbin/logrotate
+#   yesh --plan nginx-logrotate-maintenance.yesh
+#
+# Order of operations:
+# 1. acquire the non-blocking yesh lock;
+# 2. check nginx and free space before the operation;
+# 3. run logrotate -d -v without changing logs or state;
+# 4. run logrotate with the same state file only after confirm;
+# 5. check free space, nginx, and recent journal entries afterwards.
+# Any failed step stops the scenario. logrotate changes are not rolled back:
+# its rotation, compression, removal, and postrotate remain visible external
+# actions.
+
+config = environment YESH_NGINX_LOGROTATE_CONFIG
+state = environment YESH_NGINX_LOGROTATE_STATE
+lock = environment YESH_NGINX_LOGROTATE_LOCK
+confirm = environment YESH_NGINX_LOGROTATE_CONFIRM
+binary = environment YESH_NGINX_LOGROTATE_BIN
+
+with lock $lock:
+    service status nginx.service
+    df -P -h -- /var/log
+
+    $binary -d -v -s $state $config
+
+    if exists $confirm:
+        $binary -s $state $config
+    else:
+        echo "nginx logrotate plan reviewed; confirmation file is missing"
+        exit 5
+
+    df -P -h -- /var/log
+    service status nginx.service
+    # Read recent journald evidence; do not manage journal storage here.
+    journal nginx.service since 5m lines 40

@@ -532,3 +532,28 @@ func TestPOSIXPlanConditionWithQuotedMatches(t *testing.T) {
 		t.Fatalf("condition executed in plan: %v", err)
 	}
 }
+
+func TestPOSIXPlanExistsEnvironmentValue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "logs")
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "script")
+	writeTestFile(t, script, []byte("path = environment YESH_PLAN_PATH\nif exists $path:\n    echo present\nelse:\n    echo missing\n"), 0600)
+	cmd := posixCLI(t, context.Background(), "--plan", script)
+	cmd.Env = append(cmd.Env, "YESH_PLAN_PATH="+path)
+	out, err := cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("PLAN [\"echo\" \"present\"]")) || bytes.Contains(out, []byte("missing")) {
+		t.Fatalf("existing environment path plan: %v %s", err, out)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	cmd = posixCLI(t, context.Background(), "--plan", script)
+	cmd.Env = append(cmd.Env, "YESH_PLAN_PATH="+path)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("PLAN [\"echo\" \"missing\"]")) || bytes.Contains(out, []byte("present")) {
+		t.Fatalf("missing environment path plan: %v %s", err, out)
+	}
+}
