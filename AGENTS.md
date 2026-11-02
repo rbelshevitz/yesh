@@ -295,7 +295,8 @@ Linux/POSIX-сценариев.
   проектирование из документации за реализованный интерфейс.
 - Подробные результаты Linux-проверок, наблюдений ресурсов и дальний план ARM64
   находятся в `docs/underthehood/linux-integration.ru.md`,
-  `docs/underthehood/resource-observation-findings.ru.md` и `docs/arm64.ru.md`.
+  `docs/underthehood/resource-observation-findings.ru.md` и
+  `docs/underthehood/arm64.ru.md`.
 - Собственные руководства — `man/yesh.1`, `man/ru/yesh.1` и
   `man/yesh-language.7`; при изменении правил обновлять примеры и руководства.
 - Длительные бюджеты, устойчивое JSON-состояние/возобновление, единая модель

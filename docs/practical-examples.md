@@ -26,6 +26,8 @@ or opening redirections. For a practical example, check the resulting fixture,
 not only the exit code: verify published data, preserved old state on failure,
 partial files, and lock cleanup.
 
+## Scenario index
+
 | Task | Example | Main negative case |
 | --- | --- | --- |
 | Archive published after success | [`backup.yesh`](../examples/backup.yesh) | missing source or failed `tar`/`gzip` |
@@ -39,7 +41,38 @@ partial files, and lock cleanup.
 | Scheduled backup | [`cron-backup-rwe.yesh`](../examples/cron-backup-rwe.yesh) | cancellation, timeout, or held lock |
 | nginx text-log maintenance | [`nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh) | missing confirmation or failed service/logrotate check |
 
+## Shared rule: exit codes
+
+The following convention belongs to the practical examples, not to the yesh
+language itself:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | operation succeeded |
+| `1` | general execution error |
+| `2` | a source or destination path is missing |
+| `3` | a safety check failed, such as a UUID/PARTUUID mismatch |
+| `4` | a required resource is unavailable, such as free space |
+
+Examples should use an explicit `exit code`, and tests should check both the
+code and diagnostic output. Do not collapse every failure to `1`: callers such
+as backup and CI automation need to distinguish an absent path from an unsafe
+destination. The language accepts explicit decimal codes from `0` through
+`255`; this convention does not change command exit statuses.
+
+## Practical scenarios
+
+The chapters below follow the same reading pattern: the operator problem,
+yesh's visible order, the external command that remains responsible for the
+domain operation, and the failure boundary proved by the fixture or host check.
+
 ## nginx text logs: logrotate and journald stay separate
+
+### What problem does yesh solve?
+
+It prevents one maintenance script from silently mixing journald and
+`logrotate`, or from changing logs without a reviewed plan, confirmation, and
+post-operation service check.
 
 The nginx service has two independent message streams. Service output is read
 from `systemd-journald`, while `/var/log/nginx/*.log` is managed by the active
@@ -73,26 +106,12 @@ and `--vacuum-*`, with its own plan and confirmation. The complete script and
 the Debian verification record are linked from the example and the [Linux
 integration evidence](underthehood/linux-integration.md).
 
-## Exit-code rules
-
-The following convention belongs to the practical examples, not to the yesh
-language itself:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | operation succeeded |
-| `1` | general execution error |
-| `2` | a source or destination path is missing |
-| `3` | a safety check failed, such as a UUID/PARTUUID mismatch |
-| `4` | a required resource is unavailable, such as free space |
-
-Examples should use an explicit `exit code`, and tests should check both the
-code and diagnostic output. Do not collapse every failure to `1`: callers such
-as backup and CI automation need to distinguish an absent path from an unsafe
-destination. The language accepts explicit decimal codes from `0` through
-`255`; this convention does not change command exit statuses.
-
 ## Backup with verified publication
+
+### What problem does yesh solve?
+
+It prevents a failed `tar`/`gzip` pipeline from replacing the last good archive:
+the partial file stays private until every stage succeeds.
 
 [backup.yesh](../examples/backup.yesh) writes a tar/gzip archive to a partial
 name, publishes it only after the pipeline succeeds, and records a small JSON
@@ -113,6 +132,11 @@ the previous archive and state report unchanged. This is not a complete backup
 policy: it does not provide a snapshot of a changing source or durable resume.
 
 ## Read-only storage checks
+
+### What problem does yesh solve?
+
+It prevents an operator from treating an unmounted or unexpected filesystem as
+the backup destination while keeping the check read-only.
 
 [storage-check.yesh](../examples/storage-check.yesh) verifies that a target is
 on a mounted filesystem, then reports its source, free space, and first-level
@@ -140,6 +164,12 @@ metadata but does not choose or mount a disk. The separate
 an exact `UUID=` or `PARTUUID=` source before a write operation.
 
 ## Rsync preflight and safe copy
+
+### What problem does yesh solve?
+
+It prevents `rsync` from starting against the wrong filesystem or insufficient
+destination space; the source, destination, and identity checks are visible
+before the external copy.
 
 [rsync-safe-copy.yesh](../examples/rsync-safe-copy.yesh) checks the source and
 destination directories, the exact filesystem identity, and free space before
@@ -173,6 +203,12 @@ deleted implicitly.
 
 ## Configuration and remote operations
 
+### What problem does yesh solve?
+
+It keeps staged publication and SSH/SCP arguments reviewable, so an invalid
+configuration does not replace the active file and a missing key does not turn
+into a hidden password workflow.
+
 [config-apply.yesh](../examples/config-apply.yesh) validates a staged
 configuration before installing and publishing it. An invalid staged file
 does not replace the active file; the test checks content and final mode.
@@ -184,6 +220,12 @@ the local source before starting `scp`. Tests use recording fixtures to verify
 the exact argv and call order; they do not store keys or passwords.
 
 ## Read-only process and service checks
+
+### What problem does yesh solve?
+
+It gives a bounded, read-only view of processes and services without implying
+that a process snapshot explains the cause of load or permits changing the
+service.
 
 [process-snapshot.yesh](../examples/process-snapshot.yesh) finds Linux
 processes by exact kernel name and displays selected fields:

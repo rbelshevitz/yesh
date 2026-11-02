@@ -1,5 +1,18 @@
 # systemd and journalctl: Simplification Design
 
+## What problem does yesh solve?
+
+An administrator normally has to correlate the service name, cgroup path, PID,
+child processes, resource counters, and restart moment by hand. Different
+invocations can then be mistaken for one history. yesh joins these facts into a
+finite snapshot and marks incomplete observations explicitly.
+
+The positive case is a snapshot or finite measurement of one service. The
+failure case is a disappeared process, changed invocation, unavailable metric,
+or corrupted history. `--plan` does not contact systemd or write JSONL. systemd,
+cgroup v2, `/proc`, permissions, and the cause of load remain outside yesh's
+guarantee.
+
 The goal is not to replace `systemctl` or `journalctl`, but to remove repeated
 administrative boilerplate and make dangerous operations obvious during review.
 

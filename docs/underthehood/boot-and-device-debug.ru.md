@@ -187,7 +187,7 @@ crypttab, ключей и credential-файлов в общий отчёт.
 через yesh. Он проверяет пять случаев манифеста с фиктивным содержимым `.ko`;
 ядро, `/boot` и привязка настоящего устройства не изменяются.
 
-Рабочий пример: [`examples/initrd-module-check.yesh`](../examples/initrd-module-check.yesh).
+Рабочий пример: [`examples/initrd-module-check.yesh`](../../examples/initrd-module-check.yesh).
 Он проверяет подготовленный тестовый образ и не является проверкой загрузки,
 драйвера или настоящего устройства.
 

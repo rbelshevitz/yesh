@@ -37,6 +37,16 @@ jobs:
           set -euo pipefail
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
 
+      - name: Install practical test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rsync pv rsnapshot initramfs-tools-core cpio zstd
+
+      - name: Run release checks
+        run: |
+          go test -trimpath ./...
+          go vet ./...
+
       - name: Build and package
         shell: bash
         env:
@@ -89,9 +99,13 @@ jobs:
           cat > RELEASE_NOTES.md <<EOF
           # yesh $GITHUB_REF_NAME
 
-          Development release of yesh for Linux amd64.
+          yesh $GITHUB_REF_NAME for Linux amd64.
 
-          Uses a practical Go 1.21 baseline instead of requiring the newest toolchain.
+          The archive contains the binary, README files, and the license.
+          Systemd/cgroup observation remains read-only and Linux-specific;
+          yesh does not replace rsync, rsnapshot, or other external tools.
+
+          Built and checked with the repository's Go 1.21 baseline.
           EOF
 
       - name: Create draft release

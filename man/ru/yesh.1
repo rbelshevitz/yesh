@@ -46,6 +46,10 @@ yesh не является средством изоляции недовере�
 безопасным `argv`, кодом выхода или сигналом, признаком превышения времени,
 ограниченным `stderr`, длительностью в миллисекундах и признаком его усечения. Секретные значения окружения
 не включаются в `argv`.
+Поле `exit_code` присутствует, если ошибка относится к внешнему процессу,
+который был запущен и завершился. Ошибка самого yesh может не содержать
+`exit_code`; в этом случае её смысл передаётся полем `message` и другими
+доступными полями.
 .SH ЯЗЫК
 .SS Значения и аргументы
 .nf
@@ -489,7 +493,7 @@ man -l man/ru/yesh.1
 .BR rpm (8),
 .BR snap (8)
 .PP
-Документы проекта: docs/pipeline-safety.ru.md, docs/cron.ru.md,
+Документы проекта: docs/underthehood/pipeline-safety.ru.md, docs/cron.ru.md,
 docs/packages.ru.md, docs/underthehood/linux-integration.ru.md.
 .SH АВТОРСКИЕ ПРАВА
 Copyright (C) 2026 Roman Belshevitz.

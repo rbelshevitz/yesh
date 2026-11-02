@@ -1,5 +1,19 @@
 # Incremental rsync benchmark
 
+## What problem does yesh solve?
+
+An administrator can run `rsync` directly into a published directory, misread
+the trailing `/`, publish a partial result, or lose the previous snapshot after
+a source failure. yesh removes the manual assembly of staging, locking, and
+publication: `rsync` remains visible, while the completed tree becomes visible
+only after the result has been checked.
+
+The positive case is a new full snapshot followed by an incremental snapshot
+with `--link-dest`. The failure case is a read error, a held lock, or an
+existing path. `--plan` shows the expanded arguments and publication without
+running the command or changing files. Permissions, network, source, and
+filesystem remain outside yesh's guarantee.
+
 ## Topology of the current workflow
 
 **Important:** yesh runs on the backup host, not on the source host. The

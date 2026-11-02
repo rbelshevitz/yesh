@@ -15,5 +15,18 @@ Start with the [syntax tutorial](../syntax-guide.md), then read the
 - [distribution package builds](packaging.md) — a long-term Debian and RPM
   delivery plan, including manual pages and installed documentation.
 
+Additional deep technical notes:
+
+- [control flow and blocks](control-flow.md), [job model](job-model.ru.md), and
+  [pipeline safety](pipeline-safety.md);
+- [processes and text filters](processes-and-text.md), [remote operations](remote-ops.md),
+  and [storage](storage.md);
+- [permissions](../permissions.ru.md), [packages](../packages.ru.md), [logging](../logging.ru.md),
+  [credentials](../credentials.ru.md), and [network values](data-and-network.ru.md);
+- [CIDR](cidr.ru.md), [BusyBox and initramfs](busybox.ru.md),
+  [boot and devices](boot-and-device-debug.ru.md), [ARM64 plan](arm64.md),
+  [Bash corpus](bash-corpus.md), [manual pages](man-pages.ru.md), and
+  [syntax review](syntax-review.ru.md).
+
 These documents explain the implementation and its limits. They do not add
 commands or promises beyond the user-facing guides.

@@ -53,6 +53,33 @@ the Linux commands used by each example. Some later examples use
 `systemctl`; you can read those examples and inspect them with `--plan` even
 without systemd.
 
+## Practical route
+
+Read this tutorial as one operational workflow rather than a list of syntax
+rules:
+
+1. [incremental `rsync` snapshot](benchmark-rsync.md) — staging,
+   `--link-dest`, publication, and failure without replacing the previous
+   snapshot;
+2. [running `rsnapshot`](rsnapshot.ru.md) — `configtest`, test mode, rotation
+   review, and explicit confirmation;
+3. [observing a service](systemd.md) — a finite snapshot, measurement, and
+   summary;
+4. [SSH keys](#ssh-keys-for-a-remote-source) — no password in the
+   script, verified host keys, and no disabled host trust;
+5. [preflight checks](#15-check-before-running) — plan output, failure, and
+   the boundary of what was proved.
+
+For each practical step, inspect `--plan` first, then run the positive stand,
+then the negative case. A successful external command proves only its own
+result; yesh separately checks whether the staged result may be published,
+whether the previous snapshot stayed unchanged, and whether observations belong
+to the same service invocation.
+
+This route proves behaviour on a specific Linux stand. It does not prove power-
+loss durability, arbitrary permissions, network availability, or behaviour on
+every systemd and filesystem version.
+
 Comments start with `#` and continue to the end of the line. They describe the
 purpose or limits of an example; they are not executed:
 
@@ -390,6 +417,13 @@ automatic `sudo`, or rollback of actions that already ran.
 
 ## 13. A complete publication workflow
 
+### What problem does yesh solve?
+
+Without this sequence, validation can happen after replacement, or a failed
+check can leave the new file visible. yesh keeps “staged file -> content check
+-> publication” in order and leaves the previous file unchanged when the
+external check fails.
+
 Validate a prepared file before replacing the active one:
 
 ```yesh
@@ -415,12 +449,47 @@ operation followed by a check for the required state.
 
 ## 13a. Practical example: rsnapshot
 
+### What problem does yesh solve?
+
+An operator can confuse configuration validation, test mode, and rotation, or
+apply a change without reviewing the actual commands. yesh separates these
+steps, requires explicit confirmation, and checks the expected result; `rsnapshot`
+still performs the transfer and rotation.
+
 The same rules can guard an external `rsnapshot` interval. yesh does not parse
 or rewrite `rsnapshot.conf`, and it does not implement rotation itself. Its
 role is to check the prerequisites, show the test run, require explicit
 confirmation, and verify the result.
 
 Before reading the yesh script, remember the basic `rsnapshot` model:
+
+### Two different models: `rsync` and `rsnapshot`
+
+`rsync` is primarily a transfer and reconciliation between one source and one
+destination. It compares trees and brings the destination to the selected copy
+policy; with an explicitly supplied `--delete`, extra destination data may be
+removed. `--dry-run` previews one transfer without changing files, but it is
+still only a forecast of that transfer.
+
+`rsnapshot` is not a different transfer protocol. It organizes a sequence of
+snapshots on top of `rsync`. It keeps named states such as `daily.0` and
+`daily.1`, shifts and removes older levels according to `retain`, and then
+performs the transfer for the selected interval. Unchanged files commonly use
+hard links between levels, so every level looks like a full tree while storage
+is mostly consumed by changes.
+
+The operator therefore asks different questions:
+
+- for `rsync`: “what tree should this destination contain, and what will be
+  transferred or deleted?”;
+- for `rsnapshot`: “which points in time must remain, which interval transfers
+  data now, which old level will be displaced, and is rotation safe to run?”
+
+💡 yesh does not choose between these tools. It makes the boundary around each
+  one reviewable: checks, a temporary tree, and publication for one `rsync`
+  result; `configtest`, test mode, rotation review, and explicit confirmation
+  for `rsnapshot`. Transfer and rotation remain the external tool's
+  responsibility.
 
 - `snapshot_root` is the directory that contains the snapshot levels;
 - `retain daily 2` keeps `daily.0` as the newest level and `daily.1` as the
@@ -493,7 +562,7 @@ test-mode report through `tee`; flag known deletion-related rsync options;
 require a pre-created confirmation file; apply the interval; then check for
 the expected `daily.0` and a released lock file.
 
-This is what yesh simplifies: the preflight order, the boundary between test
+💡 This is what yesh simplifies: the preflight order, the boundary between test
 mode and the changing command, the exact visible `rsnapshot` arguments, and
 the failure path are ordinary blocks instead of Bash-specific control-flow
 machinery. In `--plan`, yesh shows both branches without running `findmnt` or
@@ -521,7 +590,75 @@ It uses an ext4 loopback device and checks two rotations, restore, hard links,
 an invalid configuration, missing confirmation, a held lock, and resource
 cleanup. It does not use real disks or `/etc/rsnapshot.conf`.
 
+## SSH keys for a remote source
+
+### What problem does yesh solve?
+
+Without explicit SSH setup, a script can hang on a password prompt or accept an
+unverified host key. yesh keeps connection options visible and stops instead of
+using a hidden prompt; OpenSSH remains responsible for keys, host trust, and
+permissions.
+
+Remote `rsync`, `rsnapshot`, `ssh`, and `scp` do not receive a password from a
+yesh script. OpenSSH takes a key from its normal configuration, an agent, or an
+explicit file. The private key stays on the machine running yesh; only the
+public key is installed on the remote machine.
+
+For a separate test account, setup looks like this:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/yesh_test_ed25519
+ssh-copy-id -i ~/.ssh/yesh_test_ed25519.pub max@192.168.111.113
+```
+
+Before automation, verify the host-key fingerprint through a trusted channel and
+save the host key in `~/.ssh/known_hosts`. `ssh-keyscan` can retrieve a key, but
+it does not prove that the host is genuine by itself; compare its result with a
+fingerprint obtained from the host owner or another trusted source.
+
+Test non-interactive authentication:
+
+```bash
+ssh -o BatchMode=yes \
+    -o ConnectTimeout=5 \
+    -o StrictHostKeyChecking=yes \
+    max@192.168.111.113 true
+```
+
+The yesh script keeps these choices visible:
+
+```yesh
+host = environment YESH_SSH_HOST
+ssh_options = [-o, BatchMode=yes, -o, ConnectTimeout=5, -o, StrictHostKeyChecking=yes]
+
+if ssh $ssh_options $host test -d /srv/data:
+    echo "remote source is ready"
+else:
+    echo "remote source is unavailable"
+    exit 2
+```
+
+For `rsync`, pass the same options through `-e` or an ordinary `~/.ssh/config`
+entry. Do not enable `StrictHostKeyChecking=no`, store a private key or password
+in a `.yesh` file, or use `sshpass`. `BatchMode=yes` makes a missing key an
+explicit failure instead of a hanging password prompt.
+
+The rule is: yesh checks the order and boundaries of the remote call; OpenSSH
+handles the key, host trust, and user permissions.
+
+Typical failures here are not yesh failures: a wrong user, an uninstalled public
+key, a missing `known_hosts` entry, a changed fingerprint, a forbidden command,
+or missing `rsync` on the remote host. Test the same SSH call separately, inspect
+the yesh plan, and only then run the changing step.
+
 ## 13b. Measuring a systemd service over a fixed period
+
+### What problem does yesh solve?
+
+Without a joined snapshot, an administrator must correlate the service, cgroup,
+PIDs, and counters by hand and may combine two invocations. yesh collects them
+into a finite measurement, saves the history, and stops comparison when the
+service identity changes.
 
 The question is not only “what is wrong with the service right now?” We also
 want to know what happened during the last hour or day.
@@ -564,6 +701,15 @@ In this example both commands use the same `$state_dir`: the first writes there
 and the second reads there. After a successful write, the `keep history for 24h`
 directive removes results older than one day from that journal.
 
+The history is stored in `measurements.jsonl`. This is not one large JSON
+document and not a command log: each completed `measure` run is one independent
+line, while that run's samples are stored inside the record. The record is
+appended only after collection finishes. If the process stops in the middle of
+the final line, older records remain readable; if a complete line is corrupted,
+yesh stops with an error instead of silently skipping it. JSONL is therefore
+appropriate for bounded local history, but it is not a database or a resume
+mechanism.
+
 When `save to` is omitted, the default state directory is
 `~/.local/.yesh/resources/<unit>/`. yesh creates only that user-owned directory
 tree with mode `0700` and does not require or invoke `sudo`; it does not create
@@ -591,7 +737,7 @@ take new snapshots. Start by inspecting the plan:
 yesh --plan service-measurement.yesh
 ```
 
-This is what yesh simplifies: one readable check keeps the service, the
+💡 This is what yesh simplifies: one readable check keeps the service, the
 observation period, the saved history, the resource changes, and the relevant
 journal window together. The Linux commands remain visible, but their scope,
 order, and limits no longer have to be reconstructed from a collection of
@@ -652,6 +798,13 @@ explicit in yesh. Linux, an available systemd manager, and readable cgroup v2
 are required.
 
 ## 13c. Rotating a service's text logs
+
+### What problem does yesh solve?
+
+A single script can accidentally manage both journald and `logrotate`, duplicate
+deletion, or restart a service without checking the result. yesh keeps ownership
+separate, connects the dry run to the changing invocation, and checks the service
+afterward; `logrotate` still performs rotation and compression.
 
 Consider a realistic maintenance task: nginx has two independent message
 streams. Service output is read from `systemd-journald`, while
@@ -785,7 +938,7 @@ After this tutorial, see:
 - the [quickstart](quickstart.md) for a shorter first run;
 - [Practical Examples](practical-examples.md) for complete administrative
   workflows and their boundaries;
-- [pipeline safety](pipeline-safety.md) for pipelines, redirections, and process
+- [pipeline safety](underthehood/pipeline-safety.md) for pipelines, redirections, and process
   cancellation;
 - the [language manual](../man/yesh-language.7) for the complete syntax.
 

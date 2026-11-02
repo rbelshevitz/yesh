@@ -1,9 +1,9 @@
 # Man-страницы — часть интерфейса
 
-У yesh есть собственная [yesh(1) на русском](../man/ru/yesh.1)
-и [на английском](../man/yesh.1): параметры запуска, переменные,
+У yesh есть собственная [yesh(1) на русском](../../man/ru/yesh.1)
+и [на английском](../../man/yesh.1): параметры запуска, переменные,
 pipeline, редиректы, сигналы, cron, ограничения защиты и коды выхода.
-Английский справочник языка — [yesh-language(7)](../man/yesh-language.7).
+Английский справочник языка — [yesh-language(7)](../../man/yesh-language.7).
 
 ```bash
 man -l man/ru/yesh.1
@@ -33,5 +33,5 @@ MANPAGER=cat man -l man/ru/yesh.1
 
 В текущем WSL локально прочитаны `crontab(5)`, `flock(1)`, `timeout(1)`,
 `apt(8)`, `dpkg-query(1)`, `snap(8)`; RPM и alien отсутствуют,
-использованы официальные онлайн man, ссылки в [packages.ru.md](packages.ru.md).
+использованы официальные онлайн man, ссылки в [packages.ru.md](../packages.ru.md).
 Наличие client binary не доказывает доступность daemon или права на операцию.

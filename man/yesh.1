@@ -42,6 +42,9 @@ Select the error format. The default is `text`.
 `json` emits one JSON object with the message, pipeline stage, safe `argv`,
 exit code or signal, timeout flag, bounded `stderr`, duration in milliseconds,
 and truncation flag.
+The `exit_code` field is present when the failure came from an external process
+that started and exited. Errors raised by yesh itself may have no `exit_code`;
+their meaning is carried by `message` and the other available fields.
 Secret environment values are omitted from `argv`.
 .SH LANGUAGE
 .SS Values and arguments
@@ -481,7 +484,7 @@ man -l man/yesh.1
 .BR rpm (8),
 .BR snap (8)
 .PP
-Project documents: docs/pipeline-safety.ru.md, docs/cron.ru.md,
+Project documents: docs/underthehood/pipeline-safety.ru.md, docs/cron.ru.md,
 docs/packages.ru.md and docs/underthehood/linux-integration.md.
 .SH COPYRIGHT
 Copyright (C) 2026 Roman Belshevitz.

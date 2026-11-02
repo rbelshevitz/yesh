@@ -16,5 +16,18 @@ systemd](../systemd.ru.md) с практическим сценарием наб
   перспективу для доставки yesh через Debian и RPM, включая страницы справки и
   установленную документацию.
 
+Дополнительные углублённые заметки:
+
+- [модель выполнения и блоки](control-flow.ru.md), [модель задания](job-model.ru.md)
+  и [безопасность конвейеров](pipeline-safety.ru.md);
+- [процессы и текстовые фильтры](processes-and-text.ru.md), [сетевые операции](remote-ops.ru.md)
+  и [хранилища](storage.ru.md);
+- [права](../permissions.ru.md), [пакеты](../packages.ru.md), [журналы](../logging.ru.md),
+  [учётные данные](../credentials.ru.md) и [сетевые значения](data-and-network.ru.md);
+- [CIDR](cidr.ru.md), [BusyBox и initramfs](busybox.ru.md),
+  [загрузка и устройства](boot-and-device-debug.ru.md),
+  [план ARM64](arm64.ru.md), [корпус Bash](bash-corpus.ru.md),
+  [страницы справки](man-pages.ru.md) и [обзор синтаксиса](syntax-review.ru.md).
+
 Эти документы объясняют устройство реализации и её границы. Они не добавляют
 команд и обещаний сверх пользовательских руководств.

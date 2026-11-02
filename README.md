@@ -4,6 +4,8 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+Project author: Roman Belshevitz
+
 A readable language for Linux automation and preflight checks, with explicit
 failure behavior.
 
@@ -14,7 +16,7 @@ utilities and administration tools visible as external commands, while providing
 a small language for sequencing them, passing arguments, and handling failures.
 It is not an interactive shell or a Bash-compatible replacement.
 
-The repository includes 50+ examples, including real-world Linux workflows.
+The repository includes 60 examples, including real-world Linux workflows.
 Some examples require Linux, systemd, SSH, or other external tools and are not
 expected to run in every environment.
 
@@ -24,6 +26,12 @@ expected to run in every environment.
 > prototype does not yet satisfy every stable-release requirement. Treat it as
 > reviewable tooling, not as a substitute for operator judgment or operating-
 > system isolation.
+
+> **Documentation status:** the [syntax tutorial](docs/syntax-guide.md) is under
+> active development alongside the tested Linux workflows. It is being expanded
+> and proofread as the `rsync`, `rsnapshot`, SSH, and systemd examples gain
+> evidence; examples describe their current guarantees and limits, not a promise
+> that the tutorial is complete.
 
 > **Bash without the historical syntax complexity.**
 >
@@ -35,7 +43,7 @@ expected to run in every environment.
 
 ## The point
 
-The useful difference appears at the boundary where a small Bash script starts
+💡 The useful difference appears at the boundary where a small Bash script starts
 mixing validation, file replacement, service restart, and failure handling:
 
 Bash:
@@ -423,14 +431,14 @@ Bash. Its runtime starts external commands directly and provides the language's
 own variables, control flow, pipelines, and error handling.
 
 Read the English local manual with `man -l man/yesh.1`.
-See [predictable pipelines](docs/pipeline-safety.md) for the execution and
+See [predictable pipelines](docs/underthehood/pipeline-safety.md) for the execution and
 redirect safety rules.
 See [execution safety](SAFETY.md) for the security boundary and operational
 rules; this is not a sandbox for untrusted scripts.
-The core design notes are [control flow](docs/control-flow.md),
+The core design notes are [control flow](docs/underthehood/control-flow.md),
 [design principles](DESIGN.md),
-[storage design](docs/storage.md), [remote operations](docs/remote-ops.md),
-[processes and text](docs/processes-and-text.md), and
+[storage design](docs/underthehood/storage.md), [remote operations](docs/underthehood/remote-ops.md),
+[processes and text](docs/underthehood/processes-and-text.md), and
 [systemd integration](docs/systemd.md).
 Runnable [English practical examples](docs/practical-examples.md) cover archives,
 rsync, rsnapshot, configuration changes, and read-only administration.
