@@ -155,6 +155,21 @@ that best fits the context.
   check, and `❌ ` marks a concrete failure or prohibited option. The adjacent
   prose must remain understandable without emojis.
 
+## After `v0.2.0`: prove restoration
+
+First polish the existing scenario set rather than adding another built-in
+module. In two independent scenarios, show the complete path: preflight,
+transfer, failure, rerun, publication of a completed tree, and restoration to a
+temporary destination with content verification.
+
+💡 Problem solved by yesh: a backup command returning code `0` is not presented
+  as proof that the copy can actually be restored.
+
+Add a new capability only if these scenarios expose a repeated problem that
+cannot be expressed clearly with visible external commands. It must have
+positive, negative, and `--plan` cases, together with an explicit description
+of the new state model it introduces.
+
 ## Do not do before the milestone is complete
 
 - do not add `observe`, `resume`, a general desired-state language, or new
@@ -172,10 +187,9 @@ negative, and `--plan` cases prove the benefit.
 
 ## Next working step
 
-The local release check is closed: the tag workflow now repeats the practical
-dependencies, full tests, and `vet` before packaging. The only open action is
-to create the tag and publish after reviewing the final diff. Do not add
-network capabilities or metrics before that step.
+Repeat and review the `rsync`/`rsnapshot` matrix, separately verify restoration
+and negative cases, then update the tutorial and practical examples. Release
+`v0.2.0` is published; do not add network capabilities or metrics yet.
 
 ## Boundaries and documents
 
