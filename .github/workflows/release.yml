@@ -99,13 +99,28 @@ jobs:
           cat > RELEASE_NOTES.md <<EOF
           # yesh $GITHUB_REF_NAME
 
-          yesh $GITHUB_REF_NAME for Linux amd64.
+          yesh is a readable language for Linux automation and preflight checks:
+          external commands stay visible, while checks, ordering, failure
+          handling, and postconditions become easier to review.
 
-          The archive contains the binary, README files, and the license.
-          Systemd/cgroup observation remains read-only and Linux-specific;
-          yesh does not replace rsync, rsnapshot, or other external tools.
+          ## What is in this release
 
-          Built and checked with the repository's Go 1.21 baseline.
+          - guarded backup and restore workflows around `rsync` and `rsnapshot`;
+          - staged configuration publication with bounded systemd and journal checks;
+          - finite, read-only service and cgroup resource observation;
+          - explicit `--plan`, locking, rerun, failure, and recovery scenarios;
+          - a Linux/amd64 binary, README files, and the MIT license.
+
+          ## Scope
+
+          yesh orchestrates `rsync`, `rsnapshot`, SSH, systemd, and other Linux
+          tools; it does not replace them. Resource observation is read-only and
+          Linux-specific. This is an early-stage release for reviewable operational
+          scripts, not a production safety boundary or a general monitoring system.
+
+          The release was checked by the repository's full Go test suite, `go vet`,
+          Windows and Linux CI, and the Linux/amd64 release build using the Go 1.21
+          baseline.
           EOF
 
       - name: Create draft release
