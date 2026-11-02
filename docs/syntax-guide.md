@@ -3,8 +3,8 @@
 > This tutorial covers the core language and the Linux tasks verified by the
 > test suite.
 
-To open the table of contents, press the three-bullet button in the lower-right
-corner.
+💡 To open the table of contents, press the three-bullet button in the
+upper-right corner.
 
 yesh is a small language for Linux scripts where you need to see the order of
 actions, the arguments passed to external commands, and what happens when a
