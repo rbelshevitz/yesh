@@ -9,7 +9,10 @@ yesh — читаемый язык для Linux-автоматизации и п
 командами и добавляет небольшой понятный способ описывать последовательность
 проверок, действий и обработки ошибок.
 
-[English README](README.md)
+[English README](README.md) · [README на иврите](README.he.md)
+
+Начните с [учебника по синтаксису на русском](docs/syntax-guide.ru.md) или
+откройте [английский учебник](docs/syntax-guide.md).
 
 Автор проекта — Roman Belshevitz.
 

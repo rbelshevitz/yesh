@@ -61,7 +61,7 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" \
             go build -trimpath -ldflags "-X main.version=$GITHUB_REF_NAME" \
             -o "$stage/yesh" ./cmd/yesh
-          cp LICENSE README.md README.ru.md "$stage/"
+          cp LICENSE README.md README.ru.md README.he.md "$stage/"
 
           if [[ "$GOARCH" == amd64 ]]; then
             [[ "$("$stage/yesh" --version)" == "yesh $GITHUB_REF_NAME" ]]

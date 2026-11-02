@@ -8,7 +8,10 @@ yesh is a readable language for Linux automation and preflight checks. It keeps
 Linux tools visible as external commands and adds a small, clear way to sequence
 checks, actions, and failure handling.
 
-[Русская версия README](README.ru.md)
+[Русская версия README](README.ru.md) · [Hebrew README](README.he.md)
+
+Start with the [English syntax tutorial](docs/syntax-guide.md), or read the
+[Russian syntax tutorial](docs/syntax-guide.ru.md).
 
 Project author: Roman Belshevitz
 
