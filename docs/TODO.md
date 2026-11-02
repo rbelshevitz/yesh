@@ -40,7 +40,7 @@ long-running-job resume, cgroup management, ARM64, or replacements for
 - Read-only typed operations for storage/fstab, systemd/journal, and resource
   snapshots remain bounded; `mount`, `umount`, `start`, `stop`, `reload`, cgroup
   management, and control of foreign PIDs are not implemented.
-- On `max@192.168.111.113`, SSH/SCP and real `rsync` passed in both directions.
+- On a separate Debian node, SSH/SCP and real `rsync` passed in both directions.
   The loopback/ext4 `rsnapshot` stand passed with `no_create_root`, two
   rotations, hard links, restore, `--plan`, negative checks, and cleanup.
 - Debian checks covered resource snapshots and finite service measurement.

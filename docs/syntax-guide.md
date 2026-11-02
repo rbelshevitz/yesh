@@ -608,7 +608,7 @@ For a separate test account, setup looks like this:
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/yesh_test_ed25519
-ssh-copy-id -i ~/.ssh/yesh_test_ed25519.pub max@192.168.111.113
+ssh-copy-id -i ~/.ssh/yesh_test_ed25519.pub backup@example.test
 ```
 
 Before automation, verify the host-key fingerprint through a trusted channel and
@@ -622,7 +622,7 @@ Test non-interactive authentication:
 ssh -o BatchMode=yes \
     -o ConnectTimeout=5 \
     -o StrictHostKeyChecking=yes \
-    max@192.168.111.113 true
+    backup@example.test true
 ```
 
 The yesh script keeps these choices visible:

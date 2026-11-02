@@ -18,6 +18,8 @@ test -r /etc/ssh/ssh_host_ed25519_key.pub
 
 base=$(mktemp -d /tmp/yesh-rsync-networked-incremental-rwe.XXXXXX)
 remote_dir=/tmp/yesh-rsync-networked-incremental-rwe.$$
+remote_address=${YESH_RSYNC_ADDRESS:?set YESH_RSYNC_ADDRESS to the disposable test host address}
+remote_host=${YESH_RSYNC_HOST:?set YESH_RSYNC_HOST to the disposable test account and host}
 home=$base/home
 known_hosts=$home/.ssh/known_hosts
 original_home=${HOME:-/home/max}
@@ -33,7 +35,7 @@ mkdir -p "$root" "$home/.ssh"
 test -r "$original_home/.ssh/id_ed25519"
 ln -s "$original_home/.ssh/id_ed25519" "$home/.ssh/id_ed25519"
 
-/usr/bin/ssh-keyscan -T 5 -t ed25519 192.168.111.113 2>/dev/null >"$known_hosts"
+/usr/bin/ssh-keyscan -T 5 -t ed25519 "$remote_address" 2>/dev/null >"$known_hosts"
 /usr/bin/awk '{print $2 " " $3}' "$known_hosts" >"$base/scanned.pub"
 scanned_fingerprint=$(/usr/bin/ssh-keygen -lf "$base/scanned.pub" | /usr/bin/awk '{print $2}')
 host_fingerprint=$(/usr/bin/ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | /usr/bin/awk '{print $2}')
@@ -46,11 +48,11 @@ host_fingerprint=$(/usr/bin/ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | /
 ssh_options="-o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts -o GlobalKnownHostsFile=/dev/null"
 export HOME=$home
 
-export YESH_RSYNC_DNS_NAME=192.168.111.113
-export YESH_RSYNC_ROUTE_TARGET=192.168.111.113
-export YESH_RSYNC_HOST=max@192.168.111.113
+export YESH_RSYNC_DNS_NAME=$remote_address
+export YESH_RSYNC_ROUTE_TARGET=$remote_address
+export YESH_RSYNC_HOST=$remote_host
 export YESH_RSYNC_REMOTE_PATH=$remote_dir
-export YESH_RSYNC_SOURCE=max@192.168.111.113:$remote_dir/
+export YESH_RSYNC_SOURCE=$remote_host:$remote_dir/
 export YESH_RSYNC_ROOT=$root
 export YESH_RSYNC_CURRENT=$root/current
 export YESH_RSYNC_TEMPORARY=$root/current.partial
@@ -69,7 +71,7 @@ test ! -e "$root/current.partial"
 test ! -s "$base/positive.err"
 
 export YESH_RSYNC_REMOTE_PATH=/tmp/yesh-rwe-missing-source
-export YESH_RSYNC_SOURCE=max@192.168.111.113:/tmp/yesh-rwe-missing-source/
+export YESH_RSYNC_SOURCE=$remote_host:/tmp/yesh-rwe-missing-source/
 export YESH_RSYNC_CURRENT=$root/missing-current
 export YESH_RSYNC_TEMPORARY=$root/missing-current.partial
 if "$yesh" "$example" >"$base/negative.out" 2>"$base/negative.err"; then
@@ -81,7 +83,7 @@ test ! -e "$root/missing-current.partial"
 
 HOME="$home" ssh $ssh_options "$YESH_RSYNC_HOST" "printf '%s\\n' readable > '$remote_dir/readable.txt'; printf '%s\\n' secret > '$remote_dir/secret.txt'; chmod 000 '$remote_dir/secret.txt'"
 export YESH_RSYNC_REMOTE_PATH=$remote_dir
-export YESH_RSYNC_SOURCE=max@192.168.111.113:$remote_dir/
+export YESH_RSYNC_SOURCE=$remote_host:$remote_dir/
 export YESH_RSYNC_CURRENT=$root/partial-current
 export YESH_RSYNC_TEMPORARY=$root/partial-current.partial
 if "$yesh" "$example" >"$base/partial.out" 2>"$base/partial.err"; then

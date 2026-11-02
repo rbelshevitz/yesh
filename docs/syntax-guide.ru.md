@@ -682,7 +682,7 @@ yesh. OpenSSH берёт ключ из обычной конфигурации, 
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/yesh_test_ed25519
-ssh-copy-id -i ~/.ssh/yesh_test_ed25519.pub max@192.168.111.113
+ssh-copy-id -i ~/.ssh/yesh_test_ed25519.pub backup@example.test
 ```
 
 Перед автоматическим запуском один раз проверьте отпечаток ключа узла через
@@ -697,7 +697,7 @@ ssh-copy-id -i ~/.ssh/yesh_test_ed25519.pub max@192.168.111.113
 ssh -o BatchMode=yes \
     -o ConnectTimeout=5 \
     -o StrictHostKeyChecking=yes \
-    max@192.168.111.113 true
+    backup@example.test true
 ```
 
 В сценарии yesh эти параметры остаются видимыми:

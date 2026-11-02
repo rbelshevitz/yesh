@@ -13,7 +13,7 @@ test -x /usr/bin/ssh
 test -x /usr/bin/scp
 
 base=$(mktemp -d /tmp/yesh-deploy-release-rwe.XXXXXX)
-host=${YESH_DEPLOY_HOST:-max@192.168.111.113}
+host=${YESH_DEPLOY_HOST:?set YESH_DEPLOY_HOST to the disposable test account and host}
 known_hosts=${YESH_DEPLOY_KNOWN_HOSTS:-/home/user/.ssh/known_hosts}
 ssh_options="-o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
 remote_root=
