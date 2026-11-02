@@ -653,6 +653,9 @@ the yesh plan, and only then run the changing step.
 
 ## 13b. Measuring a systemd service over a fixed period
 
+New in `0.2.0`: read-only service resource snapshots and finite measurements with
+bounded JSONL history. This chapter describes the current Linux/systemd backend.
+
 ### What problem does yesh solve?
 
 Without a joined snapshot, an administrator must correlate the service, cgroup,
@@ -773,6 +776,13 @@ The result has important boundaries:
 - an unavailable metric is reported as `unavailable`, not as zero;
 - history is a bounded JSON Lines journal: an incomplete final line is ignored,
   while a malformed complete record is an error.
+
+An ordinary systemd unit does not need to be changed: systemd already places its
+processes in the unit's cgroup. `Delegate=yes` is needed only when the service
+creates nested cgroups and places its own processes in them. `CPUAccounting=`,
+`MemoryAccounting=`, and `IOAccounting=` can make individual counters available,
+but availability also depends on the kernel, systemd, and the active policy.
+Therefore yesh reports an unavailable counter as `unavailable`, not as zero.
 
 Each record is tied to the systemd manager, exact unit, cgroup path, and the
 unit invocation identity (`InvocationID` when available). A service restart must

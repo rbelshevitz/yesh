@@ -124,6 +124,9 @@ service or every future diagnostic path must use systemd.
 
 ## How yesh measures service resources
 
+New in `0.2.0`: read-only resource snapshots and finite measurements for a
+systemd service on Linux with cgroup v2.
+
 On Linux, yesh can observe a systemd service's resources for a fixed period
 without changing anything: it samples the cgroup, keeps a bounded history, and
 produces memory/CPU/I/O summaries. It requires a readable systemd manager and
@@ -176,6 +179,13 @@ service measurement completed even when block I/O accounting was unavailable;
 the result marked that optional field unavailable. A disappearing cgroup or
 process makes the saved measurement incomplete instead of presenting a false
 complete result.
+
+An ordinary systemd unit does not need to be changed: systemd already places its
+processes in the unit's cgroup. `Delegate=yes` is needed only when the service
+creates nested cgroups and places its own processes in them. `CPUAccounting=`,
+`MemoryAccounting=`, and `IOAccounting=` can make individual counters available,
+but availability also depends on the kernel, systemd, and the active policy; an
+unavailable counter remains `unavailable` in yesh.
 
 | Bash | yesh |
 | --- | --- |
