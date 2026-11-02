@@ -4,34 +4,30 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Project author: Roman Belshevitz
-
-A readable language for Linux automation and preflight checks, with explicit
-failure behavior.
+yesh is a readable language for Linux automation and preflight checks. It keeps
+Linux tools visible as external commands and adds a small, clear way to sequence
+checks, actions, and failure handling.
 
 [Русская версия README](README.ru.md)
 
-yesh is an early-stage project for Linux automation. It keeps Linux command-line
-utilities and administration tools visible as external commands, while providing
-a small language for sequencing them, passing arguments, and handling failures.
-It is not an interactive shell or a Bash-compatible replacement.
+Project author: Roman Belshevitz
+
+yesh is for small Linux administration and DevOps scripts: backup, deployment,
+service checks, configuration publication, and read-only diagnostics. It is not
+an interactive shell or a Bash-compatible replacement.
 
 The repository includes 60 examples, including real-world Linux workflows.
 Some examples require Linux, systemd, SSH, or other external tools and are not
 expected to run in every environment.
 
-> **Development status:** yesh is under active development and is not yet ready
-> to serve as a production safety boundary. The measures listed in
-> [SAFETY.md](SAFETY.md) define the project's requirements; the current
-> prototype does not yet satisfy every stable-release requirement. Treat it as
-> reviewable tooling, not as a substitute for operator judgment or operating-
-> system isolation.
+> **Development status:** yesh is under active development for Linux amd64. It
+> is tooling for reviewable operational scripts, not a production safety
+> boundary or a substitute for operator judgment and operating-system isolation.
+> See [SAFETY.md](SAFETY.md) for the project's safety requirements.
 
-> **Documentation status:** the [syntax tutorial](docs/syntax-guide.md) is under
-> active development alongside the tested Linux workflows. It is being expanded
-> and proofread as the `rsync`, `rsnapshot`, SSH, and systemd examples gain
-> evidence; examples describe their current guarantees and limits, not a promise
-> that the tutorial is complete.
+> **Documentation status:** the [syntax tutorial](docs/syntax-guide.md) is being
+> expanded and proofread alongside the tested `rsync`, `rsnapshot`, SSH, and
+> systemd workflows. Examples describe their current guarantees and limits.
 
 > **Bash without the historical syntax complexity.**
 >

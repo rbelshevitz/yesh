@@ -40,6 +40,11 @@ long-running-job resume, cgroup management, ARM64, or replacements for
 - Read-only typed operations for storage/fstab, systemd/journal, and resource
   snapshots remain bounded; `mount`, `umount`, `start`, `stop`, `reload`, cgroup
   management, and control of foreign PIDs are not implemented.
+- The storage checks are sufficient for the backup boundary: yesh verifies the
+  mount, expected source, and filesystem with `findmnt`, space with `df`/
+  `free_space`, and path properties with `stat`, then stops before `rsync` or
+  `rsnapshot` when the destination is not proven. Mounting and unmounting stay
+  outside `v0.2.0`.
 - On a separate Debian node, SSH/SCP and real `rsync` passed in both directions.
   The loopback/ext4 `rsnapshot` stand passed with `no_create_root`, two
   rotations, hard links, restore, `--plan`, negative checks, and cleanup.
