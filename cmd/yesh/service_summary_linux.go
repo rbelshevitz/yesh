@@ -225,6 +225,13 @@ func readServiceResourceJournal(path string) ([]serviceResourceState, error) {
 		if err := decoder.Decode(&state); err != nil {
 			return nil, fmt.Errorf("decode resource state journal %q: %w", path, err)
 		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return nil, fmt.Errorf("decode resource state journal %q: multiple JSON values on one line", path)
+			}
+			return nil, fmt.Errorf("decode resource state journal %q: trailing data: %w", path, err)
+		}
 		if err := state.validate(); err != nil {
 			return nil, fmt.Errorf("validate resource state journal %q: %w", path, err)
 		}

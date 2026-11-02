@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -193,6 +194,39 @@ func TestPOSIXCLIExecutionFailureWarnsAboutState(t *testing.T) {
 	if err == nil || !bytes.Contains(out, []byte("execution stopped; earlier actions may have completed")) ||
 		!bytes.Contains(out, []byte("no rollback was performed")) || !bytes.Contains(out, []byte("exit code 1")) {
 		t.Fatalf("execution failure warning missing: %v %s", err, out)
+	}
+}
+
+func TestPOSIXCLIDiagnosticJSONSeparatesCommandStatusFromYeshStatus(t *testing.T) {
+	fixture := posixFixture(t, "exit 23")
+	script := filepath.Join(t.TempDir(), "diagnostic.yesh")
+	writeTestFile(t, script, []byte(fixture+"\n"), 0600)
+
+	out, err := posixCLI(t, context.Background(), "-diagnostic=json", script).CombinedOutput()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 1 {
+		t.Fatalf("yesh exit code=%v, want 1: %s", err, out)
+	}
+	var report struct {
+		Message          string `json:"message"`
+		ExecutionStopped bool   `json:"execution_stopped"`
+		ExitCode         *int   `json:"exit_code"`
+	}
+	if err := json.Unmarshal(out, &report); err != nil {
+		t.Fatalf("diagnostic is not JSON: %v: %s", err, out)
+	}
+	if !report.ExecutionStopped || report.ExitCode == nil || *report.ExitCode != 23 || !strings.Contains(report.Message, "exit code 23") {
+		t.Fatalf("unexpected diagnostic: %+v", report)
+	}
+}
+
+func TestPOSIXCLIConditionFalseIsNotExecutionFailure(t *testing.T) {
+	script := filepath.Join(t.TempDir(), "condition.yesh")
+	writeTestFile(t, script, []byte("if false:\n    echo wrong\nelse:\n    echo expected\n"), 0600)
+
+	out, err := posixCLI(t, context.Background(), script).CombinedOutput()
+	if err != nil || string(out) != "expected\n" {
+		t.Fatalf("false condition was not handled as else: err=%v output=%q", err, out)
 	}
 }
 

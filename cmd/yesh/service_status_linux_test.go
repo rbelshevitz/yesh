@@ -287,6 +287,23 @@ func TestLinuxServiceResourceJournalRejectsMalformedCompleteRecord(t *testing.T)
 	if _, err := readServiceResourceJournal(journal); err == nil {
 		t.Fatal("accepted malformed complete JSONL record")
 	}
+	now := time.Now().UTC().Add(-time.Minute)
+	state := serviceResourceState{
+		Schema: serviceResourceStateSchema, Kind: "service-resource-measurement",
+		Manager: "system", Unit: "api.service", Cgroup: "/system.slice/api.service",
+		StartedAt: now, FinishedAt: now.Add(time.Second), Complete: true,
+		Samples: []serviceResourceStateSample{{ObservedAt: now, Metrics: map[string]string{"memory.current": "10"}}},
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(journal, append(data, []byte(" trailing\n")...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readServiceResourceJournal(journal); err == nil {
+		t.Fatal("accepted complete JSONL record with trailing data")
+	}
 }
 
 func TestLinuxServiceResourceJournalSerializesConcurrentAppends(t *testing.T) {

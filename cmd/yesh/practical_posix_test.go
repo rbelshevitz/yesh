@@ -257,6 +257,40 @@ func TestPOSIXPracticalConfigValidation(t *testing.T) {
 	}
 }
 
+func TestPOSIXPracticalConfigPlanDoesNotChangeFiles(t *testing.T) {
+	practicalDependencies(t, "grep", "install", "mv")
+	dir := t.TempDir()
+	active := filepath.Join(dir, "active.conf")
+	staged := filepath.Join(dir, "staged.conf")
+	writeTestFile(t, active, []byte("previous\n"), 0600)
+	writeTestFile(t, staged, []byte("mode=production\n"), 0600)
+
+	cmd := posixCLI(t, context.Background(), "--plan", practicalExample(t, "config-apply.yesh"))
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{
+		`PLAN IF ["grep" "-q" "^mode=production$" "staged.conf"]`,
+		`PLAN ["install" "-m" "0640" "--" "staged.conf" "active.conf.next"]`,
+		`PLAN ["mv" "--" "active.conf.next" "active.conf"]`,
+		`PLAN ELSE`,
+		`PLAN exit 3`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("plan output missing %q: %s", want, text)
+		}
+	}
+	if got := string(readTestFile(t, active)); got != "previous\n" {
+		t.Fatalf("plan changed active config: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "active.conf.next")); !os.IsNotExist(err) {
+		t.Fatalf("plan created temporary config: %v", err)
+	}
+}
+
 func TestPOSIXPracticalDeployArguments(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "bin")

@@ -18,6 +18,9 @@ config=$fixture/rsnapshot.conf
 confirm=$fixture/confirm
 report=$fixture/rsnapshot-test.log
 mount_source=$(findmnt -no SOURCE --target "$fixture")
+# WSL2 may report a bind source as /dev/sdd[/tmp]. findmnt matches the
+# underlying device when checking a child directory, so use that device name.
+mount_source=${mount_source%%[*}
 
 cleanup() {
     rm -rf -- "$fixture"
@@ -49,6 +52,8 @@ YESH_RSNAPSHOT_CONFIG=$config \
 YESH_RSNAPSHOT_LEVEL=daily \
 YESH_RSNAPSHOT_ROOT=$root \
 YESH_RSNAPSHOT_SOURCE=$mount_source \
+YESH_RSNAPSHOT_LOCK=$fixture/rsnapshot.pid \
+YESH_RSNAPSHOT_PUBLISHED=$root/daily.0 \
 YESH_RSNAPSHOT_CONFIRM=$confirm \
 YESH_RSNAPSHOT_REPORT=$report \
 "$yesh_bin" --plan "$wrapper" >"$fixture/plan.out"
@@ -61,6 +66,8 @@ run_snapshot() {
     YESH_RSNAPSHOT_LEVEL=daily \
     YESH_RSNAPSHOT_ROOT=$root \
     YESH_RSNAPSHOT_SOURCE=$mount_source \
+    YESH_RSNAPSHOT_LOCK=$fixture/rsnapshot.pid \
+    YESH_RSNAPSHOT_PUBLISHED=$root/daily.0 \
     YESH_RSNAPSHOT_CONFIRM=$confirm \
     YESH_RSNAPSHOT_REPORT=$report \
     "$yesh_bin" "$wrapper"
@@ -81,4 +88,4 @@ test "$(sha256sum "$restore/hello.txt" | cut -d ' ' -f 1)" = "$(sha256sum "$root
 test ! -e "$root/daily.2"
 test ! -e "$fixture/rsnapshot.pid"
 
-echo 'remote rsnapshot fixture checks passed'
+echo 'rsnapshot fixture checks passed'

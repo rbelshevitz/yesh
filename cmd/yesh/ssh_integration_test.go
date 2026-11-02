@@ -118,6 +118,9 @@ func TestPOSIXRealRsyncPullAndIncremental(t *testing.T) {
 	if out, err := ssh("rsync", "--version"); err != nil || !strings.Contains(string(out), "rsync") {
 		t.Fatalf("remote rsync unavailable: %v\n%s", err, out)
 	}
+	if out, err := ssh("mkdir", "-p", "--", base); err != nil {
+		t.Fatalf("create remote test directory: %v\n%s", err, out)
+	}
 	out, err := ssh("mktemp", "-d", "--", filepath.Join(base, "yesh-rsync-XXXXXX"))
 	if err != nil {
 		t.Fatalf("create remote fixture: %v\n%s", err, out)
@@ -237,6 +240,9 @@ func TestPOSIXRealRsyncRemoteFailureDoesNotPublish(t *testing.T) {
 	}
 	if out, err := ssh("rsync", "--version"); err != nil || !strings.Contains(string(out), "rsync") {
 		t.Fatalf("remote rsync unavailable: %v\n%s", err, out)
+	}
+	if out, err := ssh("mkdir", "-p", "--", base); err != nil {
+		t.Fatalf("create remote test directory: %v\n%s", err, out)
 	}
 	out, err := ssh("mktemp", "-d", "--", filepath.Join(base, "yesh-rsync-failure-XXXXXX"))
 	if err != nil {
