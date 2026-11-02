@@ -656,6 +656,13 @@ the yesh plan, and only then run the changing step.
 New in `0.2.0`: read-only service resource snapshots and finite measurements with
 bounded JSONL history. This chapter describes the current Linux/systemd backend.
 
+On a Linux host using the unified cgroup v2 hierarchy, systemd manages the
+hierarchy mounted at `/sys/fs/cgroup`. It creates or assigns a separate cgroup
+for each service unit; for example, `your-service.service` normally appears at
+`/sys/fs/cgroup/system.slice/your-service.service/`. That cgroup is the root of
+the service tree that yesh observes. A service may have additional child
+cgroups, but it needs `Delegate=yes` to manage those children itself.
+
 ### What problem does yesh solve?
 
 Without a joined snapshot, an administrator must correlate the service, cgroup,
