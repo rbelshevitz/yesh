@@ -105,8 +105,10 @@ jobs:
 
           ## What is in this release
 
-          - guarded backup and restore workflows around `rsync` and `rsnapshot`;
-          - staged configuration publication with bounded systemd and journal checks;
+          - guarded backup and restore workflows using visible `rsync` commands,
+            plus guarded `rsnapshot` rotation;
+          - staged configuration publication followed by bounded systemd state
+            and journal checks;
           - finite, read-only service and cgroup resource observation;
           - explicit `--plan`, locking, rerun, failure, and recovery scenarios;
           - a Linux/amd64 binary, README files, and the MIT license.
