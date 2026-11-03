@@ -4,19 +4,22 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-yesh is a readable language for Linux automation and preflight checks. It keeps
-Linux tools visible as external commands and adds a small, clear way to sequence
-checks, actions, and failure handling.
+yesh is a readable language for Linux automation and preflight checks. Commands
+stay visible, and the order of actions and failure behavior remain reviewable.
 
 [Русская версия README](README.ru.md) · [Hebrew README](README.he.md)
 
-Start with the [English syntax tutorial](docs/syntax-guide.md), or read the
-[Russian syntax tutorial](docs/syntax-guide.ru.md).
+## Start here
+
+- [Quickstart](docs/quickstart.md) — the first script and core rules;
+- [syntax tutorial](docs/syntax-guide.md) — from basic syntax to operations;
+- [practical examples](docs/practical-examples.md) — what to run and which environment it needs;
+- [safety boundaries](SAFETY.md) — what yesh checks and what remains external;
+- [current `v0.2.1` roadmap](docs/TODO.md) — what is being polished now.
+
+Project background: [Why I built yesh — Linux automation you can explain](https://dev.to/rbelshevitz/why-i-built-yesh-linux-automation-you-can-explain-32cj).
 
 Project author: Roman Belshevitz
-
-For the background and motivation, see the author's short introduction:
-[Why I built yesh — Linux automation you can explain](https://dev.to/rbelshevitz/why-i-built-yesh-linux-automation-you-can-explain-32cj).
 
 yesh is for small Linux administration and DevOps scripts: backup, deployment,
 service checks, configuration publication, and read-only diagnostics. It is not
@@ -30,10 +33,6 @@ expected to run in every environment.
 > is tooling for reviewable operational scripts, not a production safety
 > boundary or a substitute for operator judgment and operating-system isolation.
 > See [SAFETY.md](SAFETY.md) for the project's safety requirements.
-
-> **Documentation status:** the [syntax tutorial](docs/syntax-guide.md) is being
-> expanded and proofread alongside the tested `rsync`, `rsnapshot`, SSH, and
-> systemd workflows. Examples describe their current guarantees and limits.
 
 An experimental terminal UI (TUI) navigator for newcomers is being developed
 alongside the language. It helps compose small backup and service scripts,
@@ -397,21 +396,13 @@ yesh targets Linux. Its examples use external tools and may additionally require
 manager, root, a mounted filesystem, or a disposable test fixture. The
 repository does not claim support for non-Linux operating systems.
 
-Start with the [English quickstart](docs/quickstart.md) for a Bash-to-yesh
-comparison and the rules behind the syntax.
-
-The [Russian syntax tutorial](docs/syntax-guide.ru.md) gives a step-by-step
-path from the first script to a small administrative workflow.
-
-The [English syntax tutorial](docs/syntax-guide.md) covers the same syntax and
-examples. The Russian tutorial contains the fuller step-by-step narrative.
+The main entry points are grouped at the top of this README. The links below
+are for deeper technical material and test evidence.
 
 Technical notes and test results are collected in the
 [technical reference](docs/underthehood/README.md). You can skip it on a first
 read; it explains how the Linux behavior was checked and why the implementation
 has its current limits.
-
-See the [English roadmap](docs/TODO.md) for current project priorities.
 
 ## Documentation and scope
 
