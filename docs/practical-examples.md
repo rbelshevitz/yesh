@@ -201,6 +201,53 @@ checks with `--dry-run`. The test verifies that previewing does not copy data,
 that copying preserves the source, and that extra destination files are not
 deleted implicitly.
 
+### Incremental snapshot and restore
+
+For a backup rather than a mirror, write each new tree to a fresh temporary
+directory, then publish it only after `rsync` succeeds. `--link-dest` reuses
+unchanged files from the previous published snapshot; it does not make the
+temporary tree or the previous snapshot writable. The example deliberately
+does not add `--delete`:
+
+```yesh
+source = environment YESH_RSYNC_SOURCE
+previous = environment YESH_RSYNC_PREVIOUS
+temporary = environment YESH_RSYNC_TEMPORARY
+current = environment YESH_RSYNC_CURRENT
+
+if exists $previous:
+    rsync -a --dry-run --itemize-changes --link-dest $previous -- $source $temporary
+    rsync -a --fsync --delay-updates --link-dest $previous -- $source $temporary
+else:
+    rsync -a --dry-run --itemize-changes -- $source $temporary
+    rsync -a --fsync --delay-updates -- $source $temporary
+publish $temporary to $current
+```
+
+The production example adds the lock and refuses an existing temporary or
+published path; see [rsync-incremental.yesh](../examples/rsync-incremental.yesh).
+The first command is a reviewable preview, not a proof that a later copy will
+succeed. After the copy, restore the selected completed snapshot into a new
+empty directory and compare expected files or checksums. A successful `rsync`
+exit code alone is not proof that the application can use the restored data.
+
+The equivalent Bash outline is shorter but leaves the staging and failure
+rules to surrounding shell code:
+
+```bash
+rsync -a --dry-run --itemize-changes --link-dest "$previous" -- "$source" "$temporary"
+rsync -a --fsync --delay-updates --link-dest "$previous" -- "$source" "$temporary"
+mv -- "$temporary" "$current"
+rsync -a -- "$current/" "$restore/"
+sha256sum "$current/file" "$restore/file"
+```
+
+The `mv` is safe as a publication boundary only when both paths are on the
+same filesystem and the temporary tree is private. For a selected restore,
+[rsync-selected-restore.yesh](../examples/rsync-selected-restore.yesh) checks
+that the source is a real directory and the target is an existing empty
+mounted directory; it never deletes target entries implicitly.
+
 ## Configuration and remote operations
 
 ### What problem does yesh solve?
