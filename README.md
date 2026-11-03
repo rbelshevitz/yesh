@@ -32,7 +32,6 @@ expected to run in every environment.
 > **Development status:** yesh is under active development for Linux amd64. It
 > is tooling for reviewable operational scripts, not a production safety
 > boundary or a substitute for operator judgment and operating-system isolation.
-> See [SAFETY.md](SAFETY.md) for the project's safety requirements.
 
 An experimental terminal UI (TUI) navigator for newcomers is being developed
 alongside the language. It helps compose small backup and service scripts,
@@ -442,8 +441,8 @@ own variables, control flow, pipelines, and error handling.
 Read the English local manual with `man -l man/yesh.1`.
 See [predictable pipelines](docs/underthehood/pipeline-safety.md) for the execution and
 redirect safety rules.
-See [execution safety](SAFETY.md) for the security boundary and operational
-rules; this is not a sandbox for untrusted scripts.
+The execution-safety document describes the security boundary and operational
+rules; yesh is not a sandbox for untrusted scripts.
 The core design notes are [control flow](docs/underthehood/control-flow.md),
 [design principles](DESIGN.md),
 [storage design](docs/underthehood/storage.md), [remote operations](docs/underthehood/remote-ops.md),
