@@ -266,6 +266,16 @@ mode, and host-key policy in an explicit argument list. The SCP example checks
 the local source before starting `scp`. Tests use recording fixtures to verify
 the exact argv and call order; they do not store keys or passwords.
 
+For a remote backup, read these examples in order: `ssh-health` checks that the
+user can enter the host without a password prompt; `rsync-network-preflight`
+then checks DNS, the route, and the remote source directory before a dry run;
+`rsync-networked-incremental-rwe` finally transfers into a private local
+staging directory and publishes it only after `rsync` succeeds. These checks do
+not establish that the remote files are correct or that the host is trusted:
+the operator must verify the host fingerprint and prepare `known_hosts` first.
+See [the SSH key section](syntax-guide.ru.md#ssh-ключи-для-источника-на-другом-узле)
+for that setup.
+
 ## Read-only process and service checks
 
 ### What problem does yesh solve?
