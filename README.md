@@ -15,6 +15,9 @@ Start with the [English syntax tutorial](docs/syntax-guide.md), or read the
 
 Project author: Roman Belshevitz
 
+For the background and motivation, see the author's short introduction:
+[Why I built yesh — Linux automation you can explain](https://dev.to/rbelshevitz/why-i-built-yesh-linux-automation-you-can-explain-32cj).
+
 yesh is for small Linux administration and DevOps scripts: backup, deployment,
 service checks, configuration publication, and read-only diagnostics. It is not
 an interactive shell or a Bash-compatible replacement.

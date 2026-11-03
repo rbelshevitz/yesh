@@ -512,6 +512,13 @@ performs the transfer for the selected interval. Unchanged files commonly use
 hard links between levels, so every level looks like a full tree while storage
 is mostly consumed by changes.
 
+In the standard `rsnapshot` configuration, the test output commonly contains
+`--delete` and `--delete-excluded`. These are flags passed to `rsync`: they do
+not delete the source, but make the new snapshot tree follow the source and may
+remove extras in the destination. Review the real `rsnapshot -t` output rather
+than only the yesh file; the example flags these options and stops before the
+explicit confirmation.
+
 The operator therefore asks different questions:
 
 - for `rsync`: “what tree should this destination contain, and what will be
@@ -582,33 +589,32 @@ The important order is:
 
 ```yesh
 if exists $config:
-    if exists $root:
-        if findmnt --source $mount_source --target $root:
-            if free_space $root at_least 20MiB:
-                rsnapshot -c $config configtest
+    if findmnt --source $mount_source --target $root:
+        if free_space $root at_least 20MiB:
+            rsnapshot -c $config configtest
+            if $sync_first matches regex "1":
+                rsnapshot -c $config -t sync | tee $report
+                rsnapshot -c $config -t $level | tee -a $report
+            else:
+                rsnapshot -c $config -t $level | tee $report
+            if exists $confirm:
                 if $sync_first matches regex "1":
-                    rsnapshot -c $config -t sync | tee $report
-                    rsnapshot -c $config -t $level | tee -a $report
-                else:
-                    rsnapshot -c $config -t $level | tee $report
-                if exists $confirm:
-                    if $sync_first matches regex "1":
-                        rsnapshot -c $config sync
-                    rsnapshot -c $config $level
-                    if exists $published:
-                        if exists $lock:
-                            echo "rsnapshot lockfile remains after successful interval"
-                            exit 6
-                        else:
-                            echo "rsnapshot interval completed"
+                    rsnapshot -c $config sync
+                rsnapshot -c $config $level
+                if exists $published:
+                    if exists $lock:
+                        echo "rsnapshot lockfile remains after successful interval"
+                        exit 6
+                    else:
+                        echo "rsnapshot interval completed"
 ```
 
-The full file also reports a missing root, an unmounted destination, and low
-free space. `YESH_RSNAPSHOT_SYNC_FIRST` must be copied from the configuration.
+The full file also reports an unmounted destination and low free space.
+`YESH_RSNAPSHOT_SYNC_FIRST` must be copied from the configuration.
 When it is `1`, the plan and the real run contain `sync` followed by the
 selected rotation interval; when it is `0`, the selected interval performs the
 transfer and rotation. The order is readable from top to bottom: check the
-configuration, root, mount, and free space; run `configtest`; show and save the
+configuration, exact mount, and free space; run `configtest`; show and save the
 test-mode report through `tee`; flag known deletion-related rsync options;
 require a pre-created confirmation file; apply the correct operation; then
 check for the expected `daily.0` and a released lock file.

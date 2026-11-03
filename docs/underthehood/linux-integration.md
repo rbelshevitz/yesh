@@ -78,6 +78,20 @@ The Debian check used a real `nginx.service`, `/etc/logrotate.d/nginx`, and
 `/usr/sbin/logrotate`; the changing run used only a temporary policy and
 temporary log tree. The real nginx policy and `/var/log/nginx` were not changed.
 
+## Separate physical-partition check, 2026-11-03
+
+On the stand machine, a separate ext4 partition was mounted at `/opt` through
+`/etc/fstab`. Its exact UUID is intentionally not recorded in the repository:
+the value must be obtained on the specific machine with `lsblk -f` or `blkid`
+and passed to the scenario through the environment.
+
+The partition passed positive `rsync`, an unchanged rerun, changed-file
+transfer, wrong-UUID detection, unmounted refusal, and final tree comparison.
+Real `rsnapshot` then passed `configtest`, test mode with explicit confirmation,
+two rotations, restore of the older snapshot, and unmounted refusal with a
+clear message and exit code `3`. yesh does not mount automatically; `fstab` and
+directory permissions remain stand-operator responsibilities.
+
 ## What this evidence does not prove
 
 These checks do not prove behavior on every kernel, filesystem, distribution,

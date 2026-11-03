@@ -25,7 +25,7 @@
 # The test output is shown and saved at YESH_RSNAPSHOT_REPORT. The fixed 20MiB
 # floor is a conservative preflight guard, not a size estimate
 # for a successful snapshot.
-# Order: check config/root/mount/free space, run `configtest`, show test mode,
+# Order: check config and mount/free space, run `configtest`, show test mode,
 # then require the pre-created confirmation file before the changing operation.
 # With sync_first=1 the test and real operation contain both `sync` and the
 # selected rotation interval. With sync_first=0 the selected interval performs
@@ -46,53 +46,49 @@ published = environment YESH_RSNAPSHOT_PUBLISHED
 confirm = environment YESH_RSNAPSHOT_CONFIRM
 
 if exists $config:
-    if exists $root:
-        if findmnt --source $mount_source --target $root:
-            df -P -h -- $root
-            if free_space $root at_least 20MiB:
-                rsnapshot -c $config configtest
-                if $sync_first matches regex "^(0|1)$":
-                    if $sync_first matches regex "1":
-                        rsnapshot -c $config -t sync | tee $report
-                        rsnapshot -c $config -t $level | tee -a $report
-                    else:
-                        rsnapshot -c $config -t $level | tee $report
-                    if test -s $report:
-                        if grep -E -- '--(delete|delete-excluded|remove-source-files)([= ]|$)' $report:
-                            echo "review: test report contains deletion-related rsync flags"
-                        else:
-                            echo "review: test report contains no known deletion-related rsync flags"
-                        if exists $confirm:
-                            if $sync_first matches regex "1":
-                                rsnapshot -c $config sync
-                            rsnapshot -c $config $level
-                            if exists $published:
-                                if exists $lock:
-                                    echo "rsnapshot lockfile remains after successful operation"
-                                    exit 6
-                                else:
-                                    echo "rsnapshot operation completed"
-                            else:
-                                echo "rsnapshot operation completed without publishing the expected snapshot"
-                                exit 6
-                        else:
-                            echo "review rsnapshot test output and create the confirmation file"
-                            exit 4
-                    else:
-                        echo "rsnapshot test report is missing or empty"
-                        exit 6
+    if findmnt --source $mount_source --target $root:
+        df -P -h -- $root
+        if free_space $root at_least 20MiB:
+            rsnapshot -c $config configtest
+            if $sync_first matches regex "^(0|1)$":
+                if $sync_first matches regex "1":
+                    rsnapshot -c $config -t sync | tee $report
+                    rsnapshot -c $config -t $level | tee -a $report
                 else:
-                    echo "YESH_RSNAPSHOT_SYNC_FIRST must be exactly 0 or 1"
-                    exit 7
+                    rsnapshot -c $config -t $level | tee $report
+                if test -s $report:
+                    if grep -E -- '--(delete|delete-excluded|remove-source-files)([= ]|$)' $report:
+                        echo "review: test report contains deletion-related rsync flags"
+                    else:
+                        echo "review: test report contains no known deletion-related rsync flags"
+                    if exists $confirm:
+                        if $sync_first matches regex "1":
+                            rsnapshot -c $config sync
+                        rsnapshot -c $config $level
+                        if exists $published:
+                            if exists $lock:
+                                echo "rsnapshot lockfile remains after successful operation"
+                                exit 6
+                            else:
+                                echo "rsnapshot operation completed"
+                        else:
+                            echo "rsnapshot operation completed without publishing the expected snapshot"
+                            exit 6
+                    else:
+                        echo "review rsnapshot test output and create the confirmation file"
+                        exit 4
+                else:
+                    echo "rsnapshot test report is missing or empty"
+                    exit 6
             else:
-                echo "snapshot root has less than 20MiB free"
-                exit 5
+                echo "YESH_RSNAPSHOT_SYNC_FIRST must be exactly 0 or 1"
+                exit 7
         else:
-            echo "snapshot root is not mounted"
-            exit 3
+            echo "snapshot root has less than 20MiB free"
+            exit 5
     else:
-        echo "snapshot root is missing"
-        exit 2
+        echo "snapshot root is not mounted"
+        exit 3
 else:
     echo "rsnapshot config is missing"
     exit 2

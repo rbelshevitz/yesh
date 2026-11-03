@@ -47,8 +47,11 @@ long-running-job resume, cgroup management, ARM64, or replacements for
   outside `v0.2.0`.
 - `storage-preflight.yesh` was checked with a placeholder UUID: `--plan` only
   shows deferred checks, while a real run stops during device resolution and
-  does not attempt to mount anything. A positive run with a real UUID-backed
-  partition remains an external Linux-stand check.
+  does not attempt to mount anything. A separate physical ext4 partition
+  mounted at `/opt` through `fstab` then passed the positive run, unchanged
+  rerun, changed-file transfer, wrong-UUID refusal, and unmounted refusal; the
+  final tree matched the source. The UUID remains a stand-specific parameter,
+  not a repository example.
 - On a separate Linux stand, `backup-mounted-rwe.yesh` passed positively:
   loopback/ext4 with a real UUID, backup write, `--plan`, wrong UUID,
   read-only, unmounted target, and low-space cases. All negative checks left
@@ -61,9 +64,11 @@ long-running-job resume, cgroup management, ARM64, or replacements for
   temporary loopback/ext4 image is sufficient. A real destination such as
   `/var/cache/rsnapshot` still requires its own mounted filesystem; a directory
   on the root filesystem is not an accepted backup destination.
-- When a separate partition becomes available, repeat the `rsnapshot` check on
-  the real mount: verify the UUID, `no_create_root=1`, refusal while unmounted,
-  and a successful rerun after mounting it again.
+- The real-partition `rsnapshot` check is complete: the UUID,
+  `no_create_root=1`, two rotations, restore of the older snapshot, refusal
+  while unmounted with “snapshot root is not mounted” and exit code `3`, and a
+  successful run after remounting were verified. Before the preflight-order
+  fix, yesh leaked a low-level `stat` permission error; it no longer does.
 - Debian checks covered resource snapshots and finite service measurement.
   Different invocations are not combined; unavailable counters remain explicit
   rather than becoming zero.
@@ -131,6 +136,13 @@ host.
   verify → publish” boundary instead of reconstructing it from fragile quoting
   and shell defaults.
 
+Add a separate backup-result check to the practical example: verify expected
+files/content rather than only the `rsync` exit code, then perform a restore
+drill into an empty temporary tree. Teach the order `--dry-run` → review
+changes → execute → restore. Keep `--delete` an explicit operator decision;
+yesh must not infer it from synchronization or make a mirror the default
+meaning of backup.
+
 ### 2. Polish `rsnapshot`
 
 Keep `rsnapshot` responsible for transfer and rotation. Before the selected
@@ -148,6 +160,14 @@ responsibility of the `rsnapshot` configuration and operator.
 Add an explicit navigator check for the chain form → real parser → `--plan` →
 optional review window → save. Do not treat a selected `daily` as a data
 transfer until it is established that `sync_first` is disabled.
+
+Proofread the tutorial against the real `rsnapshot` stand: explain that
+`--delete` and `--delete-excluded` come from the standard `rsnapshot`
+configuration, remove only destination-side extras, and require review of the
+test report; show the boundary `--plan` → test report → explicit confirmation
+file → rotation → restore. Explain the `/./` source suffix in a `backup` line,
+the difference between `daily.0` and `daily.1`, hard-link verification, and
+that `fstab` and automatic mounting are outside this scenario.
 
 🚫 Danger zone: an ordinary directory in place of the mounted destination,
   `sync_first`, stale lockfiles, `.sync` or `_delete.*`, and publication after
@@ -461,11 +481,52 @@ A new feature is allowed only after answering what real scenario it simplifies,
 which ambiguity it removes, what state model it introduces, and how positive,
 negative, and `--plan` cases prove the benefit.
 
+### Separate future initramfs profile
+
+The practical value of yesh here is a pre-reboot check, not its own image
+builder or a “boot guarantee”. The first slice should take an explicit
+kernel-version/initramfs-image pair, check `root=`/UUID/PARTUUID, filesystem
+type, expected modules, and firmware through external `lsinitrd`/`lsinitcpio`/
+`lsinitramfs`, `modinfo`, `findmnt`, and `lsblk`.
+
+The report must distinguish proven, unproven, and uninspectable facts: a
+built-in driver does not need a `.ko`, a `.ko` in the image does not prove
+device binding, host-only limits portability, and LUKS/LVM/RAID form a separate
+chain to the root filesystem. A multi-segment image with early microcode, a
+UKI, or an incomplete inspection must not be reported as an image missing a
+module.
+
+Until a positive and negative temporary-VM scenario exists, do not add writes
+to `/boot`, `dracut --force`, `mkinitcpio`, `modprobe`, reboot, or a new built-in
+type. `--plan` must perform none of those operations.
+
+Build the stand in layers:
+
+1. temporary kernel/initramfs/root-disk artifacts and content inspection without
+   booting;
+2. a separate QEMU VM with `-kernel`, `-initrd`, a temporary disk,
+   `console=ttyS0`, `-nographic`, a finite timeout, and `-no-reboot`;
+3. a positive boot and failures for a wrong UUID, missing driver or filesystem,
+   incomplete image, and host-only output on different virtual hardware;
+4. a separate UKI/OVMF level with test Secure Boot keys.
+
+The stand must not attach real host devices. A successful QEMU boot proves only
+the selected pair on virtual hardware; real firmware, LUKS/LVM/RAID, and
+physical controllers require separate checks.
+
+Preserve a diagnostic artifact from a failed early boot (`rdsosreport`, serial
+console log, or equivalent) when one is produced. Compare a normal and a
+fallback image separately: a fallback may contain more drivers, but its
+presence does not prove that the main image is bootable. Keep “UUID not found”
+distinct from a missing driver, filesystem, image, or `/boot` space problem.
+
 ## Next working step
 
 Repeat and review the `rsync`/`rsnapshot` matrix, separately verify restoration
-and negative cases, then update the tutorial and practical examples. Release
-`v0.2.0` is published; do not add network capabilities or metrics yet.
+and negative cases, then proofread the tutorial against the real stand: default
+deletion flags, `/./` source layout, explicit confirmation, rotation, restore,
+and the unmounted refusal. Release `v0.2.0` is published; do not add network
+capabilities or metrics yet.
 
 ## Boundaries and documents
 

@@ -582,6 +582,13 @@ else:
 между уровнями обычно представлены жёсткими ссылками, поэтому каждый уровень
 выглядит как полное дерево, хотя место занимают в основном изменения.
 
+В стандартной конфигурации `rsnapshot` пробный вывод обычно содержит
+`--delete` и `--delete-excluded`. Это флаги передаваемого `rsync`: они не удаляют
+источник, но приводят новое дерево снимка к содержимому источника и могут удалить
+лишнее в назначении. Поэтому нужно смотреть реальный `rsnapshot -t`, а не только
+исходный файл yesh; сценарий отмечает такие флаги и останавливается до явного
+подтверждения.
+
 Отсюда разные вопросы администратора:
 
 - для `rsync`: «какое дерево должно получиться в этом назначении и что будет
@@ -653,33 +660,32 @@ confirm = environment YESH_RSNAPSHOT_CONFIRM
 ```
 
 Сокращённая последовательность сценария выглядит так; полный файл также
-сообщает об отсутствующем корне, незамонтированном назначении и нехватке места:
+сообщает о незмонтированном назначении и нехватке места:
 
 ```yesh
 if exists $config:
-    if exists $root:
-        if findmnt --source $mount_source --target $root:
-            if free_space $root at_least 20MiB:
-                rsnapshot -c $config configtest
+    if findmnt --source $mount_source --target $root:
+        if free_space $root at_least 20MiB:
+            rsnapshot -c $config configtest
+            if $sync_first matches regex "1":
+                rsnapshot -c $config -t sync | tee $report
+                rsnapshot -c $config -t $level | tee -a $report
+            else:
+                rsnapshot -c $config -t $level | tee $report
+            if exists $confirm:
                 if $sync_first matches regex "1":
-                    rsnapshot -c $config -t sync | tee $report
-                    rsnapshot -c $config -t $level | tee -a $report
-                else:
-                    rsnapshot -c $config -t $level | tee $report
-                if exists $confirm:
-                    if $sync_first matches regex "1":
-                        rsnapshot -c $config sync
-                    rsnapshot -c $config $level
-                    if exists $published:
-                        if exists $lock:
-                            echo "rsnapshot lockfile remains after successful interval"
-                            exit 6
-                        else:
-                            echo "rsnapshot interval completed"
+                    rsnapshot -c $config sync
+                rsnapshot -c $config $level
+                if exists $published:
+                    if exists $lock:
+                        echo "rsnapshot lockfile remains after successful interval"
+                        exit 6
+                    else:
+                        echo "rsnapshot interval completed"
 ```
 
-Сначала проверяется файл конфигурации, корень снимков, точное монтирование и
-свободное место. Затем `configtest` проверяет конфигурацию, а `-t` показывает
+Сначала проверяется файл конфигурации, точное монтирование и свободное место.
+Затем `configtest` проверяет конфигурацию, а `-t` показывает
 действия выбранного уровня без ротации и одновременно сохраняет этот план в
 отчёт через `tee`. yesh отмечает в отчёте известные флаги удаления, но не
 объявляет конфигурацию безопасной автоматически. Только наличие заранее
