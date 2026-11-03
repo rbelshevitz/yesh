@@ -200,8 +200,9 @@ exact. Explain a necessary English term on first use and then choose the form
 that best fits the context.
 
 💡 In the tutorial, `💡 ` marks yesh's benefit, `🚫 ` marks a danger or required
-  check, and `❌ ` marks a concrete failure or prohibited option. The adjacent
-  prose must remain understandable without emojis.
+  check, `❌ ` marks a concrete failure or prohibited option, and `👀 ` marks
+  something the administrator must check personally. The adjacent prose must
+  remain understandable without emojis.
 
 ## After `v0.2.0`: prove restoration
 

@@ -226,7 +226,7 @@ publish $temporary to $current
 
 The production example adds the lock and refuses an existing temporary or
 published path; see [rsync-incremental.yesh](../examples/rsync-incremental.yesh).
-The first command is a reviewable preview, not a proof that a later copy will
+👀 The first command is a reviewable preview, not a proof that a later copy will
 succeed. After the copy, restore the selected completed snapshot into a new
 empty directory and compare expected files or checksums. A successful `rsync`
 exit code alone is not proof that the application can use the restored data.
@@ -266,7 +266,7 @@ mode, and host-key policy in an explicit argument list. The SCP example checks
 the local source before starting `scp`. Tests use recording fixtures to verify
 the exact argv and call order; they do not store keys or passwords.
 
-For a remote backup, read these examples in order: `ssh-health` checks that the
+👀 For a remote backup, read these examples in order: `ssh-health` checks that the
 user can enter the host without a password prompt; `rsync-network-preflight`
 then checks DNS, the route, and the remote source directory before a dry run;
 `rsync-networked-incremental-rwe` finally transfers into a private local
