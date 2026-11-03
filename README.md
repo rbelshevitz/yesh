@@ -15,7 +15,7 @@ stay visible, and the order of actions and failure behavior remain reviewable.
 - [syntax tutorial](docs/syntax-guide.md) — from basic syntax to operations;
 - [practical examples](docs/practical-examples.md) — what to run and which environment it needs;
 - [safety boundaries](SAFETY.md) — what yesh checks and what remains external;
-- [current `v0.2.1` roadmap](docs/TODO.md) — what is being polished now.
+- [`v0.2.1` release](https://github.com/rbelshevitz/yesh/releases/tag/v0.2.1) · [current roadmap](docs/TODO.md) — what comes next;
 
 Project background: [Why I built yesh — Linux automation you can explain](https://dev.to/rbelshevitz/why-i-built-yesh-linux-automation-you-can-explain-32cj).
 

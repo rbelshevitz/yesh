@@ -4,11 +4,12 @@ This is the short working map. It contains only the current milestone,
 verifiable tasks, and boundaries. Historical decisions and closed discussions
 are kept in the [archive](TODO-history.md).
 
-## Current milestone: preparing `v0.2.1`
+## Current focus: after `v0.2.1`
 
-Release `v0.2.0` is published. The goal of `v0.2.1` is fixes, polish of the
+Release `v0.2.1` is published. The current focus is continued polish of the
 implemented Linux scenarios, documentation review, and reproducible checks.
-New language constructs are out of scope. The working boundary is Linux/amd64.
+New language constructs are out of scope for now. The working boundary is
+Linux/amd64.
 
 Release `v0.2.0` already includes:
 

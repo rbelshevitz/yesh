@@ -15,7 +15,7 @@ yesh — читаемый язык Linux-автоматизации и пред�
 - [учебник по синтаксису](docs/syntax-guide.ru.md) — язык от простого к практическому;
 - [практические примеры](docs/practical-examples.md) и [карта примеров](docs/example-map.ru.md) — что запускать и какие нужны условия;
 - [границы безопасности](SAFETY.ru.md) — что yesh проверяет, а что остаётся внешней системе;
-- [текущий план `v0.2.1`](docs/TODO.ru.md) — что полируется сейчас.
+- [релиз `v0.2.1`](https://github.com/rbelshevitz/yesh/releases/tag/v0.2.1) · [текущий план](docs/TODO.ru.md) — что дальше;
 
 Статья о замысле проекта: [«Зачем я создал yesh — язык автоматизации Linux,
 который можно объяснить»](https://dev.to/rbelshevitz/zachiem-ia-sozdal-yesh-iazyk-avtomatizatsii-linux-kotoryi-mozhno-obiasnit-6pg).
