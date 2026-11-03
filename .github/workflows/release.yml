@@ -96,8 +96,9 @@ jobs:
           set -euo pipefail
           cd release-files
           sha256sum yesh-*.tar.gz > SHA256SUMS
-          cat > RELEASE_NOTES.md <<EOF
-          # yesh $GITHUB_REF_NAME
+          {
+            printf '# yesh %s\n\n' "$GITHUB_REF_NAME"
+            cat <<'EOF'
 
           yesh is a readable language for Linux automation and preflight checks:
           external commands stay visible, while checks, ordering, failure
@@ -124,6 +125,7 @@ jobs:
           Windows and Linux CI, and the Linux/amd64 release build using the Go 1.21
           baseline.
           EOF
+          } > RELEASE_NOTES.md
 
       - name: Create draft release
         env:
