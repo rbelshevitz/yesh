@@ -14,8 +14,10 @@
 передача, права и фактическая конфигурация остаются ответственностью
 `rsnapshot` и внешней системы.
 
-Статус: предметный интерфейс ниже пока проектируется. Уже исполняемый
-пример обычных команд — [rsnapshot-local.yesh](../examples/rsnapshot-local.yesh).
+Статус: предметный интерфейс ниже пока проектируется. Уже исполняемые
+примеры обычной проверки и защищённого запуска —
+[rsnapshot-preflight.yesh](../examples/rsnapshot-preflight.yesh) и
+[rsnapshot-apply.yesh](../examples/rsnapshot-apply.yesh).
 Реальные Go-тесты двух ротаций, восстановления версий и повторного
 использования жёстких ссылок описаны в [длинных практических сценариях](real-world-workflows.ru.md).
 
@@ -23,7 +25,8 @@ rsnapshot уже умеет сложную и полезную часть: ин�
 rsync и жёсткие ссылки, включая резервное копирование машин на другом узле через SSH. yesh не должен
 переписывать этот механизм или заменять его конфигурацию новым языком. Его задача —
 сделать операционный запуск читаемым и проверяемым: предварительная проверка,
-`configtest`, пробный режим, блокировка (`lock`), явный интервал и `--plan`.
+`configtest`, пробный режим, проверка монтирования, явное подтверждение и
+`--plan`.
 
 ### Чем отличается парадигма `rsync` от парадигмы `rsnapshot`
 
@@ -54,9 +57,15 @@ rsync и жёсткие ссылки, включая резервное копи
 ```yesh
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
+sync_first = environment YESH_RSNAPSHOT_SYNC_FIRST
 rsnapshot -c $config configtest
-rsnapshot -c $config -t $level
+if $sync_first matches regex "1":
+    rsnapshot -c $config -t sync
+    rsnapshot -c $config -t $level
+else:
+    rsnapshot -c $config -t $level
 # применение — отдельный явный шаг оператора:
+# rsnapshot -c $config sync
 # rsnapshot -c $config $level
 ```
 

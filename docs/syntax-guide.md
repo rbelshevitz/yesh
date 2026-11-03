@@ -33,6 +33,36 @@ separate arguments. yesh checks the expanded list and its boundaries; it does
 not decide what `install` means or whether the operation has sufficient
 permissions.
 
+### How yesh parses a file
+
+yesh keeps a separate boundary between script text and execution:
+
+```text
+text → lexer and parser → AST → runtime → external Linux processes
+```
+
+The lexer first recognizes words, strings, lists, operators, and blocks while
+respecting quoting. The parser then checks the grammar and builds an internal
+tree (the AST). Only after parsing succeeds does the runtime expand values,
+build the exact `argv`, choose a conditional branch, and start external
+processes.
+
+Four rules follow:
+
+- a syntax error stops the file before the first command starts;
+- the parser does not run commands, inspect host state, or silently repair
+  ambiguous text;
+- an ordinary word remains a literal, while a variable reference is explicit
+  as `$name`;
+- `--plan` uses the same parsed tree, but shows the possible action order and
+  expanded arguments instead of starting commands.
+
+For example, `echo service` and `echo $service` are different parser inputs:
+the first passes the word `service`, while the second requires an existing
+variable. An unknown `$service` is an error, not an empty string. The yesh
+navigator uses the same parser: generated text is not accepted merely because
+the form produced it.
+
 ## Who this is for
 
 This tutorial is for a Linux administrator who can run ordinary commands and
@@ -489,6 +519,13 @@ The operator therefore asks different questions:
 - for `rsnapshot`: “which points in time must remain, which interval transfers
   data now, which old level will be displaced, and is rotation safe to run?”
 
+A practical check for ordinary `rsync -a` is simple: after the source changes,
+the changed file appears in the itemized output; a repeat run without new
+changes usually reports no transfers. A file that exists only at the
+destination remains there: deletion starts only when an option such as
+`--delete` is passed explicitly. Review the plan and argument list before the
+run instead of inferring the policy from the word “backup”.
+
 💡 yesh does not choose between these tools. It makes the boundary around each
   one reviewable: checks, a temporary tree, and publication for one `rsync`
   result; `configtest`, test mode, rotation review, and explicit confirmation
@@ -532,6 +569,7 @@ inputs are explicit environment values:
 ```yesh
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
+sync_first = environment YESH_RSNAPSHOT_SYNC_FIRST
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
 lock = environment YESH_RSNAPSHOT_LOCK
@@ -548,8 +586,14 @@ if exists $config:
         if findmnt --source $mount_source --target $root:
             if free_space $root at_least 20MiB:
                 rsnapshot -c $config configtest
-                rsnapshot -c $config -t $level | tee $report
+                if $sync_first matches regex "1":
+                    rsnapshot -c $config -t sync | tee $report
+                    rsnapshot -c $config -t $level | tee -a $report
+                else:
+                    rsnapshot -c $config -t $level | tee $report
                 if exists $confirm:
+                    if $sync_first matches regex "1":
+                        rsnapshot -c $config sync
                     rsnapshot -c $config $level
                     if exists $published:
                         if exists $lock:
@@ -560,11 +604,14 @@ if exists $config:
 ```
 
 The full file also reports a missing root, an unmounted destination, and low
-free space. The order is readable from top to bottom: check the configuration,
-root, mount, and free space; run `configtest`; show and save the interval's
+free space. `YESH_RSNAPSHOT_SYNC_FIRST` must be copied from the configuration.
+When it is `1`, the plan and the real run contain `sync` followed by the
+selected rotation interval; when it is `0`, the selected interval performs the
+transfer and rotation. The order is readable from top to bottom: check the
+configuration, root, mount, and free space; run `configtest`; show and save the
 test-mode report through `tee`; flag known deletion-related rsync options;
-require a pre-created confirmation file; apply the interval; then check for
-the expected `daily.0` and a released lock file.
+require a pre-created confirmation file; apply the correct operation; then
+check for the expected `daily.0` and a released lock file.
 
 💡 This is what yesh simplifies: the preflight order, the boundary between test
 mode and the changing command, the exact visible `rsnapshot` arguments, and
@@ -576,8 +623,16 @@ The Bash idea would be:
 
 ```bash
 rsnapshot -c "$config" configtest || exit 1
-rsnapshot -c "$config" -t "$level" | tee "$report" || exit 1
+if [ "$sync_first" = 1 ]; then
+    rsnapshot -c "$config" -t sync | tee "$report" || exit 1
+    rsnapshot -c "$config" -t "$level" | tee -a "$report" || exit 1
+else
+    rsnapshot -c "$config" -t "$level" | tee "$report" || exit 1
+fi
 test -e "$confirm" || exit 4
+if [ "$sync_first" = 1 ]; then
+    rsnapshot -c "$config" sync || exit 1
+fi
 rsnapshot -c "$config" "$level" || exit 1
 test -d "$published" || exit 6
 test ! -e "$lock" || exit 6

@@ -99,10 +99,10 @@ resource trend beside a bounded journal window. It does not start nginx or
 generate HTTP traffic; use a separate, operator-approved load source if the
 comparison needs traffic.
 
-If `save to` is omitted, yesh uses the user-owned directory
-`~/.local/.yesh/resources/<unit>/`; for this example that is
-`~/.local/.yesh/resources/nginx.service/`. yesh creates only the missing
-directories below the user's home with mode `0700` (owner access only). It does
+If `save to` is omitted, yesh uses the user-owned JSONL path
+`~/.local/yesh/<unit>.jsonl`; for this example that is
+`~/.local/yesh/nginx.service.jsonl`. yesh creates only the missing parent
+directory below the user's home with mode `0700` (owner access only). It does
 not invoke `sudo`, create or repair a privileged parent, or change ownership.
 An explicit `save to` path must already be writable by the current user; yesh
 does not change its existing permissions.
@@ -134,9 +134,9 @@ during collection makes the saved measurement incomplete.
 The block requires the retention directive; `save to` may be omitted to use the
 default state directory. If no retention policy is needed, use the short
 one-line form without a block.
-`summarize` reads matching records from the state directory; it does not start
-a service, sample cgroups, or repair state. The state path is a directory and
-is created below `~/.local/.yesh/resources/` with restrictive permissions when
+`summarize` reads matching records from the state path; it does not start
+a service, sample cgroups, or repair state. The parent path is created below
+`~/.local/yesh/` with restrictive permissions when
 it does not exist. An explicit `save to $state_dir` / `from $state_dir` path is
 available for a different layout. A restart or
 cgroup identity change ends the current record as incomplete rather than

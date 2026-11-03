@@ -32,6 +32,12 @@ expected to run in every environment.
 > expanded and proofread alongside the tested `rsync`, `rsnapshot`, SSH, and
 > systemd workflows. Examples describe their current guarantees and limits.
 
+An experimental terminal UI (TUI) navigator for newcomers is being developed
+alongside the language. It helps compose small backup and service scripts,
+validates the generated text with the same parser, shows `--plan`, and saves
+the script to a new file. It does not execute the script or discover storage
+and remote hosts silently.
+
 > **Bash without the historical syntax complexity.**
 >
 > Read a yesh script from top to bottom. Strings stay strings, lists stay

@@ -57,6 +57,37 @@ install -m 0640 -- config.next /etc/myapp.conf.next
 аргументы. yesh проверяет раскрытый список и его границы, но не решает, что
 означает `install`, и не проверяет наличие нужных полномочий.
 
+### Как yesh разбирает файл
+
+У yesh есть отдельная граница между текстом сценария и его выполнением:
+
+```text
+текст → лексический анализатор → parser → AST → исполнитель
+→ внешние процессы Linux
+```
+
+Сначала лексический анализатор выделяет слова, строки, списки, операторы и
+блоки, учитывая кавычки. Затем parser проверяет грамматику и строит внутреннее
+дерево (AST).
+Только после успешного разбора исполнитель раскрывает значения, строит точный
+`argv`, выбирает ветвь условия и запускает внешние процессы.
+
+Из этого следуют четыре правила:
+
+- ошибка синтаксиса останавливает файл до запуска первой команды;
+- parser не запускает команды, не читает состояние хоста и не исправляет
+  неоднозначный текст молча;
+- обычное слово остаётся литералом, а ссылка на переменную пишется явно как
+  `$name`;
+- `--plan` использует то же разобранное дерево, но вместо запуска показывает
+  возможный порядок действий и раскрытые аргументы.
+
+Например, `echo service` и `echo $service` — разные вызовы для parser-а:
+первое передаёт слово `service`, второе требует существующую переменную.
+Неизвестное имя `$service` — ошибка, а не пустая строка. Навигатор yesh
+использует тот же parser: сгенерированный текст нельзя считать годным только
+потому, что его собрала форма.
+
 ## Для кого этот учебник
 
 Этот учебник — для администратора Linux, который умеет запускать обычные
@@ -559,6 +590,13 @@ else:
   сейчас передаёт данные, какой старый уровень будет вытеснен и можно ли
   безопасно выполнить ротацию?»
 
+Практическая проверка обычного `rsync -a` проста: после изменения источника
+изменённый файл появляется в выводе, а повторный запуск без новых изменений
+обычно не выводит передачи. Файл, который есть только в назначении, остаётся
+на месте: удаление начинается только с явно переданного флага вроде
+`--delete`. Поэтому перед запуском нужно отдельно посмотреть план и список
+аргументов, а не предполагать политику по одному слову «резервная копия».
+
 💡 yesh упрощает не выбор между этими инструментами, а чтение границы вокруг
   них: для `rsync` — проверка, временное дерево и публикация одного результата;
   для `rsnapshot` — `configtest`, пробный режим, просмотр ротации и явное
@@ -605,6 +643,7 @@ backup	/srv/data/./	local/
 ```yesh
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
+sync_first = environment YESH_RSNAPSHOT_SYNC_FIRST
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
 lock = environment YESH_RSNAPSHOT_LOCK
@@ -622,8 +661,14 @@ if exists $config:
         if findmnt --source $mount_source --target $root:
             if free_space $root at_least 20MiB:
                 rsnapshot -c $config configtest
-                rsnapshot -c $config -t $level | tee $report
+                if $sync_first matches regex "1":
+                    rsnapshot -c $config -t sync | tee $report
+                    rsnapshot -c $config -t $level | tee -a $report
+                else:
+                    rsnapshot -c $config -t $level | tee $report
                 if exists $confirm:
+                    if $sync_first matches regex "1":
+                        rsnapshot -c $config sync
                     rsnapshot -c $config $level
                     if exists $published:
                         if exists $lock:
@@ -649,8 +694,16 @@ if exists $config:
 
 ```bash
 rsnapshot -c "$config" configtest || exit 1
-rsnapshot -c "$config" -t "$level" || exit 1
+if [ "$sync_first" = 1 ]; then
+    rsnapshot -c "$config" -t sync || exit 1
+    rsnapshot -c "$config" -t "$level" || exit 1
+else
+    rsnapshot -c "$config" -t "$level" || exit 1
+fi
 test -e "$confirm" || exit 4
+if [ "$sync_first" = 1 ]; then
+    rsnapshot -c "$config" sync || exit 1
+fi
 rsnapshot -c "$config" "$level" || exit 1
 test -d "$published" || exit 6
 test ! -e "$lock" || exit 6
