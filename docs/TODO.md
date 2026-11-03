@@ -92,17 +92,26 @@ network, service, or power-loss scenario.
 
 ## `v0.2.1` acceptance
 
-Run the acceptance in this order:
+Status: the current corpus is accepted against the confirmed Linux/amd64
+scenarios. Stand results do not claim universal support for every kernel,
+distribution, filesystem, or security policy.
 
-1. incremental `rsync` from a source on another node;
-2. a guarded `rsnapshot` interval;
-3. a finite service-resource snapshot;
-4. snapshot comparison with a break at service restart;
-5. configuration publication and service-state verification;
-6. separate file-log and journald maintenance.
+- [x] incremental `rsync` from a source on another node;
+- [x] a guarded `rsnapshot` interval;
+- [x] a finite service-resource snapshot;
+- [x] snapshot comparison with a break at service restart;
+- [x] configuration publication and service-state verification;
+- [x] separate file-log and journald maintenance.
 
-Each scenario needs a positive case, a negative case, a rerun, `--plan`, a
-machine-readable report, and a check that failure leaves data unchanged.
+Before publishing the tag, repeat only the release checks:
+
+1. `go test ./...`;
+2. `go vet ./...` and a `-trimpath` build;
+3. green Linux and Windows CI;
+4. review the change list, README files, manuals, and release text.
+
+The acceptance was based on positive and negative cases, reruns, `--plan`,
+machine-readable reports, and checks that failures leave data unchanged.
 External commands remain visible: yesh does not hide their argv, exit codes, or
 responsibility for the network, permissions, and filesystem.
 
