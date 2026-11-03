@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+const serviceResourceJournalName = "measurements.jsonl"
+
 func serviceResourceJournalPath(statePath string) string {
 	if strings.HasSuffix(statePath, ".jsonl") {
 		return statePath

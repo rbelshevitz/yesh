@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	serviceResourceJournalName = "measurements.jsonl"
-	maxServiceResourceRecord   = 8 << 20
+	maxServiceResourceRecord = 8 << 20
 )
 
 func writeServiceResourceState(r *runtime, stateDir string, state serviceResourceState) (string, error) {
