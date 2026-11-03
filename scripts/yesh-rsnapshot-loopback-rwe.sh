@@ -88,6 +88,7 @@ touch "$confirm"
 common_env=(
     YESH_RSNAPSHOT_CONFIG="$config"
     YESH_RSNAPSHOT_LEVEL=daily
+    YESH_RSNAPSHOT_SYNC_FIRST=0
     YESH_RSNAPSHOT_ROOT="$snapshot_root"
     YESH_RSNAPSHOT_SOURCE="$mount_source"
     YESH_RSNAPSHOT_LOCK="$lockfile"
@@ -145,6 +146,40 @@ set -e
 [ "$held_lock_status" -ne 0 ] || die "held rsnapshot lock unexpectedly succeeded"
 [ ! -e "$snapshot_root/daily.2" ] || die "held lock published a snapshot"
 rm -- "$lockfile"
+
+# Repeat the changing path with sync_first=1. This uses a separate snapshot
+# root and lock so the two contracts cannot hide state from one another.
+sync_root=$mountpoint/sync-snapshots
+sync_config=$work/rsnapshot-sync-first.conf
+sync_lockfile=$work/rsnapshot-sync-first.pid
+sync_report=$work/rsnapshot-sync-first-test.log
+sync_confirm=$work/sync-first-approved
+sync_published=$sync_root/daily.0
+mkdir -m 0700 -- "$sync_root"
+printf 'config_version\t1.2\nsnapshot_root\t%s/\nno_create_root\t1\nsync_first\t1\nretain\tdaily\t2\nloglevel\t2\nlockfile\t%s\ncmd_rsync\t%s\ncmd_cp\t%s\ncmd_rm\t%s\nbackup\t%s/./\tlocal/\n' \
+    "$sync_root" "$sync_lockfile" "$(command -v rsync)" "$(command -v cp)" "$(command -v rm)" "$source" > "$sync_config"
+touch -- "$sync_confirm"
+
+sync_env=(
+    YESH_RSNAPSHOT_CONFIG="$sync_config"
+    YESH_RSNAPSHOT_LEVEL=daily
+    YESH_RSNAPSHOT_SYNC_FIRST=1
+    YESH_RSNAPSHOT_ROOT="$sync_root"
+    YESH_RSNAPSHOT_SOURCE="$mount_source"
+    YESH_RSNAPSHOT_LOCK="$sync_lockfile"
+    YESH_RSNAPSHOT_REPORT="$sync_report"
+    YESH_RSNAPSHOT_PUBLISHED="$sync_published"
+    YESH_RSNAPSHOT_CONFIRM="$sync_confirm"
+)
+
+env "${sync_env[@]}" "$yesh_bin" --plan "$yesh_script" > "$work/sync-first-plan.out"
+grep -F '"sync"' "$work/sync-first-plan.out" >/dev/null || die "sync_first plan omitted sync"
+grep -F 'rsnapshot' "$work/sync-first-plan.out" >/dev/null || die "sync_first plan omitted rsnapshot argv"
+test "$(grep -c '"-t"' "$work/sync-first-plan.out")" -ge 2 || die "sync_first plan omitted one of the test-mode calls"
+env "${sync_env[@]}" "$yesh_bin" "$yesh_script" > "$work/sync-first-run.out"
+[ -s "$sync_report" ] || die "sync_first test report was not captured"
+cmp "$sync_root/daily.0/local/versioned.txt" <(printf 'version-two-changed\n')
+[ ! -e "$sync_lockfile" ] || die "sync_first lockfile remains after the run"
 
 echo "yesh-rsnapshot-loopback: PASS"
 echo "image: $image"

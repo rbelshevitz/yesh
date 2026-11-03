@@ -1,6 +1,8 @@
 # Environment-dependent example: requires rsnapshot and a prepared local config.
 # Prepare the rsnapshot configuration separately with no_create_root=1 and a
-# lockfile. Check that the target device is mounted before a real backup.
+# lockfile. This minimal example is only for configurations with sync_first=0;
+# use rsnapshot-preflight.yesh or rsnapshot-apply.yesh when sync_first=1.
+# Check that the target device is mounted before a real backup.
 # Role of yesh: expose preflight, confirmation, and failure handling; rsnapshot remains the snapshot engine.
 
 config = "rsnapshot.conf"

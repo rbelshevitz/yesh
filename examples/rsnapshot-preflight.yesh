@@ -5,6 +5,7 @@
 # Required environment:
 #   YESH_RSNAPSHOT_CONFIG  path to the prepared rsnapshot.conf
 #   YESH_RSNAPSHOT_LEVEL   interval to preview, for example daily
+#   YESH_RSNAPSHOT_SYNC_FIRST 0 or 1, copied from rsnapshot.conf
 #
 # The config must set snapshot_root, lockfile and (for removable media)
 # no_create_root=1. Remote sources remain ordinary rsnapshot backup entries;
@@ -13,6 +14,13 @@
 
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
+sync_first = environment YESH_RSNAPSHOT_SYNC_FIRST
 
 rsnapshot -c $config configtest
-rsnapshot -c $config -t $level
+if $sync_first matches regex "^(0|1)$":
+    if $sync_first matches regex "1":
+        rsnapshot -c $config -t sync
+    rsnapshot -c $config -t $level
+else:
+    echo "YESH_RSNAPSHOT_SYNC_FIRST must be exactly 0 or 1"
+    exit 7

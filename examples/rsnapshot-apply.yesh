@@ -1,14 +1,15 @@
-# Real-World Example: guarded rsnapshot interval with explicit confirmation.
-# Goal: make one potentially changing rsnapshot interval explainable before apply.
+# Real-World Example: guarded rsnapshot operation with explicit confirmation.
+# Goal: make transfer and rotation explainable before apply.
 # What yesh simplifies: the preflight order, the confirmation boundary, and the
 # postcondition are visible as ordinary blocks; a failed command stops before
 # the next action, without Bash-specific control-flow machinery.
 # The rsnapshot.conf remains authoritative;
-# this script adds operator-facing checks before a destructive interval.
+# this script adds operator-facing checks before a changing operation.
 #
 # Required environment:
 #   YESH_RSNAPSHOT_CONFIG   prepared rsnapshot.conf
 #   YESH_RSNAPSHOT_LEVEL    interval, for example daily
+#   YESH_RSNAPSHOT_SYNC_FIRST 0 or 1, copied from rsnapshot.conf
 #   YESH_RSNAPSHOT_ROOT     expected local snapshot_root/mount path
 #   YESH_RSNAPSHOT_SOURCE   expected mount source, preferably UUID=... or
 #                           PARTUUID=... rather than a mutable /dev name
@@ -25,7 +26,10 @@
 # floor is a conservative preflight guard, not a size estimate
 # for a successful snapshot.
 # Order: check config/root/mount/free space, run `configtest`, show test mode,
-# then require the pre-created confirmation file before the mutating interval.
+# then require the pre-created confirmation file before the changing operation.
+# With sync_first=1 the test and real operation contain both `sync` and the
+# selected rotation interval. With sync_first=0 the selected interval performs
+# the transfer and rotation itself.
 # The script does not parse or rewrite rsnapshot.conf and does not delete a
 # quarantine. Codes 2..5 identify missing inputs, mount, confirmation, or
 # capacity failures; inspect the resulting snapshot and lock cleanup separately.
@@ -33,6 +37,7 @@
 
 config = environment YESH_RSNAPSHOT_CONFIG
 level = environment YESH_RSNAPSHOT_LEVEL
+sync_first = environment YESH_RSNAPSHOT_SYNC_FIRST
 root = environment YESH_RSNAPSHOT_ROOT
 mount_source = environment YESH_RSNAPSHOT_SOURCE
 lock = environment YESH_RSNAPSHOT_LOCK
@@ -46,29 +51,39 @@ if exists $config:
             df -P -h -- $root
             if free_space $root at_least 20MiB:
                 rsnapshot -c $config configtest
-                rsnapshot -c $config -t $level | tee $report
-                if test -s $report:
-                    if grep -E -- '--(delete|delete-excluded|remove-source-files)([= ]|$)' $report:
-                        echo "review: test report contains deletion-related rsync flags"
+                if $sync_first matches regex "^(0|1)$":
+                    if $sync_first matches regex "1":
+                        rsnapshot -c $config -t sync | tee $report
+                        rsnapshot -c $config -t $level | tee -a $report
                     else:
-                        echo "review: test report contains no known deletion-related rsync flags"
-                    if exists $confirm:
-                        rsnapshot -c $config $level
-                        if exists $published:
-                            if exists $lock:
-                                echo "rsnapshot lockfile remains after successful interval"
-                                exit 6
-                            else:
-                                echo "rsnapshot interval completed"
+                        rsnapshot -c $config -t $level | tee $report
+                    if test -s $report:
+                        if grep -E -- '--(delete|delete-excluded|remove-source-files)([= ]|$)' $report:
+                            echo "review: test report contains deletion-related rsync flags"
                         else:
-                            echo "rsnapshot interval completed without publishing the expected snapshot"
-                            exit 6
+                            echo "review: test report contains no known deletion-related rsync flags"
+                        if exists $confirm:
+                            if $sync_first matches regex "1":
+                                rsnapshot -c $config sync
+                            rsnapshot -c $config $level
+                            if exists $published:
+                                if exists $lock:
+                                    echo "rsnapshot lockfile remains after successful operation"
+                                    exit 6
+                                else:
+                                    echo "rsnapshot operation completed"
+                            else:
+                                echo "rsnapshot operation completed without publishing the expected snapshot"
+                                exit 6
+                        else:
+                            echo "review rsnapshot test output and create the confirmation file"
+                            exit 4
                     else:
-                        echo "review rsnapshot test output and create the confirmation file"
-                        exit 4
+                        echo "rsnapshot test report is missing or empty"
+                        exit 6
                 else:
-                    echo "rsnapshot test report is missing or empty"
-                    exit 6
+                    echo "YESH_RSNAPSHOT_SYNC_FIRST must be exactly 0 or 1"
+                    exit 7
             else:
                 echo "snapshot root has less than 20MiB free"
                 exit 5
