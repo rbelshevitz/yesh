@@ -63,6 +63,37 @@ variable. An unknown `$service` is an error, not an empty string. The yesh
 navigator uses the same parser: generated text is not accepted merely because
 the form produced it.
 
+## The experimental navigator
+
+The navigator is an experimental terminal user interface (TUI): a
+full-screen text interface for working in a terminal. It is a guide for a
+first yesh script, not a second command executor. Its purpose is to help a
+newcomer produce a readable first script
+without having to remember the whole syntax up front, while keeping the
+result visible and explainable. You choose an intention and fill in a form;
+the navigator builds an ordinary yesh text file and passes that text to the
+same parser used when a file is started from the terminal.
+
+The workflow is:
+
+1. fill in the form;
+2. fix any errors reported by the parser;
+3. after successful validation, open `Plan` to inspect the commands and their
+   order;
+4. save a new script file if you need one;
+5. start it explicitly from the terminal only after reviewing the text and the
+   plan yourself.
+
+`Plan` is not a replacement for parsing. If the text fails to parse, plan
+review and saving are blocked until the error is fixed. The navigator does not
+run the generated script, guess a correction, or hide host-state checks behind
+the form.
+
+👀 Before saving, read the generated file and check its paths, service names,
+permissions, and external commands. A successful parse proves only that yesh
+understood the syntax and built a plan; it does not prove that the operation is
+safe for a particular host or that you have the required privileges.
+
 ## Who this is for
 
 This tutorial is for a Linux administrator who can run ordinary commands and
