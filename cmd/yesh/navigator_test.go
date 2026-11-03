@@ -4,12 +4,24 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	goRuntime "runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
 )
+
+func assertNavigatorPrivateMode(t *testing.T, info os.FileInfo) {
+	t.Helper()
+	if goRuntime.GOOS == "windows" {
+		// Windows does not expose POSIX permission bits through FileMode.Perm.
+		return
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("saved mode = %o, want 600", info.Mode().Perm())
+	}
+}
 
 func TestNavigatorMainMenuHasOnlyImplementedActivities(t *testing.T) {
 	activities := navigatorActivities()
@@ -388,9 +400,7 @@ func TestSaveNavigatorScriptDoesNotOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat saved script: %v", err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("saved mode = %o, want 600", info.Mode().Perm())
-	}
+	assertNavigatorPrivateMode(t, info)
 	if err := saveNavigatorScript(path, "changed\n"); err == nil {
 		t.Fatal("saving over an existing script unexpectedly succeeded")
 	}
@@ -424,9 +434,7 @@ func TestSaveNavigatorScriptTempCreatesPrivateCopy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat temporary script: %v", err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("temporary mode = %o, want 600", info.Mode().Perm())
-	}
+	assertNavigatorPrivateMode(t, info)
 }
 
 func TestNavigatorBackupRecipeExplainsRemoteBoundary(t *testing.T) {
@@ -495,9 +503,7 @@ func TestNavigatorBackupFlowParsesPlansAndSaves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("saved script missing: %v", err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("saved mode = %o, want 600", info.Mode().Perm())
-	}
+	assertNavigatorPrivateMode(t, info)
 }
 
 func TestNavigatorBackupFlowRejectsEmptyDestination(t *testing.T) {
