@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/netip"
 	"os"
 	"regexp"
@@ -30,9 +31,17 @@ type runtime struct {
 	values   map[string]value
 	filename string
 	plan     bool
+	output   io.Writer
 	steps    int
 	// cgroupRoot is empty for normal execution and is injectable for Linux tests.
 	cgroupRoot string
+}
+
+func (r *runtime) outputWriter() io.Writer {
+	if r.output != nil {
+		return r.output
+	}
+	return os.Stdout
 }
 
 const maxLoopIterations = 10000

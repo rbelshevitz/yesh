@@ -42,7 +42,7 @@ func defaultServiceResourceStateDir(unit string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve user home for resource state: %w", err)
 	}
-	return filepath.Join(home, ".local", ".yesh", "resources", unit), nil
+	return filepath.Join(home, ".local", "yesh", unit+".jsonl"), nil
 }
 
 func serviceResourceObservation(snapshot serviceResourceSnapshot) (string, string) {
@@ -93,8 +93,8 @@ func (r *runtime) executeServiceResources(s serviceResourcesStmt) error {
 	}
 	argv := systemctlArgv(s.manager, "show", "--no-pager", "--property="+serviceResourceProperties, v.scalar)
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %q\n", argv)
-		fmt.Fprintf(os.Stdout, "PLAN cgroup resources for %q (deferred)\n", v.scalar)
+		fmt.Fprintf(r.outputWriter(), "PLAN %q\n", argv)
+		fmt.Fprintf(r.outputWriter(), "PLAN cgroup resources for %q (deferred)\n", v.scalar)
 		return nil
 	}
 	snapshot, err := r.queryServiceResources(s.manager, v.scalar)
@@ -102,13 +102,13 @@ func (r *runtime) executeServiceResources(s serviceResourcesStmt) error {
 		return fmt.Errorf("service resources %q: %w", v.scalar, err)
 	}
 	observation, observationReason := serviceResourceObservation(snapshot)
-	fmt.Fprintf(os.Stdout, "RESOURCE_OBSERVATION: %s — %s.\n", observation, serviceResourceObservationMessage(observation, observationReason))
-	fmt.Fprintf(os.Stdout, "SERVICE_RESOURCES observed_at=%s id=%s invocation_id=%s load_state=%s active_state=%s sub_state=%s main_pid=%s observation=%s observation_reason=%s cgroup=%q cgroup_type=%s cgroup_controllers=%q io_stat_available=%s processes_incomplete=%s n_restarts=%s process_count=%d rss_bytes=%d memory_current=%s memory_max=%s memory_swap_current=%s memory_swap_max=%s memory_anon=%s memory_file=%s memory_kernel=%s memory_pressure_some_avg10=%s memory_pressure_some_avg60=%s memory_pressure_some_avg300=%s memory_pressure_full_avg10=%s cpu_pressure_some_avg10=%s cpu_pressure_some_avg60=%s cpu_pressure_some_avg300=%s io_pressure_some_avg10=%s io_pressure_some_avg60=%s io_pressure_some_avg300=%s host_memory_pressure_some_avg10=%s host_memory_pressure_some_avg60=%s host_memory_pressure_some_avg300=%s host_cpu_pressure_some_avg10=%s host_cpu_pressure_some_avg60=%s host_cpu_pressure_some_avg300=%s host_io_pressure_some_avg10=%s host_io_pressure_some_avg60=%s host_io_pressure_some_avg300=%s pids_current=%s pids_max=%s pids_events_max=%s cpu_usage_usec=%s cpu_user_usec=%s cpu_system_usec=%s cpu_nr_periods=%s cpu_nr_throttled=%s cpu_throttled_usec=%s cgroup_populated=%s cgroup_frozen=%s memory_high=%s memory_max_events=%s oom=%s oom_kill=%s oom_group_kill=%s memory_high_local=%s memory_max_events_local=%s oom_local=%s oom_kill_local=%s oom_group_kill_local=%s memory_swap_events_high=%s memory_swap_events_max=%s memory_swap_events_fail=%s\n",
+	fmt.Fprintf(r.outputWriter(), "RESOURCE_OBSERVATION: %s — %s.\n", observation, serviceResourceObservationMessage(observation, observationReason))
+	fmt.Fprintf(r.outputWriter(), "SERVICE_RESOURCES observed_at=%s id=%s invocation_id=%s load_state=%s active_state=%s sub_state=%s main_pid=%s observation=%s observation_reason=%s cgroup=%q cgroup_type=%s cgroup_controllers=%q io_stat_available=%s processes_incomplete=%s n_restarts=%s process_count=%d rss_bytes=%d memory_current=%s memory_max=%s memory_swap_current=%s memory_swap_max=%s memory_anon=%s memory_file=%s memory_kernel=%s memory_pressure_some_avg10=%s memory_pressure_some_avg60=%s memory_pressure_some_avg300=%s memory_pressure_full_avg10=%s cpu_pressure_some_avg10=%s cpu_pressure_some_avg60=%s cpu_pressure_some_avg300=%s io_pressure_some_avg10=%s io_pressure_some_avg60=%s io_pressure_some_avg300=%s host_memory_pressure_some_avg10=%s host_memory_pressure_some_avg60=%s host_memory_pressure_some_avg300=%s host_cpu_pressure_some_avg10=%s host_cpu_pressure_some_avg60=%s host_cpu_pressure_some_avg300=%s host_io_pressure_some_avg10=%s host_io_pressure_some_avg60=%s host_io_pressure_some_avg300=%s pids_current=%s pids_max=%s pids_events_max=%s cpu_usage_usec=%s cpu_user_usec=%s cpu_system_usec=%s cpu_nr_periods=%s cpu_nr_throttled=%s cpu_throttled_usec=%s cgroup_populated=%s cgroup_frozen=%s memory_high=%s memory_max_events=%s oom=%s oom_kill=%s oom_group_kill=%s memory_high_local=%s memory_max_events_local=%s oom_local=%s oom_kill_local=%s oom_group_kill_local=%s memory_swap_events_high=%s memory_swap_events_max=%s memory_swap_events_fail=%s\n",
 		snapshot.observedAt.Format(time.RFC3339Nano), snapshot.properties["Id"], snapshot.properties["InvocationID"], snapshot.properties["LoadState"], snapshot.properties["ActiveState"], snapshot.properties["SubState"], snapshot.properties["MainPID"], observation, observationReason, snapshot.cgroup,
 		snapshot.metrics["cgroup.type"], snapshot.metrics["cgroup.controllers"], snapshot.metrics["io.stat.available"], snapshot.metrics["processes.incomplete"], snapshot.properties["NRestarts"], len(snapshot.processes), snapshot.rssBytes,
 		snapshot.metrics["memory.current"], snapshot.metrics["memory.max"], snapshot.metrics["memory.swap.current"], snapshot.metrics["memory.swap.max"], snapshot.metrics["memory.stat.anon"], snapshot.metrics["memory.stat.file"], snapshot.metrics["memory.stat.kernel"], snapshot.metrics["memory.pressure.some.avg10"], snapshot.metrics["memory.pressure.some.avg60"], snapshot.metrics["memory.pressure.some.avg300"], snapshot.metrics["memory.pressure.full.avg10"], snapshot.metrics["cpu.pressure.some.avg10"], snapshot.metrics["cpu.pressure.some.avg60"], snapshot.metrics["cpu.pressure.some.avg300"], snapshot.metrics["io.pressure.some.avg10"], snapshot.metrics["io.pressure.some.avg60"], snapshot.metrics["io.pressure.some.avg300"], snapshot.metrics["host.memory.pressure.some.avg10"], snapshot.metrics["host.memory.pressure.some.avg60"], snapshot.metrics["host.memory.pressure.some.avg300"], snapshot.metrics["host.cpu.pressure.some.avg10"], snapshot.metrics["host.cpu.pressure.some.avg60"], snapshot.metrics["host.cpu.pressure.some.avg300"], snapshot.metrics["host.io.pressure.some.avg10"], snapshot.metrics["host.io.pressure.some.avg60"], snapshot.metrics["host.io.pressure.some.avg300"], snapshot.metrics["pids.current"], snapshot.metrics["pids.max"], snapshot.metrics["pids.events.max"], snapshot.metrics["cpu.stat.usage_usec"], snapshot.metrics["cpu.stat.user_usec"], snapshot.metrics["cpu.stat.system_usec"], snapshot.metrics["cpu.stat.nr_periods"], snapshot.metrics["cpu.stat.nr_throttled"], snapshot.metrics["cpu.stat.throttled_usec"], snapshot.metrics["cgroup.events.populated"], snapshot.metrics["cgroup.events.frozen"], snapshot.metrics["memory.events.high"], snapshot.metrics["memory.events.max"], snapshot.metrics["memory.events.oom"], snapshot.metrics["memory.events.oom_kill"], snapshot.metrics["memory.events.oom_group_kill"], snapshot.metrics["memory.events.local.high"], snapshot.metrics["memory.events.local.max"], snapshot.metrics["memory.events.local.oom"], snapshot.metrics["memory.events.local.oom_kill"], snapshot.metrics["memory.events.local.oom_group_kill"], snapshot.metrics["memory.swap.events.high"], snapshot.metrics["memory.swap.events.max"], snapshot.metrics["memory.swap.events.fail"])
 	if len(snapshot.processes) > 0 {
-		if err := writeProcessTable(os.Stdout, snapshot.processes, []string{"pid", "ppid", "uid", "state", "rss", "start_time", "cgroup"}); err != nil {
+		if err := writeProcessTable(r.outputWriter(), snapshot.processes, []string{"pid", "ppid", "uid", "state", "rss", "start_time", "cgroup"}); err != nil {
 			return fmt.Errorf("service resources processes: %w", err)
 		}
 	}
@@ -150,7 +150,7 @@ func (r *runtime) executeServiceMeasure(s serviceMeasureStmt) error {
 		return fmt.Errorf("measure would collect %d samples; limit is %d", count, maxServiceResourceStateSamples)
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN measure service %s %s for %s every %s save to %q keep history for %s\n", s.manager, v.scalar, s.durationText, s.intervalText, statePath, s.keepForText)
+		fmt.Fprintf(r.outputWriter(), "PLAN measure service %s %s for %s every %s save to %q keep history for %s\n", s.manager, v.scalar, s.durationText, s.intervalText, statePath, s.keepForText)
 		return nil
 	}
 	return r.runServiceMeasurement(s.manager, v.scalar, s.duration, s.interval, s.keepFor, statePath)
@@ -184,7 +184,7 @@ func (r *runtime) executeServiceSummarize(s serviceSummarizeStmt) error {
 		}
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN summarize service %s %s from %q since %s\n", s.manager, v.scalar, statePath, s.sinceText)
+		fmt.Fprintf(r.outputWriter(), "PLAN summarize service %s %s from %q since %s\n", s.manager, v.scalar, statePath, s.sinceText)
 		return nil
 	}
 	return r.runServiceResourceSummary(s.manager, v.scalar, statePath, s.since)

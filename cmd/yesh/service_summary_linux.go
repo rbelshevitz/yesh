@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -52,13 +53,14 @@ type serviceGaugeAnalysis struct {
 }
 
 func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, since time.Duration) error {
-	entries, err := os.ReadDir(stateDir)
+	journalPath := serviceResourceJournalPath(stateDir)
+	stateDirectory := serviceResourceStateDirectory(stateDir)
+	entries, err := os.ReadDir(stateDirectory)
 	if err != nil {
 		return fmt.Errorf("read resource state directory: %w", err)
 	}
 	states := make([]serviceResourceState, 0, len(entries))
 	cutoff := time.Now().UTC().Add(-since)
-	journalPath := filepath.Join(stateDir, serviceResourceJournalName)
 	if _, err := os.Stat(journalPath); err == nil {
 		journalStates, err := readServiceResourceJournal(journalPath)
 		if err != nil {
@@ -73,6 +75,9 @@ func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, sinc
 		return fmt.Errorf("stat resource state journal %q: %w", journalPath, err)
 	}
 	for _, entry := range entries {
+		if strings.HasSuffix(stateDir, ".jsonl") {
+			break
+		}
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
@@ -169,8 +174,8 @@ func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, sinc
 	rssAnalysis := analyzeServiceGaugeDetails(summary.rssPoints)
 	summary.memorySlope, summary.memoryTrend, summary.hasMemorySlope = memoryAnalysis.slope, memoryAnalysis.trend, memoryAnalysis.ok
 	summary.rssSlope, summary.rssTrend, summary.hasRSSSlope = rssAnalysis.slope, rssAnalysis.trend, rssAnalysis.ok
-	writeHumanServiceSummary(os.Stdout, unit, manager, summary, memoryAnalysis, rssAnalysis)
-	writeServiceProcessSummary(os.Stdout, unit, summary)
+	writeHumanServiceSummary(r.outputWriter(), unit, manager, summary, memoryAnalysis, rssAnalysis)
+	writeServiceProcessSummary(r.outputWriter(), unit, summary)
 	return nil
 }
 

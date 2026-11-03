@@ -21,11 +21,14 @@ func main() {
 }
 
 func runCLI() int {
+	if len(os.Args) > 1 && os.Args[1] == "navigator" {
+		return runNavigator()
+	}
 	flags := flag.NewFlagSet(filepath.Base(os.Args[0]), flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	flags.Usage = func() {
 		fmt.Fprintf(flags.Output(), "yesh %s — Linux automation you can explain\n\n", version)
-		fmt.Fprintf(flags.Output(), "usage: %s [flags] SCRIPT.yesh\n\n", flags.Name())
+		fmt.Fprintf(flags.Output(), "usage: %s [flags] SCRIPT.yesh\n       %s navigator\n\n", flags.Name(), flags.Name())
 		fmt.Fprintln(flags.Output(), "flags:")
 		flags.PrintDefaults()
 	}

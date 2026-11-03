@@ -1,0 +1,17 @@
+package main
+
+import (
+	"path/filepath"
+	"strings"
+)
+
+func serviceResourceJournalPath(statePath string) string {
+	if strings.HasSuffix(statePath, ".jsonl") {
+		return statePath
+	}
+	return filepath.Join(statePath, serviceResourceJournalName)
+}
+
+func serviceResourceStateDirectory(statePath string) string {
+	return filepath.Dir(serviceResourceJournalPath(statePath))
+}

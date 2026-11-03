@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 )
 
 func (r *runtime) executeJournal(s journalStmt) error {
@@ -19,14 +18,14 @@ func (r *runtime) executeJournal(s journalStmt) error {
 	argv := journalctlArgv(s.manager, "--no-pager", "--output=json", "--unit", v.scalar,
 		"--since", "-"+s.sinceText, "--lines", fmt.Sprintf("%d", s.lines))
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %q\n", argv)
+		fmt.Fprintf(r.outputWriter(), "PLAN %q\n", argv)
 		return nil
 	}
 	data, err := r.queryJournal(s.manager, v.scalar, s.sinceText, s.lines)
 	if err != nil {
 		return err
 	}
-	_, err = os.Stdout.Write(data)
+	_, err = r.outputWriter().Write(data)
 	return err
 }
 

@@ -307,7 +307,7 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 		return err
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %s\n", r.formatPipeline(stages))
+		fmt.Fprintf(r.outputWriter(), "PLAN %s\n", r.formatPipeline(stages))
 		return nil
 	}
 	parent := r.ctx

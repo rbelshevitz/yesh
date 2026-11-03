@@ -11,7 +11,7 @@ import (
 )
 
 func pruneServiceResourceHistory(r *runtime, stateDir, manager, unit string, keepFor time.Duration) (int, error) {
-	journalPath := filepath.Join(stateDir, serviceResourceJournalName)
+	journalPath := serviceResourceJournalPath(stateDir)
 	if _, err := os.Stat(journalPath); err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil
@@ -19,7 +19,7 @@ func pruneServiceResourceHistory(r *runtime, stateDir, manager, unit string, kee
 		return 0, err
 	}
 	removed := 0
-	err := r.withLock(filepath.Join(stateDir, ".lock"), func() error {
+	err := r.withLock(filepath.Join(filepath.Dir(journalPath), ".lock"), func() error {
 		states, err := readServiceResourceJournal(journalPath)
 		if err != nil {
 			return err

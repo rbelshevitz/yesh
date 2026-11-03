@@ -1673,6 +1673,7 @@ func TestPOSIXPracticalRsnapshotPreflightOrder(t *testing.T) {
 		"YESH_TEST_CLI=1",
 		"YESH_RSNAPSHOT_CONFIG="+config,
 		"YESH_RSNAPSHOT_LEVEL=daily",
+		"YESH_RSNAPSHOT_SYNC_FIRST=0",
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"TRACE_FILE="+trace,
 	)
@@ -1709,6 +1710,7 @@ func TestPOSIXPracticalRsnapshotGuardedApply(t *testing.T) {
 			"YESH_TEST_CLI=1",
 			"YESH_RSNAPSHOT_CONFIG="+config,
 			"YESH_RSNAPSHOT_LEVEL=daily",
+			"YESH_RSNAPSHOT_SYNC_FIRST=0",
 			"YESH_RSNAPSHOT_ROOT="+root,
 			"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
 			"YESH_RSNAPSHOT_LOCK="+filepath.Join(dir, "rsnapshot.pid"),
@@ -1783,6 +1785,7 @@ func TestPOSIXPracticalRsnapshotGuardedApplyFreeSpaceFailureStopsRotation(t *tes
 		"YESH_TEST_CLI=1",
 		"YESH_RSNAPSHOT_CONFIG="+config,
 		"YESH_RSNAPSHOT_LEVEL=daily",
+		"YESH_RSNAPSHOT_SYNC_FIRST=0",
 		"YESH_RSNAPSHOT_ROOT="+root,
 		"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
 		"YESH_RSNAPSHOT_CONFIRM="+confirm,

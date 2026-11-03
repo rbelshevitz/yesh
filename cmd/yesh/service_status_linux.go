@@ -110,7 +110,7 @@ func (r *runtime) transitionService(manager, action, unit, expectedState string,
 	if action == "restart" && before.ActiveEnterTimestampMonotonic != "" && status.ActiveEnterTimestampMonotonic != "" && before.ActiveEnterTimestampMonotonic == status.ActiveEnterTimestampMonotonic {
 		fmt.Fprintf(os.Stderr, "yesh: service %s %q warning: ActiveEnterTimestampMonotonic did not change (%s)\n", action, unit, status.ActiveEnterTimestampMonotonic)
 	}
-	fmt.Fprintf(os.Stdout, "SERVICE_%s id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s\n", strings.ToUpper(action), status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
+	fmt.Fprintf(r.outputWriter(), "SERVICE_%s id=%s active_state=%s sub_state=%s result=%s exec_main_code=%s exec_main_status=%s active_enter_timestamp_monotonic=%s\n", strings.ToUpper(action), status.ID, status.ActiveState, status.SubState, status.Result, status.ExecMainCode, status.ExecMainStatus, status.ActiveEnterTimestampMonotonic)
 	return nil
 }
 

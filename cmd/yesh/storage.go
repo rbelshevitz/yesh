@@ -76,7 +76,7 @@ func (r *runtime) evalDevice(raw string, line int) (value, error) {
 	}
 	d := storageDevice{kind: t[2].text, identity: id}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN device by %s %q (deferred)\n", d.kind, id)
+		fmt.Fprintf(r.outputWriter(), "PLAN device by %s %q (deferred)\n", d.kind, id)
 	} else {
 		d, err = r.resolveStorage(d.kind, id)
 		if err != nil {
@@ -158,7 +158,7 @@ func (r *runtime) executeStorage(s storageStmt) error {
 			return err
 		}
 		if r.plan {
-			fmt.Fprintf(os.Stdout, "PLAN require mounted %q from %s%s (deferred fstab/device/mount checks)\n", path, name, storageModePlan(mode))
+			fmt.Fprintf(r.outputWriter(), "PLAN require mounted %q from %s%s (deferred fstab/device/mount checks)\n", path, name, storageModePlan(mode))
 			return nil
 		}
 		entry, kind, id, err := selectFstabMount(v.fstab, path)
@@ -176,10 +176,10 @@ func (r *runtime) executeStorage(s storageStmt) error {
 	}
 	if ok && v.fstab != nil && s.kind == storageInspect {
 		if r.plan {
-			fmt.Fprintf(os.Stdout, "PLAN inspect %s (deferred)\n", name)
+			fmt.Fprintf(r.outputWriter(), "PLAN inspect %s (deferred)\n", name)
 			return nil
 		}
-		return writeFstabInspection(os.Stdout, v.fstab)
+		return writeFstabInspection(r.outputWriter(), v.fstab)
 	}
 	if !ok || v.device == nil {
 		if s.kind == storageInspect {
@@ -189,10 +189,10 @@ func (r *runtime) executeStorage(s storageStmt) error {
 	}
 	if s.kind == storageInspect {
 		if r.plan {
-			fmt.Fprintf(os.Stdout, "PLAN inspect %s (deferred)\n", name)
+			fmt.Fprintf(r.outputWriter(), "PLAN inspect %s (deferred)\n", name)
 			return nil
 		}
-		return json.NewEncoder(os.Stdout).Encode(v.device)
+		return json.NewEncoder(r.outputWriter()).Encode(v.device)
 	}
 	path, err := r.storageString(s.path, s.line)
 	if err != nil {
@@ -203,7 +203,7 @@ func (r *runtime) executeStorage(s storageStmt) error {
 		return err
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN require mounted %q from %s filesystem %q%s (deferred)\n", path, name, fs, storageModePlan(mode))
+		fmt.Fprintf(r.outputWriter(), "PLAN require mounted %q from %s filesystem %q%s (deferred)\n", path, name, fs, storageModePlan(mode))
 		return nil
 	}
 	return r.requireMountedDevice(path, *v.device, fs, mode)

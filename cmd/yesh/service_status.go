@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -30,7 +29,7 @@ func (r *runtime) executeServiceStatus(s serviceStatusStmt) error {
 	}
 	argv := systemctlArgv(s.manager, "show", "--no-pager", "--property=Id,LoadState,ActiveState,SubState", v.scalar)
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %q\n", argv)
+		fmt.Fprintf(r.outputWriter(), "PLAN %q\n", argv)
 		return nil
 	}
 	requested := argv[len(argv)-1]
@@ -41,7 +40,7 @@ func (r *runtime) executeServiceStatus(s serviceStatusStmt) error {
 	if status.ID != requested {
 		return fmt.Errorf("systemctl returned canonical unit %q for requested %q; aliases are not supported", status.ID, requested)
 	}
-	fmt.Fprintf(os.Stdout, "SERVICE_STATUS id=%s load_state=%s active_state=%s sub_state=%s\n",
+	fmt.Fprintf(r.outputWriter(), "SERVICE_STATUS id=%s load_state=%s active_state=%s sub_state=%s\n",
 		status.ID, status.LoadState, status.ActiveState, status.SubState)
 	return nil
 }
@@ -62,7 +61,7 @@ func (r *runtime) executeServiceRestart(s serviceRestartStmt) error {
 	}
 	argv := systemctlArgv(s.manager, s.action, v.scalar)
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %q until %s within %s\n", argv, s.expectedState, s.timeoutText)
+		fmt.Fprintf(r.outputWriter(), "PLAN %q until %s within %s\n", argv, s.expectedState, s.timeoutText)
 		return nil
 	}
 	return r.transitionService(s.manager, s.action, v.scalar, s.expectedState, s.timeout)
@@ -84,14 +83,14 @@ func (r *runtime) executeServiceWait(s serviceWaitStmt) error {
 	}
 	argv := systemctlArgv(s.manager, "show", "--no-pager", "--property=Id,LoadState,ActiveState,SubState", v.scalar)
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN %q until %s within %s\n", argv, s.expectedState, s.timeoutText)
+		fmt.Fprintf(r.outputWriter(), "PLAN %q until %s within %s\n", argv, s.expectedState, s.timeoutText)
 		return nil
 	}
 	status, err := r.waitForService(s.manager, v.scalar, s.expectedState, s.timeout)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "SERVICE_WAIT id=%s active_state=%s sub_state=%s\n", status.ID, status.ActiveState, status.SubState)
+	fmt.Fprintf(r.outputWriter(), "SERVICE_WAIT id=%s active_state=%s sub_state=%s\n", status.ID, status.ActiveState, status.SubState)
 	return nil
 }
 

@@ -10,7 +10,9 @@ import (
 )
 
 func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval, keepFor time.Duration, stateDir string) error {
-	if err := os.MkdirAll(stateDir, 0700); err != nil {
+	journalPath := serviceResourceJournalPath(stateDir)
+	stateDirectory := serviceResourceStateDirectory(stateDir)
+	if err := os.MkdirAll(stateDirectory, 0700); err != nil {
 		return fmt.Errorf("create resource state directory: %w", err)
 	}
 	first, err := r.queryServiceResources(manager, unit)
@@ -65,13 +67,13 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 	if err := state.validate(); err != nil {
 		return fmt.Errorf("resource measurement: %w", err)
 	}
-	path, err := writeServiceResourceState(r, stateDir, state)
+	path, err := writeServiceResourceState(r, journalPath, state)
 	if err != nil {
 		return err
 	}
 	removed := 0
 	if keepFor > 0 {
-		removed, err = pruneServiceResourceHistory(r, stateDir, manager, unit, keepFor)
+		removed, err = pruneServiceResourceHistory(r, journalPath, manager, unit, keepFor)
 		if err != nil {
 			return err
 		}
@@ -80,7 +82,7 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 	if keepFor > 0 {
 		keepText = keepFor.String()
 	}
-	fmt.Fprintf(os.Stdout, "SERVICE_MEASURE unit=%s state=%q samples=%d complete=%t history_keep=%s history_removed=%d\n", unit, path, len(samples), complete, keepText, removed)
+	fmt.Fprintf(r.outputWriter(), "SERVICE_MEASURE unit=%s state=%q samples=%d complete=%t history_keep=%s history_removed=%d\n", unit, path, len(samples), complete, keepText, removed)
 	return nil
 }
 

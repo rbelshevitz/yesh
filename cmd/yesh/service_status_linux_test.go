@@ -306,6 +306,54 @@ func TestLinuxServiceResourceJournalRejectsMalformedCompleteRecord(t *testing.T)
 	}
 }
 
+func TestLinuxServiceResourceJournalRefusesResumeAfterPartialTailOrIdentityMix(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now().UTC().Add(-time.Minute)
+	state := serviceResourceState{
+		Schema: serviceResourceStateSchema, Kind: "service-resource-measurement",
+		Manager: "system", Unit: "api.service", Cgroup: "/system.slice/api.service",
+		StartedAt: now, FinishedAt: now.Add(time.Second), Complete: true,
+		Samples: []serviceResourceStateSample{{ObservedAt: now, Metrics: map[string]string{"memory.current": "10"}}},
+	}
+	r := &runtime{values: map[string]value{}, filename: "journal.yesh"}
+	if _, err := writeServiceResourceState(r, dir, state); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, serviceResourceJournalName)
+	file, err := os.OpenFile(journal, os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString(`{"schema":1`); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeServiceResourceState(r, dir, state); err == nil || !strings.Contains(err.Error(), "incomplete record") {
+		t.Fatalf("partial journal append error = %v", err)
+	}
+
+	if err := os.WriteFile(journal, append(mustJSON(t, state), '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	other := state
+	other.Manager = "user"
+	if _, err := writeServiceResourceState(r, dir, other); err == nil || !strings.Contains(err.Error(), "expected user/api.service") {
+		t.Fatalf("mixed identity append error = %v", err)
+	}
+}
+
+func mustJSON(t *testing.T, state serviceResourceState) []byte {
+	t.Helper()
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
 func TestLinuxServiceResourceJournalSerializesConcurrentAppends(t *testing.T) {
 	dir := t.TempDir()
 	r := &runtime{values: map[string]value{}, filename: "concurrent-journal.yesh"}
@@ -407,7 +455,7 @@ func TestLinuxDefaultServiceResourceStatePathIsUserOwned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(home, ".local", ".yesh", "resources", "api.service")
+	want := filepath.Join(home, ".local", "yesh", "api.service.jsonl")
 	if got != want {
 		t.Fatalf("default state path = %q, want %q", got, want)
 	}

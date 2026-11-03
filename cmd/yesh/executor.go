@@ -29,7 +29,7 @@ func (r *runtime) execute(items []statement) error {
 				return fmt.Errorf("%s:%d: %w", r.filename, s.line, err)
 			}
 			if r.plan {
-				fmt.Fprintf(os.Stdout, "PLAN exit %d\n", code)
+				fmt.Fprintf(r.outputWriter(), "PLAN exit %d\n", code)
 				continue
 			}
 			return scriptExit{code: code}
@@ -46,13 +46,13 @@ func (r *runtime) execute(items []statement) error {
 			}
 			if r.plan {
 				if len(s.fields) == 0 {
-					fmt.Fprintf(os.Stdout, "PLAN show %s\n", s.name)
+					fmt.Fprintf(r.outputWriter(), "PLAN show %s\n", s.name)
 				} else {
-					fmt.Fprintf(os.Stdout, "PLAN show %s fields %s\n", s.name, strings.Join(s.fields, " "))
+					fmt.Fprintf(r.outputWriter(), "PLAN show %s fields %s\n", s.name, strings.Join(s.fields, " "))
 				}
 				continue
 			}
-			if err := writeProcessTable(os.Stdout, v.processes, s.fields); err != nil {
+			if err := writeProcessTable(r.outputWriter(), v.processes, s.fields); err != nil {
 				return fmt.Errorf("%s:%d: show: %w", r.filename, s.line, err)
 			}
 		case summarizeStmt:
@@ -61,10 +61,10 @@ func (r *runtime) execute(items []statement) error {
 				return fmt.Errorf("%s:%d: summarize expects a process set", r.filename, s.line)
 			}
 			if r.plan {
-				fmt.Fprintf(os.Stdout, "PLAN summarize %s memory %s\n", s.name, s.metric)
+				fmt.Fprintf(r.outputWriter(), "PLAN summarize %s memory %s\n", s.name, s.metric)
 				continue
 			}
-			if err := writeProcessSummary(os.Stdout, v.processes, s.metric); err != nil {
+			if err := writeProcessSummary(r.outputWriter(), v.processes, s.metric); err != nil {
 				return fmt.Errorf("%s:%d: summarize: %w", r.filename, s.line, err)
 			}
 		case serviceSummarizeStmt:
@@ -105,12 +105,12 @@ func (r *runtime) execute(items []statement) error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(os.Stdout, "PLAN IF %s\n", r.formatPipeline(stages))
+				fmt.Fprintf(r.outputWriter(), "PLAN IF %s\n", r.formatPipeline(stages))
 				if err := r.execute(s.body); err != nil {
 					return err
 				}
 				if len(s.otherwise) > 0 {
-					fmt.Fprintln(os.Stdout, "PLAN ELSE")
+					fmt.Fprintln(r.outputWriter(), "PLAN ELSE")
 					if err := r.execute(s.otherwise); err != nil {
 						return err
 					}
@@ -154,7 +154,7 @@ func (r *runtime) execute(items []statement) error {
 				return fmt.Errorf("%s:%d: with lock expects one non-empty path", r.filename, s.line)
 			}
 			if r.plan {
-				fmt.Fprintf(os.Stdout, "PLAN lock %q\n", v.scalar)
+				fmt.Fprintf(r.outputWriter(), "PLAN lock %q\n", v.scalar)
 				if err := r.execute(s.body); err != nil {
 					return err
 				}
@@ -193,7 +193,7 @@ func (r *runtime) executePublish(s publishStmt) error {
 		return fmt.Errorf("%s:%d: publish expects one non-empty source and destination", r.filename, s.line)
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN publish %q to %q\n", source[0], dest[0])
+		fmt.Fprintf(r.outputWriter(), "PLAN publish %q to %q\n", source[0], dest[0])
 		return nil
 	}
 	if source[0] == dest[0] {
@@ -235,9 +235,9 @@ func (r *runtime) executeRetentionPlan(s retentionPlanStmt) error {
 		}
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN retention keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
+		fmt.Fprintf(r.outputWriter(), "PLAN retention keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
 	} else {
-		fmt.Fprintf(os.Stdout, "RETENTION_PLAN keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
+		fmt.Fprintf(r.outputWriter(), "RETENTION_PLAN keep %d KEEP %q PRUNE %q\n", keep, keepNames, pruneNames)
 	}
 	return nil
 }
@@ -271,7 +271,7 @@ func (r *runtime) executeRetentionQuarantine(s retentionQuarantineStmt) error {
 		names = append(names, candidate.Name)
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN retention quarantine keep %d MOVE %q TO %q\n", keep, names, quarantine[0])
+		fmt.Fprintf(r.outputWriter(), "PLAN retention quarantine keep %d MOVE %q TO %q\n", keep, names, quarantine[0])
 		return nil
 	}
 	for _, candidate := range candidates {

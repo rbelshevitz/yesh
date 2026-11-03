@@ -44,7 +44,7 @@ func (r *runtime) evalFstab(raw string, line int) (value, error) {
 		return value{}, fmt.Errorf("%s:%d: fstab: %w", r.filename, line, err)
 	}
 	if r.plan {
-		fmt.Fprintf(os.Stdout, "PLAN fstab %q (deferred)\n", path)
+		fmt.Fprintf(r.outputWriter(), "PLAN fstab %q (deferred)\n", path)
 		return value{fstab: &fstabSnapshot{}}, nil
 	}
 	if goruntime.GOOS != "linux" {
