@@ -4,13 +4,14 @@ This is the short working map. It contains only the current milestone,
 verifiable tasks, and boundaries. Historical decisions and closed discussions
 are kept in the [archive](TODO-history.md).
 
-## Current milestone: `v0.2.0`
+## Current focus: polish after `v0.2.0`
 
-The goal is to make the implemented Linux scenarios understandable and
-reproducible. New language constructs are not the goal of this milestone. The
-acceptance boundary is Linux amd64.
+Release `v0.2.0` is published. The goal now is to make the implemented Linux
+scenarios understandable and reproducible before the next milestone. New
+language constructs are not the goal for now. The working boundary is Linux
+amd64.
 
-The release must include:
+Release `v0.2.0` already includes:
 
 - backup and restore with result verification, locking, reruns, failure, and
   `--plan` coverage;
@@ -90,7 +91,7 @@ long-running-job resume, cgroup management, ARM64, or replacements for
 These results prove specific Linux/amd64 stands, not every OS, filesystem,
 network, service, or power-loss scenario.
 
-## `v0.2.0` acceptance
+## Next working acceptance
 
 Run the acceptance in this order:
 
