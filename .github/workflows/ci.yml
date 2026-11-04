@@ -7,7 +7,6 @@ on:
       - '**/*.go'
       - '**/*.sh'
       - '**/testdata/**'
-      - 'examples/**/*.yesh'
       - 'go.mod'
       - 'go.sum'
   pull_request:
@@ -16,7 +15,6 @@ on:
       - '**/*.go'
       - '**/*.sh'
       - '**/testdata/**'
-      - 'examples/**/*.yesh'
       - 'go.mod'
       - 'go.sum'
 

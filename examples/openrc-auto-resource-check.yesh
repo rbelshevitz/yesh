@@ -1,5 +1,6 @@
-# Environment-dependent example: requires Alpine Linux with OpenRC, readable
-# cgroup v2 state, and an active `sshd` service.
+# Environment-dependent example: requires Linux with OpenRC, readable cgroup v2
+# state, and an active `sshd` service. Verified on Alpine Linux; other OpenRC
+# systems are not yet covered by the project's integration tests.
 service status sshd
 service resources sshd
 measure service sshd for 2s every 1s:

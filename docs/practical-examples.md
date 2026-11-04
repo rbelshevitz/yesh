@@ -388,7 +388,7 @@ successful `systemctl restart` is a failed yesh operation; an empty journal
 query is successful and means that no matching records were returned; a
 non-empty diagnostic or invalid JSON is an error rather than a partial report.
 
-### OpenRC on Alpine
+### OpenRC on Linux (validated on Alpine)
 
 These examples apply the same finite observation model to a Linux system that
 uses OpenRC instead of systemd:

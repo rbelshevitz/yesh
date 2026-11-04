@@ -75,7 +75,8 @@
 Отдельная ветка для Alpine/OpenRC:
 
 - `openrc-resource-check.yesh` — состояние и ресурсы службы OpenRC;
-- `openrc-auto-resource-check.yesh` — автоматический выбор OpenRC на Alpine;
+- `openrc-auto-resource-check.yesh` — автоматическое подтверждение доступного
+  диспетчера OpenRC;
 - `openrc-lighttpd-check.yesh` — чистое измерение службы `lighttpd`;
 - `openrc-lighttpd-load-check.yesh` — измерение во время временной нагрузки;
 - `openrc-lighttpd-summary.yesh` и `openrc-lighttpd-load-summary.yesh` — сводка
@@ -84,10 +85,10 @@
 - `openrc-supervise-check.yesh` — смена эпохи дочернего процесса в
   `supervise-daemon`.
 
-Для этой ветки нужен Alpine Linux с OpenRC, доступным cgroup v2 и указанной
-службой. Нагрузочный и `supervise-daemon` примеры требуют соответствующих
-стендовых скриптов из `scripts/`; на обычном Linux их запуск не считается
-проверкой OpenRC.
+Для этой ветки нужен Linux с OpenRC, доступным cgroup v2 и указанной службой.
+Основная проверенная среда — Alpine Linux; другие системы с OpenRC пока не
+входят в интеграционные проверки проекта. Нагрузочный и `supervise-daemon`
+примеры требуют соответствующих стендовых скриптов из `scripts/`.
 
 ## Уровень 4 — полный временный стенд
 

@@ -1,0 +1,29 @@
+name: Example scripts
+
+on:
+  push:
+    paths:
+      - 'examples/**/*.yesh'
+  pull_request:
+    paths:
+      - 'examples/**/*.yesh'
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    env:
+      GOCACHE: ${{ github.workspace }}/.gocache
+      GOMODCACHE: ${{ github.workspace }}/.gomodcache
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Parse examples and tutorial snippets
+        run: >-
+          go test -trimpath ./cmd/yesh
+          -run 'Test(AllExamplesParse|QuickstartExamplesMatchAndParse|SyntaxGuideExamplesParse|EnglishSyntaxGuideExamplesParse)$'
