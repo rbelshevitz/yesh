@@ -17,6 +17,10 @@ can be costly. The plan is visible before execution and the result can be checke
 afterwards. For these scenarios, yesh is easier to read and review than an
 equivalent Bash script.
 
+yesh removes more than Bash's historical syntax noise. It makes recurring
+protective code visible and reusable: preflight checks, failure boundaries,
+argument inspection, locks, cleanup, planning, and result verification.
+
 ## What it is for
 
 yesh targets small administrative scripts: backups, configuration publication,
