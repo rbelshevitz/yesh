@@ -119,7 +119,7 @@ Detailed Linux test results are in the
 [under-the-hood section](docs/underthehood/README.md). The project is under
 active development; the current stated platform is Linux/amd64.
 
-[Русский README](README.ru.md) · [README.he.md](README.he.md)
+[Русский README](README.ru.md) · [README in Hebrew](README.he.md)
 
 ## Verify from a checkout
 
