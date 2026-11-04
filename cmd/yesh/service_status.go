@@ -24,8 +24,33 @@ func (r *runtime) executeServiceStatus(s serviceStatusStmt) error {
 	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service status expects one non-empty unit name")
 	}
-	if err := validateUnitName(v.scalar); err != nil {
+	if err := validateServiceUnit(s.manager, v.scalar); err != nil {
 		return err
+	}
+	if s.manager == "auto" {
+		if r.plan {
+			fmt.Fprintf(r.outputWriter(), "PLAN detect systemd or OpenRC for service %q\n", v.scalar)
+			return nil
+		}
+		manager, status, err := r.queryAutoServiceStatus(v.scalar)
+		if err != nil {
+			return fmt.Errorf("service status %q: %w", v.scalar, err)
+		}
+		fmt.Fprintf(r.outputWriter(), "SERVICE_STATUS id=%s load_state=%s active_state=%s sub_state=%s supervisor=%s\n", status.ID, status.LoadState, status.ActiveState, status.SubState, manager)
+		return nil
+	}
+	if s.manager == "openrc" {
+		if r.plan {
+			fmt.Fprintf(r.outputWriter(), "PLAN %q\n", openRCStatusArgv())
+			fmt.Fprintf(r.outputWriter(), "PLAN verify OpenRC service %q\n", v.scalar)
+			return nil
+		}
+		status, err := r.queryOpenRCServiceStatus(v.scalar)
+		if err != nil {
+			return fmt.Errorf("service status %q: %w", v.scalar, err)
+		}
+		fmt.Fprintf(r.outputWriter(), "SERVICE_STATUS id=%s load_state=loaded active_state=%s sub_state=%s supervisor=openrc runlevel=%s supervised=%t respawns=%d\n", v.scalar, openRCActiveState(status.State), status.State, status.Runlevel, status.Supervised, status.Respawns)
+		return nil
 	}
 	argv := systemctlArgv(s.manager, "show", "--no-pager", "--property=Id,LoadState,ActiveState,SubState", v.scalar)
 	if r.plan {
@@ -53,11 +78,14 @@ func (r *runtime) executeServiceRestart(s serviceRestartStmt) error {
 	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service %s expects one non-empty unit name", s.action)
 	}
-	if err := validateUnitName(v.scalar); err != nil {
+	if err := validateServiceUnit(s.manager, v.scalar); err != nil {
 		return err
 	}
 	if s.expectedState != "active" {
 		return fmt.Errorf("service %s currently supports only postcondition active", s.action)
+	}
+	if s.manager == "openrc" {
+		return fmt.Errorf("service %s is not implemented for OpenRC", s.action)
 	}
 	argv := systemctlArgv(s.manager, s.action, v.scalar)
 	if r.plan {
@@ -75,11 +103,14 @@ func (r *runtime) executeServiceWait(s serviceWaitStmt) error {
 	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service wait expects one non-empty unit name")
 	}
-	if err := validateUnitName(v.scalar); err != nil {
+	if err := validateServiceUnit(s.manager, v.scalar); err != nil {
 		return err
 	}
 	if s.expectedState != "active" {
 		return fmt.Errorf("service wait currently supports only postcondition active")
+	}
+	if s.manager == "openrc" {
+		return fmt.Errorf("service wait is not implemented for OpenRC")
 	}
 	argv := systemctlArgv(s.manager, "show", "--no-pager", "--property=Id,LoadState,ActiveState,SubState", v.scalar)
 	if r.plan {
@@ -110,6 +141,38 @@ func validateUnitName(unit string) error {
 		return fmt.Errorf("service operation expects a concrete unit instance, not template %q", unit)
 	}
 	return nil
+}
+
+func validateServiceUnit(manager, unit string) error {
+	if manager != "openrc" && manager != "auto" {
+		return validateUnitName(unit)
+	}
+	if unit == "" || strings.ContainsAny(unit, " \t\r\n\x00/|;&<>*?[]") || strings.HasPrefix(unit, "-") {
+		return fmt.Errorf("OpenRC service operation expects one service name without path, glob, or shell operator")
+	}
+	return nil
+}
+
+func (r *runtime) queryAutoServiceStatus(unit string) (string, serviceStatus, error) {
+	system, systemErr := r.queryServiceStatus("system", unit)
+	if systemErr == nil && system.ID != unit {
+		systemErr = fmt.Errorf("systemctl returned canonical unit %q; aliases are not supported", system.ID)
+	}
+	openrc, openRCErr := r.queryOpenRCServiceStatus(unit)
+	if systemErr == nil && openRCErr == nil {
+		return "", serviceStatus{}, fmt.Errorf("service %q is reported by both systemd and OpenRC", unit)
+	}
+	if systemErr == nil {
+		return "systemd", system, nil
+	}
+	if openRCErr == nil {
+		return "openrc", openRCStatusAsServiceStatus(unit, openrc), nil
+	}
+	return "", serviceStatus{}, fmt.Errorf("neither systemd nor OpenRC confirmed service %q (systemd: %v; OpenRC: %v)", unit, systemErr, openRCErr)
+}
+
+func openRCStatusAsServiceStatus(unit string, status openRCServiceStatus) serviceStatus {
+	return serviceStatus{ID: unit, LoadState: "loaded", ActiveState: openRCActiveState(status.State), SubState: status.State}
 }
 
 func parseServiceStatus(data []byte) (serviceStatus, error) {

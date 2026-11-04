@@ -17,14 +17,44 @@ type serviceResourceState struct {
 	Kind              string                       `json:"kind"`
 	Manager           string                       `json:"manager"`
 	Unit              string                       `json:"unit"`
+	PlatformID        string                       `json:"platform_id,omitempty"`
+	Supervisor        string                       `json:"supervisor,omitempty"`
 	Cgroup            string                       `json:"cgroup"`
 	InvocationID      string                       `json:"invocation_id,omitempty"`
+	Epoch             serviceResourceEpoch         `json:"epoch,omitempty"`
 	StartedAt         time.Time                    `json:"started_at"`
 	FinishedAt        time.Time                    `json:"finished_at"`
 	Samples           []serviceResourceStateSample `json:"samples"`
 	Complete          bool                         `json:"complete"`
 	IncompleteReasons []string                     `json:"incomplete_reasons,omitempty"`
 	Summary           map[string]string            `json:"summary,omitempty"`
+}
+
+type serviceResourceEpoch struct {
+	PID                 int    `json:"pid,omitempty"`
+	ProcessStartTime    uint64 `json:"process_start_time,omitempty"`
+	SupervisorStartTime string `json:"supervisor_start_time,omitempty"`
+}
+
+func sameServiceResourceEpoch(left, right serviceResourceEpoch) bool {
+	if left.PID == 0 && left.ProcessStartTime == 0 && left.SupervisorStartTime == "" &&
+		right.PID == 0 && right.ProcessStartTime == 0 && right.SupervisorStartTime == "" {
+		return true
+	}
+	return left == right
+}
+
+func sameServiceResourceIdentity(left, right serviceResourceState) bool {
+	if left.Cgroup != right.Cgroup {
+		return false
+	}
+	if left.InvocationID != "" || right.InvocationID != "" {
+		return left.InvocationID == right.InvocationID
+	}
+	if left.Epoch != (serviceResourceEpoch{}) || right.Epoch != (serviceResourceEpoch{}) {
+		return left.Epoch == right.Epoch
+	}
+	return true
 }
 
 type serviceResourceStateSample struct {
@@ -50,8 +80,8 @@ func (s serviceResourceState) validate() error {
 	if s.Kind != "service-resource-measurement" {
 		return fmt.Errorf("unexpected resource state kind %q", s.Kind)
 	}
-	if s.Manager != "system" && s.Manager != "user" {
-		return fmt.Errorf("unexpected systemd manager %q", s.Manager)
+	if s.Manager != "system" && s.Manager != "user" && s.Manager != "openrc" {
+		return fmt.Errorf("unexpected service manager %q", s.Manager)
 	}
 	if s.Unit == "" || s.Cgroup == "" || !strings.HasPrefix(s.Cgroup, "/") {
 		return fmt.Errorf("resource state has invalid unit or cgroup identity")

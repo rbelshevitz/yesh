@@ -9,6 +9,9 @@ import (
 
 type serviceResourceSnapshot struct {
 	properties map[string]string
+	platform   osReleaseInfo
+	supervisor string
+	epoch      serviceResourceEpoch
 	cgroup     string
 	observedAt time.Time
 	metrics    map[string]string
@@ -18,6 +21,14 @@ type serviceResourceSnapshot struct {
 
 func (r *runtime) queryServiceResources(manager, unit string) (serviceResourceSnapshot, error) {
 	return serviceResourceSnapshot{}, fmt.Errorf("service resources are supported only on Linux")
+}
+
+func (r *runtime) queryAutoServiceResources(unit string) (string, serviceResourceSnapshot, error) {
+	return "", serviceResourceSnapshot{}, fmt.Errorf("service resources are supported only on Linux")
+}
+
+func (r *runtime) resolveAutoServiceManager(unit string) (string, error) {
+	return "", fmt.Errorf("service resources are supported only on Linux")
 }
 
 func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval, keepFor time.Duration, stateDir string) error {

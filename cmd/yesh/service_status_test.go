@@ -13,7 +13,8 @@ func TestParserAcceptsServiceStatus(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("expected assignment and service status, got %#v", items)
 	}
-	if _, ok := items[1].(serviceStatusStmt); !ok {
+	status, ok := items[1].(serviceStatusStmt)
+	if !ok || status.manager != "auto" {
 		t.Fatalf("expected service status statement, got %#v", items[1])
 	}
 }
@@ -125,13 +126,17 @@ func TestParserRejectsInvalidMeasuredHistoryDirective(t *testing.T) {
 }
 
 func TestParserAcceptsServiceSummary(t *testing.T) {
-	items, err := parse("summarize service user api.service from state since 1h\n", "summary.yesh")
+	items, err := parse("summarize service user api.service from state since 1h\nsummarize service openrc lighttpd from state since 1h\n", "summary.yesh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	stmt, ok := items[0].(serviceSummarizeStmt)
 	if !ok || stmt.manager != "user" || stmt.unit.text != "api.service" || stmt.statePath.text != "state" || stmt.since != time.Hour {
 		t.Fatalf("unexpected service summary statement: %#v", items[0])
+	}
+	openrc, ok := items[1].(serviceSummarizeStmt)
+	if !ok || openrc.manager != "openrc" || openrc.unit.text != "lighttpd" || openrc.statePath.text != "state" || openrc.since != time.Hour {
+		t.Fatalf("unexpected OpenRC service summary statement: %#v", items[1])
 	}
 }
 
@@ -200,6 +205,28 @@ func TestParseServiceStatus(t *testing.T) {
 		if _, err := parseServiceStatus([]byte(data)); err == nil {
 			t.Errorf("accepted invalid status %q", data)
 		}
+	}
+}
+
+func TestParseOpenRCServiceStatements(t *testing.T) {
+	items, err := parse("service status openrc sshd\nservice resources openrc sshd\nmeasure service openrc sshd for 2s every 1s:\n    keep history for 1h\n", "openrc.yesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("got %d statements, want 3", len(items))
+	}
+	status, ok := items[0].(serviceStatusStmt)
+	if !ok || status.manager != "openrc" || status.unit.text != "sshd" {
+		t.Fatalf("unexpected OpenRC status: %#v", items[0])
+	}
+	resources, ok := items[1].(serviceResourcesStmt)
+	if !ok || resources.manager != "openrc" || resources.unit.text != "sshd" {
+		t.Fatalf("unexpected OpenRC resources: %#v", items[1])
+	}
+	measure, ok := items[2].(serviceMeasureStmt)
+	if !ok || measure.manager != "openrc" || measure.unit.text != "sshd" {
+		t.Fatalf("unexpected OpenRC measurement: %#v", items[2])
 	}
 }
 

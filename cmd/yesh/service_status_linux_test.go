@@ -645,7 +645,7 @@ func TestLinuxReadServiceCgroupIncludesCurrentProcess(t *testing.T) {
 	if err != nil || cgroup == "" {
 		t.Skipf("cgroup v2 is unavailable: %v", err)
 	}
-	processes, metrics, rss, err := readServiceCgroup("/sys/fs/cgroup", cgroup)
+	processes, metrics, rss, err := collectCgroupResources("/sys/fs/cgroup", cgroup)
 	if err != nil {
 		t.Skipf("current cgroup is not readable: %v", err)
 	}
@@ -662,7 +662,7 @@ func TestLinuxReadServiceCgroupIncludesCurrentProcess(t *testing.T) {
 }
 
 func TestLinuxReadServiceCgroupRejectsEscapingPath(t *testing.T) {
-	if _, _, _, err := readServiceCgroup(t.TempDir(), "/../../proc"); err == nil {
+	if _, _, _, err := collectCgroupResources(t.TempDir(), "/../../proc"); err == nil {
 		t.Fatal("accepted cgroup path escaping root")
 	}
 }
@@ -681,7 +681,7 @@ func TestLinuxReadServiceCgroupMarksMissingNestedProcFileIncomplete(t *testing.T
 		t.Fatal(err)
 	}
 
-	_, metrics, _, err := readServiceCgroup(root, "/system.slice/api.service")
+	_, metrics, _, err := collectCgroupResources(root, "/system.slice/api.service")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -879,6 +879,32 @@ func TestServiceResourceStateValidatesBoundedIdentityAndSamples(t *testing.T) {
 	state.Samples[1].Processes[0].StartTime = 0
 	if err := state.validate(); err == nil {
 		t.Fatal("accepted process identity without start time")
+	}
+}
+
+func TestOpenRCServiceResourceStateValidation(t *testing.T) {
+	start := time.Unix(100, 0)
+	state := serviceResourceState{
+		Schema: serviceResourceStateSchema, Kind: "service-resource-measurement",
+		Manager: "openrc", Unit: "sshd", PlatformID: "alpine", Supervisor: "openrc",
+		Cgroup: "/openrc.sshd", Epoch: serviceResourceEpoch{PID: 2918, ProcessStartTime: 12345},
+		StartedAt: start, FinishedAt: start.Add(time.Second), Complete: true,
+		Samples: []serviceResourceStateSample{{ObservedAt: start, Metrics: map[string]string{}, ProcessCount: 1}},
+	}
+	if err := state.validate(); err != nil {
+		t.Fatalf("valid OpenRC state rejected: %v", err)
+	}
+}
+
+func TestOpenRCServiceResourceEpochChange(t *testing.T) {
+	epoch := serviceResourceEpoch{PID: 10, ProcessStartTime: 20, SupervisorStartTime: "2026-11-04 16:00:00"}
+	if !sameServiceResourceEpoch(epoch, epoch) {
+		t.Fatal("identical OpenRC epochs differ")
+	}
+	changed := epoch
+	changed.PID = 11
+	if sameServiceResourceEpoch(epoch, changed) {
+		t.Fatal("accepted changed OpenRC child PID as the same epoch")
 	}
 }
 

@@ -399,7 +399,10 @@ func (p parser) block(index, indent int) ([]statement, int, error) {
 		if strings.HasPrefix(text, "summarize ") {
 			tokens, err := words(text)
 			if err == nil && len(tokens) >= 2 && tokens[1].text == "service" {
-				manager, offset := systemdManager(tokens, 2)
+				manager, offset := serviceManager(tokens, 2)
+				if manager == "auto" {
+					manager = "system"
+				}
 				if len(tokens) == offset+3 && !tokens[offset].operator && tokens[offset+1].text == "since" && !tokens[offset+1].operator && !tokens[offset+2].operator {
 					since, sinceErr := time.ParseDuration(tokens[offset+2].text)
 					if sinceErr != nil || since <= 0 {
@@ -471,7 +474,7 @@ func (p parser) parseServiceMeasureBlock(index, indent int) (statement, int, err
 	if err != nil {
 		return nil, index, p.err(line.number, err.Error())
 	}
-	manager, offset := systemdManager(tokens, 2)
+	manager, offset := serviceManager(tokens, 2)
 	if len(tokens) != offset+5 || tokens[0].text != "measure" || tokens[1].text != "service" ||
 		tokens[offset].operator || tokens[offset+1].text != "for" || tokens[offset+2].operator ||
 		tokens[offset+3].text != "every" || tokens[offset+4].operator {
@@ -539,7 +542,7 @@ func (p parser) parseService(text string, line int) (statement, error) {
 	if err != nil {
 		return nil, p.err(line, err.Error())
 	}
-	manager, offset := systemdManager(tokens, 2)
+	manager, offset := serviceManager(tokens, 2)
 	if (len(tokens) == offset+5 || len(tokens) == offset+8) && builtinKeyword(tokens[0], "measure") && builtinKeyword(tokens[1], "service") &&
 		!tokens[offset].operator && builtinKeyword(tokens[offset+1], "for") && !tokens[offset+2].operator &&
 		builtinKeyword(tokens[offset+3], "every") && !tokens[offset+4].operator &&
@@ -619,6 +622,16 @@ func systemdManager(tokens []commandToken, unitOffset int) (string, int) {
 		return "user", unitOffset + 1
 	}
 	return "system", unitOffset
+}
+
+func serviceManager(tokens []commandToken, unitOffset int) (string, int) {
+	if len(tokens) > unitOffset && builtinKeyword(tokens[unitOffset], "openrc") {
+		return "openrc", unitOffset + 1
+	}
+	if len(tokens) > unitOffset && (builtinKeyword(tokens[unitOffset], "system") || builtinKeyword(tokens[unitOffset], "user")) {
+		return systemdManager(tokens, unitOffset)
+	}
+	return "auto", unitOffset
 }
 
 func builtinKeyword(t commandToken, word string) bool {

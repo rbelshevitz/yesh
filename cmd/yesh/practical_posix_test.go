@@ -550,7 +550,7 @@ func TestPOSIXPracticalTypedSystemdFailureAndPlan(t *testing.T) {
 	planCmd := posixCLI(t, context.Background(), "--plan", plan)
 	planCmd.Env = append(planCmd.Env, "PATH="+filepath.Join(planDir, "empty-bin"), "TRACE_FILE="+filepath.Join(planDir, "trace"))
 	out, err = planCmd.CombinedOutput()
-	if err != nil || !bytes.Contains(out, []byte(`PLAN ["systemctl" "show" "--no-pager" "--property=Id,LoadState,ActiveState,SubState" "systemd-journald.service"]`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "restart" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "show" "--no-pager" "--property=Id,LoadState,ActiveState,SubState" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["journalctl" "--no-pager" "--output=json" "--unit" "systemd-journald.service" "--since" "-15m" "--lines" "2"]`)) {
+	if err != nil || !bytes.Contains(out, []byte(`PLAN detect systemd or OpenRC for service "systemd-journald.service"`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "restart" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "show" "--no-pager" "--property=Id,LoadState,ActiveState,SubState" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["journalctl" "--no-pager" "--output=json" "--unit" "systemd-journald.service" "--since" "-15m" "--lines" "2"]`)) {
 		t.Fatalf("typed plan: %v %s", err, out)
 	}
 	if _, err := os.Stat(filepath.Join(planDir, "trace")); !os.IsNotExist(err) {

@@ -19,6 +19,9 @@ import (
 
 type serviceResourceSnapshot struct {
 	properties map[string]string
+	platform   osReleaseInfo
+	supervisor string
+	epoch      serviceResourceEpoch
 	cgroup     string
 	observedAt time.Time
 	metrics    map[string]string
@@ -27,6 +30,9 @@ type serviceResourceSnapshot struct {
 }
 
 func (r *runtime) queryServiceResources(manager, unit string) (serviceResourceSnapshot, error) {
+	if manager == "openrc" {
+		return r.queryOpenRCServiceResources(unit)
+	}
 	parent := r.ctx
 	if parent == nil {
 		parent = context.Background()
@@ -58,7 +64,13 @@ func (r *runtime) queryServiceResources(manager, unit string) (serviceResourceSn
 	if properties["Id"] != unit {
 		return serviceResourceSnapshot{}, fmt.Errorf("systemctl returned canonical unit %q; aliases are not supported", properties["Id"])
 	}
-	snapshot := serviceResourceSnapshot{properties: properties, cgroup: properties["ControlGroup"], observedAt: time.Now().UTC(), metrics: unavailableServiceResourceMetrics()}
+	platform, err := readOSRelease(os.ReadFile)
+	if err != nil {
+		// Platform identity is useful context, but it must not make a valid
+		// service observation fail when os-release is unavailable.
+		platform = osReleaseInfo{}
+	}
+	snapshot := serviceResourceSnapshot{properties: properties, platform: platform, supervisor: "systemd", cgroup: properties["ControlGroup"], observedAt: time.Now().UTC(), metrics: unavailableServiceResourceMetrics()}
 	if snapshot.cgroup == "" {
 		return snapshot, nil
 	}
@@ -66,12 +78,32 @@ func (r *runtime) queryServiceResources(manager, unit string) (serviceResourceSn
 	if root == "" {
 		root = "/sys/fs/cgroup"
 	}
-	processes, metrics, rss, err := readServiceCgroup(root, snapshot.cgroup)
+	processes, metrics, rss, err := collectCgroupResources(root, snapshot.cgroup)
 	if err != nil {
 		return serviceResourceSnapshot{}, err
 	}
 	snapshot.processes, snapshot.metrics, snapshot.rssBytes = processes, metrics, rss
 	return snapshot, nil
+}
+
+func (r *runtime) queryAutoServiceResources(unit string) (string, serviceResourceSnapshot, error) {
+	system, systemErr := r.queryServiceResources("system", unit)
+	openrc, openRCErr := r.queryServiceResources("openrc", unit)
+	if systemErr == nil && openRCErr == nil {
+		return "", serviceResourceSnapshot{}, fmt.Errorf("service %q is reported by both systemd and OpenRC", unit)
+	}
+	if systemErr == nil {
+		return "systemd", system, nil
+	}
+	if openRCErr == nil {
+		return "openrc", openrc, nil
+	}
+	return "", serviceResourceSnapshot{}, fmt.Errorf("neither systemd nor OpenRC confirmed service %q (systemd: %v; OpenRC: %v)", unit, systemErr, openRCErr)
+}
+
+func (r *runtime) resolveAutoServiceManager(unit string) (string, error) {
+	manager, _, err := r.queryAutoServiceResources(unit)
+	return manager, err
 }
 
 func parseServiceResourceProperties(data []byte) (map[string]string, error) {
@@ -101,14 +133,16 @@ func parseServiceResourceProperties(data []byte) (map[string]string, error) {
 	return result, nil
 }
 
-func readServiceCgroup(root, controlGroup string) ([]processInfo, map[string]string, uint64, error) {
+// collectCgroupResources reads Linux cgroup and process state without assuming
+// which service manager supplied the cgroup path.
+func collectCgroupResources(root, controlGroup string) ([]processInfo, map[string]string, uint64, error) {
 	if root == "" || !filepath.IsAbs(root) || controlGroup == "" || !strings.HasPrefix(controlGroup, "/") || strings.ContainsRune(controlGroup, '\x00') {
-		return nil, nil, 0, errors.New("invalid systemd ControlGroup path")
+		return nil, nil, 0, errors.New("invalid cgroup path")
 	}
 	path := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(controlGroup, "/")))
 	rel, err := filepath.Rel(root, path)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return nil, nil, 0, errors.New("systemd ControlGroup escapes cgroup root")
+		return nil, nil, 0, errors.New("cgroup path escapes cgroup root")
 	}
 	if info, err := os.Stat(path); err != nil || !info.IsDir() {
 		if err == nil {

@@ -48,7 +48,7 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 		}
 		samples = append(samples, serviceResourceStateSampleFromSnapshot(next))
 		appendServiceMeasurementCompleteness(&complete, &reasons, next)
-		if next.cgroup != first.cgroup || next.properties["InvocationID"] != first.properties["InvocationID"] {
+		if next.cgroup != first.cgroup || next.properties["InvocationID"] != first.properties["InvocationID"] || !sameServiceResourceEpoch(next.epoch, first.epoch) {
 			complete = false
 			appendServiceMeasurementReason(&reasons, "identity_changed")
 			break
@@ -60,7 +60,8 @@ func (r *runtime) runServiceMeasurement(manager, unit string, duration, interval
 	finished := time.Now().UTC()
 	state := serviceResourceState{
 		Schema: serviceResourceStateSchema, Kind: "service-resource-measurement", Manager: manager,
-		Unit: unit, Cgroup: first.cgroup, InvocationID: first.properties["InvocationID"],
+		Unit: unit, PlatformID: first.platform.id, Supervisor: first.supervisor,
+		Cgroup: first.cgroup, InvocationID: first.properties["InvocationID"], Epoch: first.epoch,
 		StartedAt: first.observedAt, FinishedAt: finished, Samples: samples,
 		Complete: complete, IncompleteReasons: reasons,
 	}

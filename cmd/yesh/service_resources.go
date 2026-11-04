@@ -88,10 +88,28 @@ func (r *runtime) executeServiceResources(s serviceResourcesStmt) error {
 	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("service resources expects one non-empty unit name")
 	}
-	if err := validateUnitName(v.scalar); err != nil {
+	if err := validateServiceUnit(s.manager, v.scalar); err != nil {
 		return err
 	}
+	if s.manager == "auto" {
+		if r.plan {
+			fmt.Fprintf(r.outputWriter(), "PLAN detect systemd or OpenRC for service resources %q\n", v.scalar)
+			return nil
+		}
+		manager, snapshot, err := r.queryAutoServiceResources(v.scalar)
+		if err != nil {
+			return fmt.Errorf("service resources %q: %w", v.scalar, err)
+		}
+		return r.writeServiceResourceSnapshot(manager, snapshot)
+	}
 	argv := systemctlArgv(s.manager, "show", "--no-pager", "--property="+serviceResourceProperties, v.scalar)
+	if s.manager == "openrc" {
+		if r.plan {
+			fmt.Fprintf(r.outputWriter(), "PLAN %q\n", openRCStatusArgv())
+			fmt.Fprintf(r.outputWriter(), "PLAN cgroup resources for OpenRC service %q (deferred)\n", v.scalar)
+			return nil
+		}
+	}
 	if r.plan {
 		fmt.Fprintf(r.outputWriter(), "PLAN %q\n", argv)
 		fmt.Fprintf(r.outputWriter(), "PLAN cgroup resources for %q (deferred)\n", v.scalar)
@@ -101,7 +119,12 @@ func (r *runtime) executeServiceResources(s serviceResourcesStmt) error {
 	if err != nil {
 		return fmt.Errorf("service resources %q: %w", v.scalar, err)
 	}
+	return r.writeServiceResourceSnapshot(s.manager, snapshot)
+}
+
+func (r *runtime) writeServiceResourceSnapshot(manager string, snapshot serviceResourceSnapshot) error {
 	observation, observationReason := serviceResourceObservation(snapshot)
+	fmt.Fprintf(r.outputWriter(), "RUNTIME_PLATFORM id=%s pretty_name=%q supervisor=%s\n", snapshot.platform.id, snapshot.platform.prettyName, snapshot.supervisor)
 	fmt.Fprintf(r.outputWriter(), "RESOURCE_OBSERVATION: %s — %s.\n", observation, serviceResourceObservationMessage(observation, observationReason))
 	fmt.Fprintf(r.outputWriter(), "SERVICE_RESOURCES observed_at=%s id=%s invocation_id=%s load_state=%s active_state=%s sub_state=%s main_pid=%s observation=%s observation_reason=%s cgroup=%q cgroup_type=%s cgroup_controllers=%q io_stat_available=%s processes_incomplete=%s n_restarts=%s process_count=%d rss_bytes=%d memory_current=%s memory_max=%s memory_swap_current=%s memory_swap_max=%s memory_anon=%s memory_file=%s memory_kernel=%s memory_pressure_some_avg10=%s memory_pressure_some_avg60=%s memory_pressure_some_avg300=%s memory_pressure_full_avg10=%s cpu_pressure_some_avg10=%s cpu_pressure_some_avg60=%s cpu_pressure_some_avg300=%s io_pressure_some_avg10=%s io_pressure_some_avg60=%s io_pressure_some_avg300=%s host_memory_pressure_some_avg10=%s host_memory_pressure_some_avg60=%s host_memory_pressure_some_avg300=%s host_cpu_pressure_some_avg10=%s host_cpu_pressure_some_avg60=%s host_cpu_pressure_some_avg300=%s host_io_pressure_some_avg10=%s host_io_pressure_some_avg60=%s host_io_pressure_some_avg300=%s pids_current=%s pids_max=%s pids_events_max=%s cpu_usage_usec=%s cpu_user_usec=%s cpu_system_usec=%s cpu_nr_periods=%s cpu_nr_throttled=%s cpu_throttled_usec=%s cgroup_populated=%s cgroup_frozen=%s memory_high=%s memory_max_events=%s oom=%s oom_kill=%s oom_group_kill=%s memory_high_local=%s memory_max_events_local=%s oom_local=%s oom_kill_local=%s oom_group_kill_local=%s memory_swap_events_high=%s memory_swap_events_max=%s memory_swap_events_fail=%s\n",
 		snapshot.observedAt.Format(time.RFC3339Nano), snapshot.properties["Id"], snapshot.properties["InvocationID"], snapshot.properties["LoadState"], snapshot.properties["ActiveState"], snapshot.properties["SubState"], snapshot.properties["MainPID"], observation, observationReason, snapshot.cgroup,
@@ -123,8 +146,15 @@ func (r *runtime) executeServiceMeasure(s serviceMeasureStmt) error {
 	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("measure service expects one non-empty unit name")
 	}
-	if err := validateUnitName(v.scalar); err != nil {
+	if err := validateServiceUnit(s.manager, v.scalar); err != nil {
 		return err
+	}
+	if s.manager == "auto" && !r.plan {
+		manager, err := r.resolveAutoServiceManager(v.scalar)
+		if err != nil {
+			return err
+		}
+		s.manager = manager
 	}
 	statePath := ""
 	if s.statePath.text != "" {
@@ -164,7 +194,11 @@ func (r *runtime) executeServiceSummarize(s serviceSummarizeStmt) error {
 	if v.fstab != nil || v.device != nil || v.ip != nil || v.cidr != nil || v.isList || v.regex != nil || v.isProcesses || v.secret || v.scalar == "" {
 		return fmt.Errorf("summarize service expects one non-empty unit name")
 	}
-	if err := validateUnitName(v.scalar); err != nil {
+	if s.manager == "openrc" {
+		if err := validateServiceUnit(s.manager, v.scalar); err != nil {
+			return err
+		}
+	} else if err := validateUnitName(v.scalar); err != nil {
 		return err
 	}
 	statePath := ""

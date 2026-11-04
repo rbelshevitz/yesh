@@ -32,6 +32,7 @@ type serviceProcessSummary struct {
 
 type serviceProcessSampleRef struct {
 	InvocationID string
+	Epoch        serviceResourceEpoch
 	Cgroup       string
 	RecordID     time.Time
 	Sample       serviceResourceStateSample
@@ -41,7 +42,7 @@ func summarizeServiceProcessSamples(result *serviceProcessSummary, states []serv
 	refs := make([]serviceProcessSampleRef, 0)
 	for _, state := range states {
 		for _, sample := range state.Samples {
-			refs = append(refs, serviceProcessSampleRef{InvocationID: state.InvocationID, Cgroup: state.Cgroup, RecordID: state.StartedAt, Sample: sample})
+			refs = append(refs, serviceProcessSampleRef{InvocationID: state.InvocationID, Epoch: state.Epoch, Cgroup: state.Cgroup, RecordID: state.StartedAt, Sample: sample})
 		}
 	}
 	sort.SliceStable(refs, func(i, j int) bool { return refs[i].Sample.ObservedAt.Before(refs[j].Sample.ObservedAt) })
@@ -53,7 +54,7 @@ func summarizeServiceProcessSamples(result *serviceProcessSummary, states []serv
 			previous = nil
 			continue
 		}
-		if previous == nil || previous.InvocationID != current.InvocationID || previous.Cgroup != current.Cgroup || (current.InvocationID == "" && !previous.RecordID.Equal(current.RecordID)) {
+		if previous == nil || previous.Cgroup != current.Cgroup || !sameServiceProcessIdentity(*previous, *current) {
 			previous = current
 			continue
 		}
@@ -61,6 +62,16 @@ func summarizeServiceProcessSamples(result *serviceProcessSummary, states []serv
 		compareServiceProcessSamples(result, previous.Sample.Processes, current.Sample.Processes)
 		previous = current
 	}
+}
+
+func sameServiceProcessIdentity(left, right serviceProcessSampleRef) bool {
+	if left.InvocationID != "" || right.InvocationID != "" {
+		return left.InvocationID == right.InvocationID
+	}
+	if left.Epoch != (serviceResourceEpoch{}) || right.Epoch != (serviceResourceEpoch{}) {
+		return left.Epoch == right.Epoch
+	}
+	return left.RecordID.Equal(right.RecordID)
 }
 
 func compareServiceProcessSamples(result *serviceProcessSummary, before, after []serviceResourceProcessIdentity) {

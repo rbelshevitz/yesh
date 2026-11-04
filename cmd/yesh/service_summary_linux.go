@@ -19,6 +19,8 @@ import (
 type serviceResourceSummary struct {
 	records, complete, incomplete, samples   int
 	first, last                              time.Time
+	sampledDuration                          time.Duration
+	platformID, supervisor                   string
 	memoryStart, memoryEnd, memoryMax        uint64
 	rssStart, rssEnd, rssMax                 uint64
 	cpuDelta, oomKillDelta                   uint64
@@ -114,6 +116,12 @@ func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, sinc
 	sort.Slice(states, func(i, j int) bool { return states[i].StartedAt.Before(states[j].StartedAt) })
 	summary := serviceResourceSummary{ioDeltas: make(map[string]serviceIODelta)}
 	for _, state := range states {
+		if summary.platformID == "" {
+			summary.platformID = state.PlatformID
+		}
+		if summary.supervisor == "" {
+			summary.supervisor = state.Supervisor
+		}
 		summary.records++
 		if state.Complete {
 			summary.complete++
@@ -121,6 +129,7 @@ func (r *runtime) runServiceResourceSummary(manager, unit, stateDir string, sinc
 			summary.incomplete++
 		}
 		summary.samples += len(state.Samples)
+		summary.sampledDuration += state.FinishedAt.Sub(state.StartedAt)
 		if summary.first.IsZero() || state.StartedAt.Before(summary.first) {
 			summary.first = state.StartedAt
 		}
@@ -195,8 +204,11 @@ func validateServiceResourceSummaryIdentity(states []serviceResourceState) error
 				return fmt.Errorf("resource measurements contain a measurement that crossed service identity")
 			}
 		}
-		if state.Cgroup != first.Cgroup || state.InvocationID != first.InvocationID {
+		if !sameServiceResourceIdentity(first, state) {
 			return fmt.Errorf("resource measurements span multiple service identities; use a narrower period")
+		}
+		if state.PlatformID != first.PlatformID || state.Supervisor != first.Supervisor {
+			return fmt.Errorf("resource measurements span multiple platforms or supervisors; use a narrower period")
 		}
 	}
 	return nil
@@ -275,10 +287,17 @@ func writeHumanServiceSummary(out interface{ Write([]byte) (int, error) }, unit,
 		duration = 0
 	}
 	trend := humanServiceTrend(summary.memoryTrend)
-	fmt.Fprintf(out, "Service %s was observed for %s; memory was %s; observation %s.\n", unit, duration, trend, state)
-	fmt.Fprintf(out, "Memory: %s -> %s; peak %s; trend %s; limit %s.\n", humanServiceMetric(summary.memoryStart, summary.hasMemory), humanServiceMetric(summary.memoryEnd, summary.hasMemory), humanServiceMetric(summary.memoryMax, summary.hasMemory), humanServiceTrend(memoryAnalysis.trend), humanServiceLimit(summary.memoryLimit))
+	if summary.platformID != "" || summary.supervisor != "" {
+		fmt.Fprintf(out, "Context: platform=%s supervisor=%s.\n", summary.platformID, summary.supervisor)
+	}
+	if summary.records == 1 {
+		fmt.Fprintf(out, "Service %s was observed for %s; memory was %s; observation %s.\n", unit, duration, trend, state)
+	} else {
+		fmt.Fprintf(out, "Service %s history spans %s across %d measurement records; sampled intervals total %s; memory was %s; observation %s.\n", unit, duration, summary.records, summary.sampledDuration.Round(time.Second), trend, state)
+	}
+	fmt.Fprintf(out, "Memory: %s -> %s; change %s; peak %s; trend %s; limit %s.\n", humanServiceMetric(summary.memoryStart, summary.hasMemory), humanServiceMetric(summary.memoryEnd, summary.hasMemory), humanServiceTrendMarker(memoryAnalysis.trend), humanServiceMetric(summary.memoryMax, summary.hasMemory), humanServiceTrend(memoryAnalysis.trend), humanServiceLimit(summary.memoryLimit))
 	writeHumanServiceTimeline(out, "Memory", memoryAnalysis)
-	fmt.Fprintf(out, "RSS: %s -> %s; peak %s; trend %s.\n", humanServiceMetric(summary.rssStart, summary.hasRSS), humanServiceMetric(summary.rssEnd, summary.hasRSS), humanServiceMetric(summary.rssMax, summary.hasRSS), humanServiceTrend(rssAnalysis.trend))
+	fmt.Fprintf(out, "RSS: %s -> %s; change %s; peak %s; trend %s.\n", humanServiceMetric(summary.rssStart, summary.hasRSS), humanServiceMetric(summary.rssEnd, summary.hasRSS), humanServiceTrendMarker(rssAnalysis.trend), humanServiceMetric(summary.rssMax, summary.hasRSS), humanServiceTrend(rssAnalysis.trend))
 	writeHumanServiceTimeline(out, "RSS", rssAnalysis)
 	if summary.hasCPU {
 		fmt.Fprintf(out, "CPU time used: %s.\n", formatServiceDuration(summary.cpuDelta))
@@ -376,6 +395,21 @@ func humanServiceTrend(value string) string {
 		return "stable"
 	default:
 		return "not available"
+	}
+}
+
+func humanServiceTrendMarker(value string) string {
+	switch value {
+	case "rising":
+		return "↑"
+	case "falling":
+		return "↓"
+	case "stable":
+		return "="
+	case "volatile":
+		return "~"
+	default:
+		return "?"
 	}
 }
 
