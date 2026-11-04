@@ -2,7 +2,7 @@
 # The explicit temporary directory makes the saved history easy to inspect
 # and remove after the exercise.
 # It contains measurements.jsonl and its lock file; summarize reads that
-# history. Use ~/.local/.yesh/resources/nginx.service for regular operation.
+# history. Use ~/.local/yesh/nginx.service.jsonl for regular operation.
 # If `save to` is omitted, yesh uses that default user-owned directory and
 # never invokes sudo. An explicit state path must be writable by this user.
 #

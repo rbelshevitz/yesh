@@ -257,9 +257,11 @@ summarize service user api.service from $state_dir since 1h
 .PP
 The block form takes the first resource snapshot immediately, samples until the
 finite deadline, and appends one completed JSON Lines record only after the
-measurement finishes. `save to` is optional; without it, state is stored below
-`~/.local/.yesh/resources/`. Missing directories in that user-owned tree are
-created with mode `0700`; yesh does not invoke `sudo`, repair a privileged
+measurement finishes. `save to` is optional; without it, the journal is stored at
+`~/.local/yesh/<unit>.jsonl`. A path ending in `.jsonl` names the journal file
+directly; another path names a directory containing `measurements.jsonl`.
+Missing parent directories in the user-owned tree are created with mode `0700`;
+yesh does not invoke `sudo`, repair a privileged
 parent, or change ownership. An explicit state path must already be writable by
 the current user, and its existing permissions are not changed. The block must
 contain `keep history for DURATION`;

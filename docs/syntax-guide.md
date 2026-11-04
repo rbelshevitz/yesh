@@ -808,9 +808,11 @@ The `measure` line contains the settings for the measurement:
 - `every 5s` requests a snapshot every five seconds.
 
 There is no separate `unit` keyword: the service name simply follows `service`
-and, when present, `user` or `system`. `save to` selects the history directory.
-In this example both commands use the same `$state_dir`: the first writes there
-and the second reads there. After a successful write, the `keep history for 24h`
+and, when present, `user` or `system`. `save to` selects the history path. In
+this example both commands use the same `$state_dir`: the first writes there
+and the second reads there. A path ending in `.jsonl` names the journal file
+directly; any other path names a directory containing `measurements.jsonl`.
+After a successful write, the `keep history for 24h`
 directive removes results older than one day from that journal.
 
 The history is stored in `measurements.jsonl`. This is not one large JSON
@@ -822,10 +824,10 @@ yesh stops with an error instead of silently skipping it. JSONL is therefore
 appropriate for bounded local history, but it is not a database or a resume
 mechanism.
 
-When `save to` is omitted, the default state directory is
-`~/.local/.yesh/resources/<unit>/`. yesh creates only that user-owned directory
-tree with mode `0700` and does not require or invoke `sudo`; it does not create
-or repair a privileged parent. Reading a system service or its journal may
+When `save to` is omitted, the default journal path is
+`~/.local/yesh/<unit>.jsonl`. yesh creates only the missing user-owned parent
+directory with mode `0700` and does not require or invoke `sudo`; it does not
+create or repair a privileged parent. Reading a system service or its journal may
 still require permissions granted by the host. An explicit state path must be
 writable by the current user, and yesh does not change its existing permissions.
 
