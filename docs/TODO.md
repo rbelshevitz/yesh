@@ -22,9 +22,9 @@ Linux/amd64.
 - [x] the incremental `rsync` Bash baseline was written, reviewed, and checked
   with positive and negative disposable scenarios;
 - [x] the benchmark includes a concrete Bash/yesh comparison;
-- [ ] full release run: `go test ./...`, `go vet ./...`, a `-trimpath` build,
+- [x] full release run: `go test ./...`, `go vet ./...`, a `-trimpath` build,
   and green CI;
-- [ ] review release text and mark OpenRC as experimental support;
+- [x] review release text and mark OpenRC as experimental support;
 - [ ] publish tag `v0.2.2` only after reviewing the file list and checksum.
 
 `v0.2.2` does not claim production-ready support for every Linux system. It does

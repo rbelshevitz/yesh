@@ -110,16 +110,23 @@ jobs:
             plus guarded `rsnapshot` rotation;
           - staged configuration publication followed by bounded systemd state
             and journal checks;
+          - experimental OpenRC service observation on Alpine, including the
+            reported platform, supervisor, cgroup, processes, and finite JSONL
+            resource history;
           - finite, read-only service and cgroup resource observation;
+          - an explicit Bash comparison baseline for the incremental rsync case;
           - explicit `--plan`, locking, rerun, failure, and recovery scenarios;
           - a Linux/amd64 binary, README files, and the MIT license.
 
           ## Scope
 
-          yesh orchestrates `rsync`, `rsnapshot`, SSH, systemd, and other Linux
-          tools; it does not replace them. Resource observation is read-only and
-          Linux-specific. This is an early-stage release for reviewable operational
-          scripts, not a production safety boundary or a general monitoring system.
+          yesh orchestrates `rsync`, `rsnapshot`, SSH, systemd, OpenRC, and other
+          Linux tools; it does not replace them. Resource observation is read-only
+          and Linux-specific. OpenRC support is experimental and verified on the
+          documented Alpine fixture. This is an early-stage release for reviewable
+          operational scripts, not a production safety boundary or a general
+          monitoring system. It does not provide supervisord or container
+          diagnostics, ARM64 support, or a replacement for Bash or Ansible.
 
           The release was checked by the repository's full Go test suite, `go vet`,
           Windows and Linux CI, and the Linux/amd64 release build using the Go 1.21
