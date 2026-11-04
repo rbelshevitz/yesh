@@ -1,0 +1,60 @@
+#!/bin/sh
+set -eu
+
+YESH=${1:-./yesh}
+EXAMPLE=${2:-examples/openrc-lighttpd-check.yesh}
+SUMMARY=${3:-examples/openrc-lighttpd-summary.yesh}
+STATE=/tmp/yesh-openrc-lighttpd-measure.jsonl
+
+test -x "$YESH" || {
+    echo "fixture: executable yesh not found: $YESH" >&2
+    exit 2
+}
+test -f "$EXAMPLE" || {
+    echo "fixture: example not found: $EXAMPLE" >&2
+    exit 2
+}
+test -f "$SUMMARY" || {
+    echo "fixture: summary example not found: $SUMMARY" >&2
+    exit 2
+}
+command -v rc-status >/dev/null 2>&1 || {
+    echo "fixture: rc-status is required" >&2
+    exit 2
+}
+test -r /sys/fs/cgroup/cgroup.controllers || {
+    echo "fixture: readable cgroup v2 is required" >&2
+    exit 2
+}
+rc-status -C -f ini -a | grep -q '^lighttpd[[:space:]]*=' || {
+    echo "fixture: lighttpd is not reported by OpenRC" >&2
+    exit 2
+}
+
+"$YESH" --plan "$EXAMPLE"
+"$YESH" "$EXAMPLE"
+"$YESH" --plan "$SUMMARY"
+"$YESH" "$SUMMARY"
+
+test -s "$STATE" || {
+    echo "fixture: JSONL record was not written: $STATE" >&2
+    exit 1
+}
+grep -q '"manager":"openrc"' "$STATE" || {
+    echo "fixture: JSONL record is not an OpenRC measurement" >&2
+    exit 1
+}
+grep -q '"unit":"lighttpd"' "$STATE" || {
+    echo "fixture: JSONL record names the wrong service" >&2
+    exit 1
+}
+grep -q '"complete":true' "$STATE" || {
+    echo "fixture: lighttpd measurement was incomplete: $STATE" >&2
+    exit 1
+}
+if grep -q '"name":"yesh' "$STATE"; then
+    echo "fixture: observer appears inside lighttpd cgroup: $STATE" >&2
+    exit 1
+fi
+
+echo "OpenRC lighttpd fixture passed; JSONL kept at $STATE"

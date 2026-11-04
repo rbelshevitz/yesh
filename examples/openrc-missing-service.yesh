@@ -1,0 +1,4 @@
+# Negative example: requires Alpine Linux with OpenRC and demonstrates a
+# missing-service result; it is expected to fail its service checks.
+service status openrc yesh-no-such-service
+service resources openrc yesh-no-such-service

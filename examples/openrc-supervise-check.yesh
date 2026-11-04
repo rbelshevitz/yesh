@@ -1,0 +1,7 @@
+# Fixture-dependent example: requires Alpine Linux with OpenRC, readable cgroup
+# v2 state, and the temporary `supervise-daemon` fixture from scripts/.
+service status openrc yesh-supervise-fixture
+service resources openrc yesh-supervise-fixture
+measure service openrc yesh-supervise-fixture for 4s every 1s:
+    save to /tmp/yesh-openrc-supervise-measure.jsonl
+    keep history for 1h

@@ -1,0 +1,7 @@
+# Environment-dependent example: requires Alpine Linux with OpenRC, readable
+# cgroup v2 state, and an active `sshd` service.
+service status sshd
+service resources sshd
+measure service sshd for 2s every 1s:
+    save to /tmp/yesh-openrc-auto-measure.jsonl
+    keep history for 1h

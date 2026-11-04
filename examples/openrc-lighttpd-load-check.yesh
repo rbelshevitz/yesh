@@ -1,0 +1,9 @@
+# Finite OpenRC measurement while lighttpd serves a temporary large page.
+# The state path is shared with openrc-lighttpd-check.yesh so summarize can
+# compare a quiet record with this loaded record.
+# Environment-dependent: requires Alpine Linux with OpenRC, readable cgroup v2
+# state, an active `lighttpd`, and the matching load fixture script.
+
+measure service openrc lighttpd for 10s every 1s:
+    save to /tmp/yesh-openrc-lighttpd-measure.jsonl
+    keep history for 1h

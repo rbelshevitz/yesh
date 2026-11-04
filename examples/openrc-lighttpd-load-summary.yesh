@@ -1,0 +1,3 @@
+# Human-readable history after the quiet and loaded lighttpd measurements.
+# Requires JSONL produced by the Alpine/OpenRC lighttpd fixture.
+summarize service openrc lighttpd from /tmp/yesh-openrc-lighttpd-measure.jsonl since 1h

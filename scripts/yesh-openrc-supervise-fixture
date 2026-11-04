@@ -1,0 +1,9 @@
+#!/sbin/openrc-run
+
+name="yesh OpenRC supervise-daemon fixture"
+command="/bin/sh"
+command_args="-c 'sleep 1; exit 7'"
+supervisor="supervise-daemon"
+respawn_delay=1
+respawn_max=0
+respawn_period=10

@@ -1,0 +1,62 @@
+#!/bin/sh
+set -eu
+
+YESH=${1:-./yesh}
+EXAMPLE=${2:-examples/openrc-lighttpd-load-check.yesh}
+SUMMARY=${3:-examples/openrc-lighttpd-load-summary.yesh}
+DOCROOT=${YESH_OPENRC_LIGHTTPD_DOCROOT:-/var/www/localhost/htdocs}
+URL=${YESH_OPENRC_LIGHTTPD_URL:-http://127.0.0.1/yesh-openrc-load.html}
+PAGE=$DOCROOT/yesh-openrc-load.html
+LOAD_PID=
+
+test -x "$YESH" || { echo "fixture: executable yesh not found: $YESH" >&2; exit 2; }
+test -f "$EXAMPLE" || { echo "fixture: load example not found: $EXAMPLE" >&2; exit 2; }
+test -f "$SUMMARY" || { echo "fixture: load summary not found: $SUMMARY" >&2; exit 2; }
+test -d "$DOCROOT" && test -w "$DOCROOT" || {
+    echo "fixture: writable lighttpd document root required: $DOCROOT" >&2
+    exit 2
+}
+if command -v curl >/dev/null 2>&1; then
+    fetch() { curl -fsS --max-time 3 "$1" -o /dev/null; }
+elif command -v wget >/dev/null 2>&1; then
+    fetch() { wget -q -O /dev/null "$1"; }
+else
+    echo "fixture: curl or wget is required" >&2
+    exit 2
+fi
+
+cleanup() {
+    if test -n "$LOAD_PID"; then
+        kill "$LOAD_PID" 2>/dev/null || true
+        wait "$LOAD_PID" 2>/dev/null || true
+    fi
+    rm -f "$PAGE"
+}
+trap cleanup EXIT HUP INT TERM
+
+dd if=/dev/zero of="$PAGE" bs=1M count=8 >/dev/null 2>&1
+fetch "$URL"
+
+load_page() {
+    end=$(($(date +%s) + 12))
+    while test "$(date +%s)" -lt "$end"; do
+        request=0
+        while test "$request" -lt 4; do
+            fetch "$URL" &
+            request=$((request + 1))
+        done
+        wait || true
+    done
+}
+
+"$YESH" --plan "$EXAMPLE"
+load_page &
+LOAD_PID=$!
+"$YESH" "$EXAMPLE"
+kill "$LOAD_PID" 2>/dev/null || true
+wait "$LOAD_PID" 2>/dev/null || true
+LOAD_PID=
+"$YESH" --plan "$SUMMARY"
+"$YESH" "$SUMMARY"
+
+echo "OpenRC lighttpd load fixture passed; temporary page removed"

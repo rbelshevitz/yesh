@@ -1,0 +1,10 @@
+# Read-only OpenRC observation for a service that is not the SSH session.
+# The fixed temporary path keeps the example fully visible in --plan.
+# Environment-dependent: requires Alpine Linux with OpenRC, readable cgroup v2
+# state, and an active `lighttpd` service.
+
+service status openrc lighttpd
+service resources openrc lighttpd
+measure service openrc lighttpd for 2s every 1s:
+    save to /tmp/yesh-openrc-lighttpd-measure.jsonl
+    keep history for 1h
