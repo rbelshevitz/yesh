@@ -31,6 +31,8 @@ Linux/amd64.
 not include supervisord, container diagnostics, continuous monitoring, ARM64, or
 an independent user audit. `v0.3` starts only after three paired Bash/yesh
 reference scenarios: backup, configuration publication, and service diagnosis.
+The navigator is not abandoned: it remains a separate experimental companion
+milestone and is intentionally outside the core `yesh` command contract.
 
 Release `v0.2.0` already includes:
 
@@ -351,9 +353,9 @@ of the new state model it introduces.
 
 ## Separate future milestone: `yesh navigator`
 
-The navigator is currently a subcommand inside the main binary. Before adding
-new screens, extract it into a separate `yesh-navigator` executable. The normal
-`yesh` binary should not require the TUI dependency just to run a script.
+The navigator remains an experimental companion milestone. Before adding new
+screens, finish extracting it into a separate `yesh-navigator` executable. The
+normal `yesh` binary should not require the TUI dependency just to run a script.
 
 The extraction is an architectural refactor, not a file move:
 
