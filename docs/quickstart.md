@@ -147,6 +147,12 @@ yesh --plan examples/nginx-logrotate-maintenance.yesh
 `df`, while `journal` appears as a separate planned yesh action. None of them
 is run and no redirection is opened.
 
+For a larger comparison, see the deliberately explicit [Bash baseline for an
+incremental rsync snapshot](../examples/bash-rsync-incremental-baseline.sh) and
+the matching [yesh scenario](../examples/rsync-incremental.yesh). The baseline
+is not a claim that Bash must be written this way; it shows the bookkeeping a
+careful implementation has to assemble around the same external tool.
+
 ## Run it
 
 Build the interpreter from the repository root:
