@@ -364,11 +364,11 @@ The extraction is an architectural refactor, not a file move:
 4. build `cmd/yesh-navigator` against the same package and keep the navigator
    limited to composing text, parsing it, showing the plan, and saving a new
    file;
-5. decide separately whether `yesh navigator` remains a compatibility launcher
-   or is removed in the next minor release.
+5. remove the `yesh navigator` subcommand from the main binary; the navigator is
+   an optional companion tool, not part of the core command contract.
 
 The extraction is complete only when the normal binary builds without the TUI
-implementation, both commands use the same parser and plan output, and the
+implementation, the optional command uses the same parser and plan output, and the
 positive, negative, and non-executing plan tests pass for both entry points.
 
 The English full-screen interface should follow `nmtui`: a main activity menu,
