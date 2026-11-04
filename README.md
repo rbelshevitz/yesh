@@ -20,6 +20,8 @@ equivalent Bash script.
 yesh removes more than Bash's historical syntax noise. It makes recurring
 protective code visible and reusable: preflight checks, failure boundaries,
 argument inspection, locks, cleanup, planning, and result verification.
+The intended effect is similar to Go's relationship with Java: less ceremony
+and less repeated scaffolding, while the underlying operations remain explicit.
 
 ## What it is for
 
