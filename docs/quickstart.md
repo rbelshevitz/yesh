@@ -1,8 +1,11 @@
 # yesh quickstart
 
-yesh is a small Go-based language and interpreter for readable
-system-administration and operational scripts. It is not an interactive shell
-and does not aim to be Bash-compatible.
+yesh is a small Go-based language and interpreter for bounded Linux operations.
+It is intended for small Linux operations where mistakes can be costly: the plan
+is visible before execution and the result can be checked afterwards. For these
+scenarios, yesh is easier to read and review than an equivalent Bash script. It
+is not an interactive shell and does not replace Bash, Ansible, or the external
+Linux tools it invokes.
 
 > **Bash without the historical syntax complexity.**
 

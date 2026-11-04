@@ -255,9 +255,11 @@ Errors include the script filename and line number where available. A failed
 external command stops normal execution. Missing executables and process
 startup errors are not treated as ordinary false conditions.
 .SH DESIGN BOUNDARY
-yesh is an administrative scripting language, not a Python replacement and
-not a Bash compatibility layer. SSH, rsync, systemctl, journalctl, mount and
-other Unix tools remain external commands until a documented typed yesh
-operation is added.
+yesh is an administrative scripting language, not a general-purpose replacement
+for Python or Ansible and not a Bash-compatible shell. It is intended for small
+Linux operations where mistakes can be costly: the plan is visible before
+execution and the result can be checked afterwards. SSH, rsync, systemctl,
+journalctl, mount and other Unix tools remain external commands until a
+documented typed yesh operation is added.
 .SH SEE ALSO
 .BR yesh (1)

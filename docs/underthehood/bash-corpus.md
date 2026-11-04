@@ -63,3 +63,12 @@ The first full case is documented in [the incremental rsync benchmark](../benchm
 and its [Russian version](../benchmark-rsync.ru.md). It is a design and
 acceptance specification until the independent adaptation and negative matrix
 are implemented.
+
+The first local comparison baseline is
+[`examples/bash-rsync-incremental-baseline.sh`](../../examples/bash-rsync-incremental-baseline.sh).
+It is an independent, deliberately explicit Bash implementation of the same
+bounded snapshot operation. It is not presented as production code: its value
+is that a reviewer can see how much state, quoting, cleanup, locking, path
+validation, and failure handling must be assembled by hand before `rsync` can
+be called. The comparison is meaningful only when both scripts run against the
+same disposable fixture and the same negative cases.

@@ -6,9 +6,10 @@
 💡 To open the table of contents, press the three-bullet button in the
 upper-right corner.
 
-yesh is a small language for Linux scripts where you need to see the order of
-actions, the arguments passed to external commands, and what happens when a
-command fails.
+yesh is a small language for bounded Linux operations where you need to see what
+will run, what may change, how the result will be checked, and what happens when
+a command fails. For small administrative tasks where mistakes can be costly,
+this makes the script easier to read and review than an equivalent Bash script.
 
 This tutorial is not a complete language reference. It starts with a safe path
 check and then introduces the rules needed to read and write small

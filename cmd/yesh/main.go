@@ -13,7 +13,7 @@ import (
 const maxScriptBytes = 4 << 20
 
 // version is replaced for release builds with:
-// go build -ldflags "-X main.version=v0.2.1"
+// go build -ldflags "-X main.version=v0.2.2"
 var version = "devel"
 
 func main() {

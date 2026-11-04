@@ -1,12 +1,15 @@
 # yesh design principles
 
-yesh is intended for small Linux administration scripts: checking services,
-deploying a release, checking hosts, or making a backup. A reader should know
-Linux commands without having to remember Bash's historical edge cases.
+yesh is intended for small Linux operations where mistakes can be costly:
+checking services, deploying a release, checking hosts, or making a backup. The
+plan should be visible before execution and the result checkable afterwards. In
+these scenarios, the script should be easier to read and review than equivalent
+Bash.
 
 yesh is a language and interpreter for Linux automation, not an interactive
-shell. It borrows the natural command-oriented shape of Linux scripts, but it does not
-aim to interpret Bash syntax or provide a shell prompt.
+shell or an Ansible replacement. It borrows the natural command-oriented shape
+of Linux scripts, but it does not aim to interpret Bash syntax or provide a
+shell prompt.
 
 The main test is:
 

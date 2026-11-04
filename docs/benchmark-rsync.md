@@ -170,6 +170,35 @@ by itself fsync the containing directories or prove power-loss durability.
 Those stronger guarantees require a separate Linux filesystem test and must
 not be inferred from a successful process exit.
 
+## Bash comparison baseline
+
+The repository includes an independent Bash baseline in
+[`examples/bash-rsync-incremental-baseline.sh`](../examples/bash-rsync-incremental-baseline.sh).
+It is deliberately explicit rather than deliberately bad: it uses strict mode,
+quoted arguments, `flock`, path normalization, temporary-tree cleanup, and
+negative-path handling. That makes the comparison fair. The point is to show
+how much bookkeeping a careful Bash implementation must assemble around the
+same `rsync` operation, not to claim that every Bash script looks like this.
+
+Compare the two implementations only on the same disposable fixture and the
+same cases: first snapshot, incremental snapshot, missing source, held lock,
+and preservation of the previous published snapshot after failure.
+
+The comparison is about the shape of the work:
+
+| Concern | Bash baseline | yesh scenario |
+| --- | --- | --- |
+| Argument boundaries | arrays, quoting, and `--` are assembled by hand | lists and command arguments keep their boundaries |
+| Failure handling | strict mode, `trap`, cleanup, and exit-code rules | command failure stops the scenario by default |
+| Lock lifetime | file descriptor `9` and external `flock` | `with lock path:` releases the lock on every exit path |
+| Staging and publication | path checks, `realpath`, `stat`, `mkdir`, and `mv` | `publish temporary to current` expresses the publication boundary |
+| Preview | must be designed separately | `--plan` shows expanded external `argv` without running it |
+| Backup engine | `rsync` remains external | `rsync` remains external |
+
+This does not mean that Bash cannot express the same policy. It means that the
+author of a Bash version must assemble and review more control plumbing around
+the external operation.
+
 Success means a reviewer can explain the state transitions and failure paths
 more quickly than in the Bash baseline. A shorter script alone is not success.
 

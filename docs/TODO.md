@@ -4,12 +4,33 @@ This is the short working map. It contains only the current milestone,
 verifiable tasks, and boundaries. Historical decisions and closed discussions
 are kept in the [archive](TODO-history.md).
 
-## Current focus: after `v0.2.1`
+## Current focus: preparing `v0.2.2`
 
-Release `v0.2.1` is published. The current focus is continued polish of the
-implemented Linux scenarios, documentation review, and reproducible checks.
-New language constructs are out of scope for now. The working boundary is
+Release `v0.2.1` is published. The `v0.2.2` candidate is a technical release
+for polishing the implemented Linux scenarios, documentation, and checks. New
+language constructs are out of scope for now. The working boundary is
 Linux/amd64.
+
+### `v0.2.2` acceptance
+
+- [x] systemd and experimental OpenRC support are described in the README,
+  tutorial, and manual;
+- [x] OpenRC was checked on Alpine: platform, supervisor, service state, cgroup,
+  processes, and finite JSONL measurement;
+- [x] the Windows build preserves the common OpenRC shape and reports the
+  Linux-only boundary explicitly;
+- [x] the incremental `rsync` Bash baseline was written, reviewed, and checked
+  with positive and negative disposable scenarios;
+- [x] the benchmark includes a concrete Bash/yesh comparison;
+- [ ] full release run: `go test ./...`, `go vet ./...`, a `-trimpath` build,
+  and green CI;
+- [ ] review release text and mark OpenRC as experimental support;
+- [ ] publish tag `v0.2.2` only after reviewing the file list and checksum.
+
+`v0.2.2` does not claim production-ready support for every Linux system. It does
+not include supervisord, container diagnostics, continuous monitoring, ARM64, or
+an independent user audit. `v0.3` starts only after three paired Bash/yesh
+reference scenarios: backup, configuration publication, and service diagnosis.
 
 Release `v0.2.0` already includes:
 

@@ -8,14 +8,20 @@ yesh is a readable language for Linux automation and preflight checks.
 
 > Bash without the historical syntax complexity.
 
-Commands remain ordinary Linux commands, while the script makes its
-preconditions, order of operations, failure boundary, and checked result clear.
+yesh is a language for bounded Linux operations where it is clear what will run,
+what will change, and how the result will be checked. Commands remain ordinary
+Linux commands, while the script makes its preconditions, order of operations,
+and failure boundary clear. yesh does not replace Bash or Ansible. It serves a
+different purpose: describing and running small Linux operations where mistakes
+can be costly. The plan is visible before execution and the result can be checked
+afterwards. For these scenarios, yesh is easier to read and review than an
+equivalent Bash script.
 
 ## What it is for
 
-yesh targets small administrative and DevOps scripts: backups, configuration
-publication, service checks, diagnostics, and individual CI/CD steps. It is not
-an interactive shell, a Python replacement, or a fleet-management system.
+yesh targets small administrative scripts: backups, configuration publication,
+service checks, diagnostics, and individual CI/CD steps. It is not an interactive
+shell or a fleet-management system.
 
 Its niche is a script of roughly 100–200 lines that is becoming difficult to
 read in Bash, while Ansible or a separate application would be excessive.
@@ -27,6 +33,13 @@ read in Bash, while Ansible or a separate application would be excessive.
 
 External commands stay visible, arguments are not rebuilt into a shell string,
 and `--plan` shows the order before execution.
+
+The value of yesh is not measured by file length or by the number of built-in
+operations. For a bounded scenario, the useful questions are whether the
+arguments can be inspected before execution, the failure path is understandable,
+the previous state is protected, and a report can be reproduced from saved
+observations. These are criteria for individual high-consequence scenarios, not
+a claim that yesh is better than Bash for every task.
 
 ## Quick start
 
@@ -96,6 +109,7 @@ is not evidence of support.
 - [practical examples](docs/practical-examples.md);
 - [systemd and resource measurement](docs/systemd.md);
 - [OpenRC and resource-constrained systems](docs/underthehood/resource-constrained-os.md);
+- [Bash comparison corpus](docs/underthehood/bash-corpus.md);
 - [security boundaries](SAFETY.md);
 - [language design](DESIGN.md);
 - [current TODO](docs/TODO.md);
