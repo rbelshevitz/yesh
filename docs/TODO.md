@@ -358,17 +358,22 @@ new screens, extract it into a separate `yesh-navigator` executable. The normal
 The extraction is an architectural refactor, not a file move:
 
 1. freeze the current navigator behaviour and its parser/plan tests;
-2. move the shared lexer, parser, AST, and plan renderer into a private package
+2. as an interim boundary, build the navigator only with the `navigator` build
+   tag and publish it as a separate optional `yesh-navigator` artifact; the
+   default `yesh` build must not include the TUI;
+3. move the shared lexer, parser, AST, and plan renderer into a private package
    such as `internal/yeshcore` without duplicating grammar or semantics;
-3. make `cmd/yesh` depend on that package for ordinary script execution;
-4. build `cmd/yesh-navigator` against the same package and keep the navigator
+4. make `cmd/yesh` depend on that package for ordinary script execution;
+5. build `cmd/yesh-navigator` against the same package and keep the navigator
    limited to composing text, parsing it, showing the plan, and saving a new
    file;
-5. remove the `yesh navigator` subcommand from the main binary; the navigator is
+6. remove the `yesh navigator` subcommand from the main binary; the navigator is
    an optional companion tool, not part of the core command contract.
 
-The extraction is complete only when the normal binary builds without the TUI
-implementation, the optional command uses the same parser and plan output, and the
+The interim step is complete when the normal binary builds without the TUI
+implementation and the tagged artifact passes its navigator tests. The final
+extraction is complete only when the optional command uses a shared parser and plan
+output from `internal/yeshcore`, and the
 positive, negative, and non-executing plan tests pass for both entry points.
 
 The English full-screen interface should follow `nmtui`: a main activity menu,
