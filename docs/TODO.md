@@ -258,7 +258,10 @@ to status reading, a resource snapshot, and finite measurement for now.
 ### Containers with `supervisord`
 
 This branch is not part of current support and must not be described as ready.
-It remains a separate future task after the systemd/OpenRC work.
+The decision is to keep developing it only as a separate experimental,
+read-only container adapter after the common systemd/OpenRC contract and the
+`v0.3` reference scenarios are stable. It is not a reason to broaden the core
+service language now.
 
 Keep this as a separate testable branch because a container PID and a host PID
 may differ. A PID number is not enough identity: combine the PID namespace,
@@ -275,6 +278,13 @@ evidence layers.
 - [ ] test a restart with a new identity tuple: PID, `starttime`, and PID
   namespace;
 - [ ] add positive, negative, and `--plan` scenarios.
+
+Do not add process management, restart/stop operations, a daemon, or a
+continuous monitor for this branch. A first useful result is one finite report
+that combines authenticated Supervisor state with `/proc` and cgroup evidence,
+and marks hidden namespaces or missing children as incomplete. Do not call this
+"supervisord support" until that report passes on a disposable container
+fixture.
 
 Boundary: `RUNNING` from `supervisord` confirms its process model, but does not
 prove resource ownership, complete container visibility, or application health.
@@ -340,6 +350,26 @@ of the new state model it introduces.
 ---
 
 ## Separate future milestone: `yesh navigator`
+
+The navigator is currently a subcommand inside the main binary. Before adding
+new screens, extract it into a separate `yesh-navigator` executable. The normal
+`yesh` binary should not require the TUI dependency just to run a script.
+
+The extraction is an architectural refactor, not a file move:
+
+1. freeze the current navigator behaviour and its parser/plan tests;
+2. move the shared lexer, parser, AST, and plan renderer into a private package
+   such as `internal/yeshcore` without duplicating grammar or semantics;
+3. make `cmd/yesh` depend on that package for ordinary script execution;
+4. build `cmd/yesh-navigator` against the same package and keep the navigator
+   limited to composing text, parsing it, showing the plan, and saving a new
+   file;
+5. decide separately whether `yesh navigator` remains a compatibility launcher
+   or is removed in the next minor release.
+
+The extraction is complete only when the normal binary builds without the TUI
+implementation, both commands use the same parser and plan output, and the
+positive, negative, and non-executing plan tests pass for both entry points.
 
 The English full-screen interface should follow `nmtui`: a main activity menu,
 a separate parameter form, a review of the generated yesh script, and its
