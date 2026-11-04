@@ -27,6 +27,9 @@ restore=$base/restore
 root=$mountpoint/snapshots
 config=$base/rsnapshot.conf
 confirm=$base/confirm
+report=$base/rsnapshot-report.txt
+lock=$root/rsnapshot.pid
+published=$root/daily.0
 phase=setup
 
 cleanup() {
@@ -66,28 +69,37 @@ lockfile	$root/rsnapshot.pid
 backup	$source/./	local/
 EOF
 printf '%s\n' 'rsnapshot version one' >"$source/data.txt"
+printf '%s\n' 'unchanged across rotations' >"$source/stable.txt"
 touch "$confirm"
 
 run_apply() {
     YESH_RSNAPSHOT_CONFIG=$config \
     YESH_RSNAPSHOT_LEVEL=daily \
+    YESH_RSNAPSHOT_SYNC_FIRST=0 \
     YESH_RSNAPSHOT_ROOT=$root \
     YESH_RSNAPSHOT_SOURCE=$mount_source \
+    YESH_RSNAPSHOT_LOCK=$lock \
+    YESH_RSNAPSHOT_REPORT=$report \
+    YESH_RSNAPSHOT_PUBLISHED=$published \
     YESH_RSNAPSHOT_CONFIRM=$confirm \
     "$yesh_bin" "$wrapper"
 }
 
 YESH_RSNAPSHOT_CONFIG=$config \
 YESH_RSNAPSHOT_LEVEL=daily \
+YESH_RSNAPSHOT_SYNC_FIRST=0 \
 YESH_RSNAPSHOT_ROOT=$root \
 YESH_RSNAPSHOT_SOURCE=$mount_source \
+YESH_RSNAPSHOT_LOCK=$lock \
+YESH_RSNAPSHOT_REPORT=$report \
+YESH_RSNAPSHOT_PUBLISHED=$published \
 YESH_RSNAPSHOT_CONFIRM=$confirm \
 "$yesh_bin" --plan "$wrapper" >"$base/plan.out"
 test ! -e "$root/daily.0"
 
 run_apply
 phase=second-rotation
-printf '%s\n' 'rsnapshot version two' >"$source/data.txt"
+printf '%s\n' 'rsnapshot version two with changed size' >"$source/data.txt"
 if ! run_apply >"$base/second-rotation.out" 2>&1; then
     cat "$base/second-rotation.out" >&2
     exit 1
@@ -98,8 +110,9 @@ printf 'daily.0: '
 cat "$root/daily.0/local/data.txt"
 printf 'daily.1: '
 cat "$root/daily.1/local/data.txt"
-test "$(cat "$root/daily.0/local/data.txt")" = 'rsnapshot version two'
+test "$(cat "$root/daily.0/local/data.txt")" = 'rsnapshot version two with changed size'
 test "$(cat "$root/daily.1/local/data.txt")" = 'rsnapshot version one'
+test "$(stat -c %i "$root/daily.0/local/stable.txt")" = "$(stat -c %i "$root/daily.1/local/stable.txt")"
 
 quarantine=$root/quarantine
 phase=quarantine
@@ -117,6 +130,7 @@ test -d "$quarantine/daily.1"
 /usr/bin/rsync -a -- "$quarantine/daily.1/local/" "$restore/"
 phase=restore
 test "$(cat "$restore/data.txt")" = 'rsnapshot version one'
+test "$(cat "$restore/stable.txt")" = 'unchanged across rotations'
 test -d "$root/daily.0"
 test ! -e "$root/daily.2"
 exec 9>&-

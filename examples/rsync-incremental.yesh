@@ -10,8 +10,9 @@
 #                       another directory.
 # YESH_RSYNC_ROOT       local directory on this backup host that owns all
 #                       snapshots and the lock.
-# YESH_RSYNC_PREVIOUS   optional previous published snapshot; it is used only
-#                       as --link-dest and is never modified.
+# YESH_RSYNC_PREVIOUS   previous published snapshot, or a deliberately
+#                       nonexistent path for the first snapshot; it is used
+#                       only as --link-dest and is never modified.
 # YESH_RSYNC_CURRENT    new final snapshot path; it must not already exist.
 # YESH_RSYNC_TEMPORARY  new private staging path; it must not already exist.
 # YESH_RSYNC_LOCK       lock-file path in the trusted snapshot root.
