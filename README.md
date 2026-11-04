@@ -4,466 +4,113 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-yesh is a readable language for Linux automation and preflight checks. Commands
-stay visible, and the order of actions and failure behavior remain reviewable.
+yesh is a readable language for Linux automation and preflight checks.
 
-[Русская версия README](README.ru.md) · [Hebrew README](README.he.md)
+> Bash without the historical syntax complexity.
 
-## Start here
+Commands remain ordinary Linux commands, while the script makes its
+preconditions, order of operations, failure boundary, and checked result clear.
 
-- [Quickstart](docs/quickstart.md) — the first script and core rules;
-- [syntax tutorial](docs/syntax-guide.md) — from basic syntax to operations;
-- [practical examples](docs/practical-examples.md) — what to run and which environment it needs;
-- [safety boundaries](SAFETY.md) — what yesh checks and what remains external;
-- [`v0.2.1` release](https://github.com/rbelshevitz/yesh/releases/tag/v0.2.1) · [current roadmap](docs/TODO.md) — what comes next;
+## What it is for
 
-Project background: [Why I built yesh — Linux automation you can explain](https://dev.to/rbelshevitz/why-i-built-yesh-linux-automation-you-can-explain-32cj).
-
-Project author: Roman Belshevitz
-
-yesh is for small Linux administration and DevOps scripts: backup, deployment,
-service checks, configuration publication, and read-only diagnostics. It is not
-an interactive shell or a Bash-compatible replacement.
-
-The repository includes 60 examples, including real-world Linux workflows.
-Some examples require Linux, systemd, SSH, or other external tools and are not
-expected to run in every environment.
-
-> **Development status:** yesh is under active development for Linux amd64. It
-> is tooling for reviewable operational scripts, not a production safety
-> boundary or a substitute for operator judgment and operating-system isolation.
-
-An experimental terminal UI (TUI) navigator for newcomers is being developed
-alongside the language. It helps compose small backup and service scripts,
-validates the generated text with the same parser, shows `--plan`, and saves
-the script to a new file. It does not execute the script or discover storage
-and remote hosts silently.
-
-> **Bash without the historical syntax complexity.**
->
-> Read a yesh script from top to bottom. Strings stay strings, lists stay
-> lists, commands stay external commands, and failures do not disappear
-> silently.
-
-![A system administrator having a Eureka moment in a data center](docs/yesh-eureka.png)
-
-## The point
-
-💡 The useful difference appears at the boundary where a small Bash script starts
-mixing validation, file replacement, service restart, and failure handling:
-
-Bash:
-
-```bash
-set -e
-if grep -q '^mode=production$' config.next; then
-    install -m 0640 -- config.next /etc/myapp.conf.next
-    mv -T /etc/myapp.conf.next /etc/myapp.conf
-    systemctl restart myapp.service
-    systemctl is-active --quiet myapp.service
-fi
-```
-
-yesh:
-
-```yesh
-if grep -q '^mode=production$' config.next:
-    install -m 0640 -- config.next /etc/myapp.conf.next
-    publish /etc/myapp.conf.next to /etc/myapp.conf
-    service restart myapp.service until active within 10s
-```
-
-The yesh version keeps validation, the publication boundary, and the service
-postcondition visible. The external `install` command prepares the file and its
-mode; `publish` uses a same-filesystem rename and does not silently fall back
-to copying. The typed restart has a finite ten-second budget and checks that
-the exact unit becomes active.
-
-The corresponding `--plan` output makes the boundary explicit:
-
-```text
-PLAN IF ["grep" "-q" "^mode=production$" "config.next"]
-PLAN ["install" "-m" "0640" "--" "config.next" "/etc/myapp.conf.next"]
-PLAN publish "/etc/myapp.conf.next" to "/etc/myapp.conf"
-PLAN ["systemctl" "restart" "myapp.service"] until active within 10s
-```
-
-The rule is simple: `PLAN [...]` is an external command's argument list
-(`argv`); `PLAN publish ...` is a yesh operation with its own parameters.
-
-## Try it in a minute
-
-From a checkout with Go 1.21 or newer:
-
-```text
-go build -trimpath -o yesh ./cmd/yesh
-./yesh examples/hello.yesh
-./yesh --plan examples/hello.yesh
-```
-
-The second command runs a self-contained example. The third shows the same
-script's expanded commands without starting an external command. For a
-Linux-specific example, see [`service-status.yesh`](examples/service-status.yesh);
-it requires a running systemd manager and only observes one service.
-
-`examples/hello.yesh` prints `hello world` and the three list items. When run
-from the repository root, it also reports that `README.md` exists. It only
-prints text and performs that existence check; it does not change files.
-
-## A lightweight diagnostic tool for small Linux systems
-
-Alongside the language, yesh is also intended as a lightweight diagnostic tool
-for small, temporary, or embedded Linux systems where CPU cycles and memory are
-scarce.
-In such an environment, continuous metric collection with Prometheus may
-require a separate collector, storage, and ongoing maintenance that are not
-worth the cost for a small system.
-yesh provides a readable, finite check when an administrator needs an answer
-about one service during one incident or maintenance window; it is not a
-replacement for continuous monitoring where that is justified.
-
-Many Linux services are started and supervised by systemd today. For that
-reason, the author started the resource-observation implementation with
-systemd: it gives us a common frame for tracking service identity, lifecycle
-state, cgroup, and journal data. This is the first backend, not a claim that
-every Linux
-service or every future diagnostic path must use systemd.
-
-## How yesh measures service resources
-
-New in `0.2.0`: read-only resource snapshots and finite measurements for a
-systemd service on Linux with cgroup v2.
-
-On Linux, yesh can observe a systemd service's resources for a fixed period
-without changing anything: it samples the cgroup, keeps a bounded history, and
-produces memory/CPU/I/O summaries. It requires a readable systemd manager and
-cgroup v2; unavailable controllers remain explicitly unavailable. See the
-[systemd guide](docs/systemd.md) and
-[syntax tutorial](docs/syntax-guide.md) for the directive rules.
-
-This is not a monitoring daemon. yesh helps an administrator answer one
-concrete question about one systemd service: what processes were observed in
-its cgroup during a fixed period, how its memory and CPU changed, and what the
-service reported in the journal during the same incident window.
-
-The useful result is the connected workflow, not another isolated number:
-
-```yesh
-state_dir = "/tmp/yesh-nginx-resources"
-
-service status nginx.service
-measure service nginx.service for 30s every 5s:
-    save to $state_dir
-    keep history for 24h
-summarize service nginx.service from $state_dir since 1h
-journal nginx.service since 15m lines 40
-```
-
-The resource snapshot reads the service's cgroup and its descendant cgroups,
-then records the processes found there, RSS, available memory/CPU/I/O counters,
-PSI and OOM information. A missing controller or field is reported as
-`unavailable`, not silently changed to zero. The finite measurement takes its
-first snapshot immediately, writes one completed JSONL record after the period
-ends, and refuses to combine different service identities across a restart.
-
-`summarize` is the reading step that follows a measurement: it does not take a
-new snapshot. It reads the history written by `measure` from the same state
-directory and summarizes records in the requested time window. For a separate
-run, use the same `save to` path with `from`, as in
-`summarize service nginx.service from $state_dir since 1h`.
-
-This removes a common Bash burden: keeping the service name, cgroup traversal,
-process table, sampling interval, history file, retention rule and journal
-window consistent by hand. The Linux commands and the observation boundary stay
-visible in the yesh script, while the runtime handles the finite loop, state
-file locking, stable service identity, and incomplete observations.
-
-The current evidence is deliberately limited. The feature is read-only and
-finite; it does not alert, enforce cgroup limits, discover application
-ownership, explain the cause of a change, or replace Prometheus and other
-continuous monitoring systems. On the Debian Linux stand, a two-second user
-service measurement completed even when block I/O accounting was unavailable;
-the result marked that optional field unavailable. A disappearing cgroup or
-process makes the saved measurement incomplete instead of presenting a false
-complete result.
-
-An ordinary systemd unit does not need to be changed: systemd already places its
-processes in the unit's cgroup. `Delegate=yes` is needed only when the service
-creates nested cgroups and places its own processes in them. `CPUAccounting=`,
-`MemoryAccounting=`, and `IOAccounting=` can make individual counters available,
-but availability also depends on the kernel, systemd, and the active policy; an
-unavailable counter remains `unavailable` in yesh.
-
-| Bash | yesh |
-| --- | --- |
-| `name=world; echo "$name"` | `name = world`<br>`echo $name` |
-| `items=(one two three)` | `items = [one, two, three]` |
-| `if [ -e "$path" ]; then ... fi` | `if exists $path:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
-| `for item in "${items[@]}"; do ... done` | `for item in $items:`<br>&nbsp;&nbsp;&nbsp;&nbsp;`...` |
-| `set -euo pipefail` | failures are errors by default |
-
-This table is an orientation, not the main proof that yesh is useful. The main
-evidence is **Real-World Examples**: short administrative workflows where
-the script has real preconditions, an external Linux tool, a failure path and
-an observable result.
-
-| Real-world workflow | Bash risk | What yesh makes reviewable |
-| --- | --- | --- |
-| incremental backup with `rsync` | quoting, accidental destructive flags, partial publication | explicit `argv`, lock, preflight, staging and publication boundary |
-| service restart and verification | a successful restart command is mistaken for a healthy service | bounded restart plus an explicit postcondition |
-| staged configuration update | invalid content replaces the active file | validate first, publish atomically, then inspect the result |
-| SSH/SCP delivery | hidden host-key or timeout policy, unclear argument boundaries | visible connection policy and exact arguments |
-
-A Real-World Example is successful only when it demonstrates a concrete
-readability or safety advantage over the Bash version. A one-line wrapper around
-an external command is useful as a smoke test, but is not by itself evidence for
-yesh.
-
-## Why yesh is easier to read than Bash
-
-yesh is not trying to replace Unix tools. It removes the shell-language traps
-that make small Bash administration scripts difficult to read and easy to get
-wrong:
-
-- **Too many ways to express the same thing.** Bash conditions and arithmetic
-  use several historical syntaxes with different rules. yesh keeps one clear
-  block form: `if condition:` and `for item in $list:`.
-- **Quoting and word-splitting traps.** In Bash, an unquoted expansion can be
-  split into words or interpreted as a glob. In yesh, a string remains one
-  argument and a list is expanded only as a list.
-- **Ambiguous variable references.** yesh uses one explicit `$name` form for
-  variable expansion; bare words remain literal, and there is no second
-  `${...}` spelling to remember.
-- **Errors hidden behind boilerplate.** A yesh command failure is an error by
-  default; scripts do not need `set -euo pipefail` just to state their basic
-  failure policy.
-- **Commands reinterpreted as shell text.** yesh passes command arguments
-  directly through its Go runtime instead of reparsing a constructed command
-  string through another shell.
-- **Scripts that are short but hard to review.** Indentation, finite lists,
-  explicit branches, and visible exit paths make the operational intent clear
-  to a reader who did not write the script.
-
-The result is a small Go-based language for scripts that should be easy to
-write and easy to review.
-
-This example is not necessarily shorter than its
-Bash equivalent. The benefit appears when a script grows: yesh keeps argument
-boundaries, the publication step, the failure rule, and the reviewable `--plan`
-visible instead of making them depend on shell quoting and conventions.
-
-## What the prototype supports
-
-The current prototype supports:
-
-- assignments such as `name = world` and `items = [one, two]`;
-- `if condition:` and `for item in $items:` blocks with indentation;
-- Linux-scoped `with lock $path:` blocks for non-blocking advisory locks;
-- `publish source to destination` for same-filesystem atomic rename;
-- ordinary commands, pipes, and redirections;
-- explicit `$name` variable expansion, with bare words kept literal;
-- command failures that stop the script and report the source line;
-- one `exists $path` predicate, regex conditions, and explicit `exit code`;
-- typed Linux operations for `service status`, bounded `service wait`, restart
-  with a postcondition, and bounded `journal` over
-  `systemctl`/`journalctl`;
-- `--plan` for expanded argv and branch inspection without running commands.
-
-## What works today
-
-yesh is already useful for small read-only checks and guarded administration
-steps built from ordinary Unix utilities and external Linux tools:
-
-- bounded service and journal checks through explicit typed operations over
-  `systemctl`/`journalctl`, without hidden `sudo`;
-- SSH health checks and SCP transfers with an explicit port, timeout, batch
-  mode, and host-key policy;
-- mount, filesystem, UUID/PARTUUID, and free-space preflight checks;
-- rsync preview and copy examples without implicit `--delete`;
-- typed IPv4/IPv6 address and CIDR checks such as containment and overlap;
-- read-only network reports for interfaces, routes, neighbours, and listening ports;
-- Linux process snapshots by exact kernel name, including PID, UID, state, RSS,
-  process group, session, and cgroup;
-- readable RSS totals, maximums, averages, and budget checks.
-
-On Linux with cgroup v2, the prototype also provides read-only service resource
-snapshots and finite measurements with bounded JSONL history. These reports can
-include CPU, memory, RSS, I/O, PSI, OOM events, process membership changes,
-restarts, and explicitly unavailable or incomplete fields. This is an
-experimental diagnostic capability, not a monitoring daemon or a replacement
-for Prometheus.
-
-The `--plan` mode shows the exact argument vector (`argv`) that each command
-stage would receive, including expanded lists and external conditions. It does
-not start external commands or open redirected output files. Built-in yesh
-operations, such as `publish`, are shown as planned yesh actions with their
-parameters, not as external `argv`. For example:
-
-```text
-PLAN ["scp" "-P" "2828" "-o" "BatchMode=yes" "-o" "ConnectTimeout=5" "--" "backup.tar.gz" "user@host:/srv/backup.tar.gz"]
-```
-
-This makes the real operation reviewable before execution.
-
-## How operational reliability is established
-
-Operational reliability is not a promise that a server will never fail. The
-useful question is: “What happened, what changed, and what did not change when
-the plan went wrong?” yesh is judged by that question: by failure behavior,
-safe reruns, and whether a reviewer can see the boundary of the damage.
-
-yesh does not make external commands or host configuration reliable by magic.
-It makes preconditions, ordering, and failure boundaries visible, and we test
-those properties in layers:
-
-| Test layer | What it checks | What it does not prove |
-| --- | --- | --- |
-| parser/runtime tests | syntax, value boundaries, expansion, errors, pipelines, redirects, cancellation and `--plan` | Linux kernel or utility behavior |
-| safety-contract tests | required preflight order, exact `argv`, forbidden destructive flags and no hidden shell reparse | that the real utility will accept every option |
-| disposable fixture tests | backup/restore, publication, permissions, lock conflicts, reruns, partial failures and unchanged state after a failure | durability after power loss or production-scale load |
-| Linux practical tests | real `rsync`, `rsnapshot`, `systemctl`, `journalctl`, `/proc`, mounts and initramfs tools where available | behavior on a different kernel, distro, filesystem or policy |
-| negative-path tests | missing input, wrong identity, unavailable service, failed pipeline stage, timeout and cancelled job stop before the next side effect | recovery from every external outage |
-
-The important assertion is usually not only “the command returned zero”. A
-practical test also checks the resulting files, permissions, ordering, emitted
-diagnostics, absence of an unpublished result, and release of locks or child
-processes. Missing external tools are reported as skipped with the required
-package; a skip is not evidence that the integration works. Tests that need
-root, a real systemd manager, a device, SSH or a second UID are labelled as
-environment-dependent rather than presented as portable proof.
-
-The current evidence covers Linux behavior through Linux CI, disposable Linux
-fixtures, and additional opt-in tests on a separate Debian host. Those tests
-exercise rsync and rsnapshot, including restore, lock, hard-link,
-partial-failure, and rerun cases. These results establish behavior in the
-named environments; they do not establish universal compatibility, power-loss
-durability, or production safety.
-
-The runnable examples and their limitations are documented in
-[Practical Examples](docs/practical-examples.md). A local verification run
-uses workspace-local caches:
-
-Linux-specific process, service, and real-host evidence is recorded in
-[Linux integration evidence](docs/underthehood/linux-integration.md).
-
-Every `examples/*.yesh` file is parsed by the test suite. Not every file runs in
-every default test job: syntax-guide and quickstart examples are exercised by
-named tests, while environment-dependent examples are covered by their Linux
-tests or opt-in fixture scripts. Each such example must state its required
-tools and environment.
-
-```text
-GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go test ./...
-GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go test -race ./...
-GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go vet ./...
-GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go build -trimpath ./cmd/yesh
-```
-
-These checks support a bounded operational claim: yesh's own execution model
-and the tested workflows behave predictably in the stated
-environment. They are not a claim of universal correctness, crash durability,
-security isolation, or safe execution of arbitrary external programs.
-
-## Where yesh should help an administrator
-
-The useful target is the awkward layer around mature Linux tools. The underlying
-tool already knows how to copy, restart, inspect or archive; yesh should make the
-preconditions, sequencing, failure policy and postcondition readable:
-
-- backup and restore workflows around `rsync`, `rsnapshot`, `tar` and `pv`;
-- service runbooks around `systemctl` and bounded `journalctl` checks;
-- storage preflight around `findmnt`, `lsblk`, `blkid`, `df`, `du` and fstab,
-  without silently mounting, changing disks or weakening permissions;
-- SSH/SCP deployment checks with explicit host-key, timeout and publication
-  rules;
-- read-only diagnostics around `/proc`, cgroups, initramfs, permissions,
-  cron and package-manager queries;
-- guarded configuration publication: validate a staged file, publish it
-  atomically, then verify the observable state.
-
-The selection rule is deliberately narrow: add a typed operation only when the
-same readability or safety problem appears in at least two real workflows.
-That is a strict admission rule, not a suggestion: an inconvenient command is
-not by itself evidence for new yesh syntax. Otherwise the Linux utility remains
-an ordinary visible command. yesh should orchestrate difficult commands, not
-grow a parallel implementation of `rsync`,
-`systemctl`, `mount`, `sed`, `awk` or a package manager.
-
-## Platform and documentation
-
-yesh targets Linux. Its examples use external tools and may additionally require a running systemd
-manager, root, a mounted filesystem, or a disposable test fixture. The
-repository does not claim support for non-Linux operating systems.
-
-The main entry points are grouped at the top of this README. The links below
-are for deeper technical material and test evidence.
-
-Technical notes and test results are collected in the
-[technical reference](docs/underthehood/README.md). You can skip it on a first
-read; it explains how the Linux behavior was checked and why the implementation
-has its current limits.
-
-## Documentation and scope
-
-yesh is an early-stage language focused on readable system administration and
-operational scripts, not a general-purpose shell or an interactive command
-environment.
-The examples and design documents are the source of truth for its semantics.
-
-### Where yesh fits beside Ansible
-
-yesh is not “Ansible, but with a different syntax”, and it is not a replacement
-for Ansible. Ansible is an orchestration system with inventory, modules, roles,
-and a desired-state model for many hosts. yesh is a small Linux runbook and
-preflight language for transparent local workflows and command-level steps
-inside larger automation.
-It keeps `ssh`, `rsync`, `systemctl`, and other tools visible instead of hiding
-them behind a new module model. Use Ansible for fleet orchestration and
-idempotent desired state; use yesh when a Bash-like Unix workflow needs clearer
-syntax, explicit arguments, and reviewable execution.
-
-The intended relationship is complementary: Ansible can select hosts and
-coordinate a rollout, while a yesh script can perform or inspect one carefully
-bounded Linux operation on a host. A yesh script may also be the reviewed
-runbook used directly by an administrator when a full inventory and role model
-would add more machinery than the task needs.
-
-## Core execution model
-
-Values keep their type: a string stays one argument and a list expands to
-multiple arguments explicitly. Commands are executed directly by the Go
-runtime, without reparsing a command string through another shell. yesh is a
-small language for readable Linux automation. It is not a shell interface: it
-does not provide an interactive prompt or interpret a script by passing it to
-Bash. Its runtime starts external commands directly and provides the language's
-own variables, control flow, pipelines, and error handling.
-
-Read the English local manual with `man -l man/yesh.1`.
-See [predictable pipelines](docs/underthehood/pipeline-safety.md) for the execution and
-redirect safety rules.
-The execution-safety document describes the security boundary and operational
-rules; yesh is not a sandbox for untrusted scripts.
-The core design notes are [control flow](docs/underthehood/control-flow.md),
-[design principles](DESIGN.md),
-[storage design](docs/underthehood/storage.md), [remote operations](docs/underthehood/remote-ops.md),
-[processes and text](docs/underthehood/processes-and-text.md), and
-[systemd integration](docs/systemd.md).
-Runnable [English practical examples](docs/practical-examples.md) cover archives,
-rsync, rsnapshot, configuration changes, and read-only administration.
-
-The runnable examples also include read-only process, journal, mount and SSH
-health checks in `examples/`.
-
-Russian project documents and the Russian manual are linked from
-[README.ru.md](README.ru.md); they are not presented as English documentation.
-
-## Comparison with Bash
-
-[Bash](https://www.gnu.org/software/bash/) is the GNU Project's **Bourne Again
-SHell**. It was originally developed by [Brian Fox](https://www.gnu.org/people/people.en.html)
-and is currently maintained by Chet Ramey.
-
-yesh is an independent implementation written in Go, with a smaller syntax
-around familiar Unix/Linux commands. It takes inspiration from Unix/Linux shell
-workflows, not from copying or embedding Bash source code. Its purpose
-is to make everyday administration scripts easier to read and safer to review.
+yesh targets small administrative and DevOps scripts: backups, configuration
+publication, service checks, diagnostics, and individual CI/CD steps. It is not
+an interactive shell, a Python replacement, or a fleet-management system.
+
+Its niche is a script of roughly 100–200 lines that is becoming difficult to
+read in Bash, while Ansible or a separate application would be excessive.
+
+    if grep -q '^mode=production$' config.next:
+        install -m 0640 -- config.next /etc/myapp.conf.next
+        publish /etc/myapp.conf.next to /etc/myapp.conf
+        service restart myapp.service until active within 10s
+
+External commands stay visible, arguments are not rebuilt into a shell string,
+and `--plan` shows the order before execution.
+
+## Quick start
+
+Go 1.21 or newer is required; Linux is required for Linux-specific features:
+
+    go build -trimpath -o yesh ./cmd/yesh
+    ./yesh examples/hello.yesh
+    ./yesh --plan examples/hello.yesh
+
+Start with the [quick start](docs/quickstart.md), then read the
+[syntax guide](docs/syntax-guide.md) and [practical examples](docs/practical-examples.md).
+
+Every file in `examples/` is checked for parsing. Some examples require
+`YESH_*` environment variables, external tools, a running service, SSH, or a
+separate fixture; without those conditions they stop before taking action.
+That is an environment boundary, not a syntax error.
+
+## Small systems: systemd and OpenRC
+
+yesh supports service checks under both systemd and OpenRC. It does not assume
+that every system has journald or a permanent telemetry stack. On Alpine and
+other small OpenRC systems, yesh can report:
+
+- the platform and supervisor under which it is running;
+- service state and PID;
+- the visible cgroup and process table;
+- finite resource measurements with bounded JSONL history;
+- explicit unavailable fields when the kernel or environment cannot provide them.
+
+This is not continuous monitoring. A script answers one concrete question during
+a bounded period and leaves a result a person can read. When a process epoch
+changes, yesh does not merge two lifetimes and marks the measurement incomplete.
+
+See the [OpenRC example](examples/openrc-auto-resource-check.yesh) and the
+[resource-constrained systems note](docs/underthehood/resource-constrained-os.md).
+Future container checks will follow the same boundary: only `/proc`, cgroup,
+and supervisor data visible inside the environment can be reported.
+
+## What exists today
+
+- strings, lists, assignments, `if`, finite `for`, and explicit `$name` expansion;
+- commands, pipelines, redirections, and stop-on-error execution;
+- `--plan` with expanded arguments and both external-condition branches;
+- locks, atomic publication, and existence checks;
+- typed systemd/journal and OpenRC checks;
+- Linux process snapshots and finite service resource measurements;
+- storage, SSH/SCP, network, and backup preflight checks;
+- scripts around `rsync` and `rsnapshot`, which remain external programs.
+
+An operation is built in only when it makes a real scenario clearer or safer.
+yesh does not rewrite `rsync`, `mount`, `sed`, `awk`, package managers, or the shell.
+
+## Limits of the claim
+
+yesh reports observed facts and explicitly reports unavailable data. It does not
+prove the cause of a failure, make an external host safe, replace continuous
+monitoring, or sandbox untrusted code.
+
+Checks that require Linux, systemd, OpenRC, cgroups, root, SSH, devices, or a
+separate fixture prove behavior only in that environment. A skipped dependency
+is not evidence of support.
+
+## Documentation
+
+- [quick start](docs/quickstart.md);
+- [language guide](docs/syntax-guide.md);
+- [practical examples](docs/practical-examples.md);
+- [systemd and resource measurement](docs/systemd.md);
+- [OpenRC and resource-constrained systems](docs/underthehood/resource-constrained-os.md);
+- [security boundaries](SAFETY.md);
+- [language design](DESIGN.md);
+- [current TODO](docs/TODO.md);
+- [manual page](man/yesh.1).
+
+Detailed Linux test results are in the
+[under-the-hood section](docs/underthehood/README.md). The project is under
+active development; the current stated platform is Linux/amd64.
+
+[Русский README](README.ru.md) · [README на иврите](README.he.md)
+
+## Verify from a checkout
+
+    GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go test ./...
+    GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go vet ./...
+    GOCACHE=$PWD/.gocache GOMODCACHE=$PWD/.gomodcache go build -trimpath ./cmd/yesh
+
+License: MIT.

@@ -144,7 +144,16 @@ combining different service invocations.
 
 The saved JSON records retain exact byte values and derived fields such as
 `memory_start`, `memory_end`, `memory_max`, `memory_delta`, and the measured
-trend and slope. `summarize` renders those records as an operator report rather
+trend and slope. In the report, `trend volatile` means that both increases and
+decreases were observed within the selected measurement, so one direction would
+be misleading. `limit unlimited` means the cgroup has no memory limit
+(`memory.max=max`); it does not mean that the service uses no memory. When the
+selected window contains several completed records, `summarize` reads them as
+accumulated history and reports the history span separately from the total
+sampled intervals, so a gap between runs is not presented as continuous
+observation. Change direction is marked with `↑` (rising), `↓` (falling), `=`
+(unchanged), `~` (volatile), or `?` (no comparable data). `summarize` renders
+those records as an operator report rather
 than printing a `key=value` table. It opens with the unit, observed duration,
 memory direction, and observation completeness, then describes memory, RSS,
 CPU/OOM counters, process RSS growth, process churn, scope, and limitations.

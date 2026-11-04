@@ -10,6 +10,9 @@ Start with the [syntax tutorial](../syntax-guide.md), then read the
   what those tests did and did not prove;
 - [resource-observation decisions](resource-observation-findings.md) — the
   sources behind the resource model and the decisions made from them;
+- [resource-constrained operating systems](resource-constrained-os.md) — the
+  Alpine/OpenRC reference case and the boundary between Linux resource data,
+  service adapters, and optional logs;
 - [long-running state](long-running-and-state.md) — history limits, safe state
   updates, retention, and the boundary of future resume support.
 - [distribution package builds](packaging.md) — a long-term Debian and RPM

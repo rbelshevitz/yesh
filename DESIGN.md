@@ -13,6 +13,22 @@ The main test is:
 > Can a reader understand a script from top to bottom without mentally
 > executing Bash?
 
+## The paradigm
+
+yesh is a verifiable operational runbook. A script makes its preconditions,
+visible commands, bounded actions, and postconditions reviewable in one place.
+Its result reports both observed facts and unavailable facts. yesh does not
+claim more than the node and its external tools can establish.
+
+The execution shape is:
+
+```text
+intent → preflight → visible command → bounded action → postcondition → evidence boundary
+```
+
+This is a design criterion, not a promise of formal proof, continuous
+monitoring, or complete knowledge of the host.
+
 ## Three rules
 
 yesh should not require the programmer to constantly defend against the

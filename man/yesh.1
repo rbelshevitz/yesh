@@ -274,6 +274,12 @@ and the unit identity remained stable. It does not mean that every optional
 controller or accounting field was available. Such fields remain
 `unavailable` and the summary identifies the missing evidence.
 .PP
+The human-readable summary marks memory and RSS direction with arrows:
+`\\(u2191` means rising, `\\(u2193` falling, `=` unchanged, `~` volatile, and `?`
+no comparable data. `trend volatile` means that both increases and decreases
+were observed during the selected interval. `limit unlimited` means the cgroup
+has no memory limit (`memory.max=max`); it does not mean zero memory usage.
+.PP
 The journal is one bounded JSON Lines file per state directory, not one JSON
 array. A final incomplete line is ignored during reading; a malformed complete
 line is an error. Records from another manager, unit, cgroup, or invocation are

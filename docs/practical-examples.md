@@ -4,7 +4,8 @@ An example is useful only when its result is checked: data is restored, invalid
 configuration does not replace the working file, and an interrupted operation
 is not reported as successful. An exit code alone is not sufficient.
 
-The scenarios are exercised by `cmd/yesh/practical_posix_test.go` and
+All files in `examples/` are checked for parsing. The practical scenarios are
+exercised by `cmd/yesh/practical_posix_test.go` and
 `cmd/yesh/initrd_linux_test.go`. Tests use temporary directories, do not touch
 production services, and do not require a real remote SSH host.
 
@@ -40,6 +41,9 @@ partial files, and lock cleanup.
 | rsnapshot with confirmation | [`rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh) | missing confirmation or failed config test |
 | Scheduled backup | [`cron-backup-rwe.yesh`](../examples/cron-backup-rwe.yesh) | cancellation, timeout, or held lock |
 | nginx text-log maintenance | [`nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh) | missing confirmation or failed service/logrotate check |
+| OpenRC service observation | [`openrc-resource-check.yesh`](../examples/openrc-resource-check.yesh) | missing service, unavailable cgroup, or incomplete measurement |
+| OpenRC automatic manager selection | [`openrc-auto-resource-check.yesh`](../examples/openrc-auto-resource-check.yesh) | no confirmed service manager |
+| OpenRC `supervise-daemon` child restart | [`openrc-supervise-check.yesh`](../examples/openrc-supervise-check.yesh) | child epoch changes during measurement |
 
 ## Shared rule: exit codes
 
@@ -204,10 +208,11 @@ deleted implicitly.
 ### Incremental snapshot and restore
 
 For a backup rather than a mirror, write each new tree to a fresh temporary
-directory, then publish it only after `rsync` succeeds. `--link-dest` reuses
-unchanged files from the previous published snapshot; it does not make the
-temporary tree or the previous snapshot writable. The example deliberately
-does not add `--delete`:
+directory, then publish it only after `rsync` succeeds. The previous-snapshot
+variable must be set; for the first snapshot it may point to a deliberately
+nonexistent path. When it exists, `--link-dest` reuses unchanged files from
+that snapshot; it does not make the temporary tree or the previous snapshot
+writable. The example deliberately does not add `--delete`:
 
 ```yesh
 source = environment YESH_RSYNC_SOURCE
@@ -230,6 +235,9 @@ published path; see [rsync-incremental.yesh](../examples/rsync-incremental.yesh)
 succeed. After the copy, restore the selected completed snapshot into a new
 empty directory and compare expected files or checksums. A successful `rsync`
 exit code alone is not proof that the application can use the restored data.
+When a test changes a source file between runs, change its size or ensure a
+new modification time; rsync's normal quick-check uses size and modification
+time and can legitimately treat a rapid same-size rewrite as unchanged.
 
 The equivalent Bash outline is shorter but leaves the staging and failure
 rules to surrounding shell code:
@@ -247,6 +255,42 @@ same filesystem and the temporary tree is private. For a selected restore,
 [rsync-selected-restore.yesh](../examples/rsync-selected-restore.yesh) checks
 that the source is a real directory and the target is an existing empty
 mounted directory; it never deletes target entries implicitly.
+
+### Guarded rsnapshot rotation
+
+[rsnapshot-apply.yesh](../examples/rsnapshot-apply.yesh) is a preflight wrapper,
+not a replacement for `rsnapshot.conf`. The configuration remains the source of
+truth for `retain`, `sync_first`, `no_create_root`, `lockfile`, backup points,
+`rsync_long_args`, and other rsnapshot parameters.
+
+`configtest` checks the configuration syntax and the referenced helper paths;
+it does not copy data, prove that the source is readable, prove that the
+destination is the intended mounted filesystem, or guarantee that a later
+transfer will succeed. yesh performs the mount and free-space checks around it,
+while rsnapshot remains responsible for parsing and applying its own options.
+
+The visible order is:
+
+1. verify the configuration, mounted destination, and free space;
+2. run `rsnapshot configtest`;
+3. capture test output with `rsnapshot -t`;
+4. review the report, including `--delete` and `--delete-excluded` flags;
+5. create the confirmation file outside yesh;
+6. run `sync` first when `sync_first=1`, then run the selected interval;
+7. require the expected `daily.0` directory and absence of the lockfile;
+8. restore an older snapshot into a separate empty directory.
+
+The `/./` suffix in a `backup` line controls the directory layout: it copies
+the contents of the source below the configured destination instead of adding
+the source directory name. `daily.0` is the newest completed rotation and
+`daily.1` is the previous one. Rotation may reuse unchanged files with hard
+links, so verify both content and inode identity when testing space reuse.
+
+`configtest` and `-t` are review steps, not proof that the real transfer will
+succeed. A failed or interrupted operation must be checked for its lockfile,
+partial output, and published snapshot. With `no_create_root=1`, rsnapshot
+must not create a missing mount root; yesh still checks the expected mount
+source before invoking it.
 
 ## Configuration and remote operations
 
@@ -343,6 +387,46 @@ The important failure distinction is deliberate: an inactive service after a
 successful `systemctl restart` is a failed yesh operation; an empty journal
 query is successful and means that no matching records were returned; a
 non-empty diagnostic or invalid JSON is an error rather than a partial report.
+
+### OpenRC on Alpine
+
+These examples apply the same finite observation model to a Linux system that
+uses OpenRC instead of systemd:
+
+- [`openrc-resource-check.yesh`](../examples/openrc-resource-check.yesh) uses
+  an explicit OpenRC adapter for status, resources, and a short measurement;
+- [`openrc-lighttpd-check.yesh`](../examples/openrc-lighttpd-check.yesh) is the
+  clean-service variant used by
+  [`scripts/yesh-openrc-lighttpd-fixture`](../scripts/yesh-openrc-lighttpd-fixture)
+  so the SSH observer is not part of the measured cgroup;
+- [`openrc-lighttpd-summary.yesh`](../examples/openrc-lighttpd-summary.yesh)
+  reads that JSONL and prints the human-readable history report;
+- [`openrc-lighttpd-load-fixture`](../scripts/yesh-openrc-lighttpd-load-fixture)
+  adds a temporary large page and bounded localhost requests, then appends a
+  second measurement to the same JSONL so changes can be compared;
+- [`openrc-auto-resource-check.yesh`](../examples/openrc-auto-resource-check.yesh)
+  lets yesh confirm the available service manager;
+- [`openrc-supervise-check.yesh`](../examples/openrc-supervise-check.yesh)
+  observes a temporary `supervise-daemon` service and records an incomplete
+  measurement if its child process is replaced during the interval;
+- [`openrc-missing-service.yesh`](../examples/openrc-missing-service.yesh) is
+  the negative case and must not produce a successful service observation.
+
+Start with `--plan`. The OpenRC status query uses `rc-status -C -f ini -a` so
+that services from all runlevels, including stopped services, are considered.
+The real observation reports the platform and supervisor separately, then
+connects the OpenRC state with the verified PID, `/proc`, and cgroup data.
+Unavailable cgroup fields remain unavailable; yesh does not turn this into a
+permanent monitor or an OpenRC management tool.
+
+The examples were run on an Alpine VM with OpenRC and cgroup v2. The
+`lighttpd` fixture produced one process, three JSONL samples, and
+`complete=true`; its `partial` observation was caused by unavailable PSI fields,
+not by an incomplete process snapshot. Its human-readable summary also
+reported stable memory and RSS, CPU time, OOM kills, block I/O, process
+continuity, and the `platform=alpine supervisor=openrc` context. That proves the
+selected Alpine/kernel setup only. User services requiring `XDG_RUNTIME_DIR`
+and containers are separate checks and are not covered by these examples.
 
 ## Dependencies and practical test run
 

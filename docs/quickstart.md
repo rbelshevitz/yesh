@@ -64,6 +64,13 @@ The yesh version reads as a sequence of ordinary sentences:
 There is no `$service`, `${services[@]}`, `[[ ... ]]`, `then`, `fi`, `do`,
 `done`, or `set -euo pipefail` to decode.
 
+Read the script as a verifiable operational runbook. For each step, ask:
+what must be true first, which command or operation is visible, what result is
+checked afterward, and what remains unknown if the node cannot expose it?
+Here, access to systemd is a precondition, the command result is evidence about
+that check, and the script claims only that the selected service passed the
+active-state check.
+
 ## What yesh changes
 
 ### Values keep their type

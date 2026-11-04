@@ -1,7 +1,11 @@
 # Execution safety
 
-yesh supports scripts that may require administrative privileges. Ambiguous or
-unsafe situations should fail before a process starts whenever possible.
+yesh supports scripts that may require administrative privileges. Ambiguity that
+can be detected in advance should stop execution.
+
+> **In short:** yesh makes commands, arguments, order, and failure boundaries
+> visible. It is not a sandbox and cannot make an arbitrary external program
+> safe. Treat a script run as root like any other privileged program.
 
 ## What ordinary mode forbids
 

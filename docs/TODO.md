@@ -61,6 +61,8 @@ long-running-job resume, cgroup management, ARM64, or replacements for
   The loopback/ext4 `rsnapshot` stand passed with `no_create_root`, two
   rotations, hard links, restore, `--plan`, negative checks, and cleanup; both
   normal mode and `sync_first=1` (`sync` → rotation) were verified separately.
+  The current `yesh-rsnapshot-mounted-rwe.sh` itself also passed with the
+  expected `daily.0`/`daily.1` contents and restore output.
 - A second physical partition is not required for this acceptance: the
   temporary loopback/ext4 image is sufficient. A real destination such as
   `/var/cache/rsnapshot` still requires its own mounted filesystem; a directory
@@ -171,13 +173,14 @@ Add an explicit navigator check for the chain form → real parser → `--plan` 
 optional review window → save. Do not treat a selected `daily` as a data
 transfer until it is established that `sync_first` is disabled.
 
-Proofread the tutorial against the real `rsnapshot` stand: explain that
-`--delete` and `--delete-excluded` come from the standard `rsnapshot`
-configuration, remove only destination-side extras, and require review of the
-test report; show the boundary `--plan` → test report → explicit confirmation
-file → rotation → restore. Explain the `/./` source suffix in a `backup` line,
-the difference between `daily.0` and `daily.1`, hard-link verification, and
-that `fstab` and automatic mounting are outside this scenario.
+The tutorial has been proofread against the real `rsnapshot` stand: it explains
+that `configtest` checks configuration syntax and helper paths but does not
+guarantee a successful transfer; `--delete` and `--delete-excluded` come from
+the standard configuration, remove only destination-side extras, and require
+review of the test report. It shows the boundary `--plan` → test report →
+explicit confirmation file → rotation → restore, including `/./`,
+`daily.0`/`daily.1`, hard-link verification, and the fact that `fstab` and
+automatic mounting are outside this scenario.
 
 🚫 Danger zone: an ordinary directory in place of the mounted destination,
   `sync_first`, stale lockfiles, `.sync` or `_delete.*`, and publication after
@@ -189,6 +192,90 @@ Keep the boundary “finite snapshot, not monitoring”. Check a positive snapsh
 an unavailable optional counter, a disappearing process, a changed cgroup tree,
 and a restart with a new `InvocationID`. `summarize` must not combine different
 service invocations or present process RSS as `memory.current`.
+
+The first technical OpenRC layer is now prepared:
+
+- [x] the common cgroup collector is independent of systemd;
+- [x] machine-readable `rc-status -C -f ini -a` parsing;
+- [x] positive and negative parser tests;
+- [x] parsing the service record from `/run/openrc/daemons/<service>/001`;
+- [x] extending JSONL records with platform, supervisor, and process epoch;
+- [x] an initial OpenRC adapter linking ordinary service state to verified PIDs
+  and cgroup;
+- [x] automatic confirmed-source selection for `status`, `resources`, and
+  finite `measure`;
+- [x] a dedicated `supervise-daemon` proof with a new child-process epoch;
+- [x] `summarize` accepts OpenRC JSONL and emits the same memory, RSS, CPU, OOM,
+  and I/O summary with platform, supervisor, and an explicit incomplete-epoch
+  marker;
+- [x] run that summary on the clean `lighttpd` stand and verify its output;
+- [ ] OpenRC user-service validation with `XDG_RUNTIME_DIR`.
+
+Mandatory architectural rule: observe resources at the Linux level (`cgroup
+v2` and `/proc`), with systemd as only the first target adapter. Do not make
+systemd or journald prerequisites for general measurement: Alpine/OpenRC and
+minimal systems must remain valid targets with an explicitly absent service-
+state or journal layer.
+
+Before selecting an adapter, identify the local OS from the `ID` field in
+`/etc/os-release` (falling back to `/usr/lib/os-release`), but do not infer a
+working OpenRC from `ID=alpine`. Separately confirm an operational service
+manager interface and state (systemd or OpenRC), then verify the service, PID,
+and cgroup. Use `PRETTY_NAME` only for display and `ID_LIKE` only as a family
+classification hint. In a container, do not treat `/run/host/os-release` as
+the current environment's OS. If the probes disagree, do not guess the manager.
+
+The first common layer should stay simple: one service, automatic source
+selection, and an explainable report. Use machine-readable interfaces for
+reading: `systemctl show` and `rc-status` with `ini` output and `-a`. Do not
+make the script author choose a
+manager or supervisor. Treat `supervise-daemon` as an OpenRC implementation
+detail. The report must still show reported state, PID, process start time,
+cgroup, and process-epoch changes separately. Keep the common contract limited
+to status reading, a resource snapshot, and finite measurement for now.
+
+### Containers with `supervisord`
+
+This branch is not part of current support and must not be described as ready.
+It remains a separate future task after the systemd/OpenRC work.
+
+Keep this as a separate testable branch because a container PID and a host PID
+may differ. A PID number is not enough identity: combine the PID namespace,
+`/proc` `starttime`, cgroup evidence, and `supervisord` XML-RPC as separate
+evidence layers.
+
+- [ ] read `getProcessInfo`/`getAllProcessInfo` through an authenticated Unix
+  socket without adding process management;
+- [ ] compare Supervisor state with `/proc` and cgroup, without treating a
+  Supervisor group as a cgroup resource boundary;
+- [ ] distinguish yesh running inside the container, in a diagnostic container,
+  and on the host with namespace access;
+- [ ] mark the result incomplete when child processes or cgroups are hidden;
+- [ ] test a restart with a new identity tuple: PID, `starttime`, and PID
+  namespace;
+- [ ] add positive, negative, and `--plan` scenarios.
+
+Boundary: `RUNNING` from `supervisord` confirms its process model, but does not
+prove resource ownership, complete container visibility, or application health.
+yesh must not infer that a container owns host processes.
+
+This remains useful on large systems, but not as a replacement for central
+monitoring. Across a large fleet, yesh should stay a finite diagnostic scenario
+for one node, one service, or one incident: check “configured → started →
+controller → PID → cgroup → resources → log source” and preserve readable
+evidence. This is useful after a configuration change, an unexpected restart,
+on a node without a monitoring agent, or when central state disagrees with the
+actual node. An external tool such as SSH or fleet management may run the
+scenario on many nodes; yesh must not become the agent, time-series database,
+or alerting system itself.
+
+- [ ] define a finite “single-service diagnosis” report with explicit evidence
+  layers and `no data`/`unsupported` states;
+- [ ] check the same report on one systemd node and one OpenRC node;
+- [ ] add a separate example that runs the scenario on a selected node through
+  external SSH, without adding a hidden remote executor to yesh;
+- [ ] document the boundary between local yesh diagnosis and central fleet
+  monitoring.
 
 🚫 Do not add a daemon, alerting system, `pkill`, `cgroup.kill`, limit writes, or
   automatic container ownership claims here.
@@ -477,6 +564,105 @@ Turbo Vision remains a reference for the general idea of dialogs, focus, and
 buttons. The first implementation should take its colors from `nmtui` so the
 interface remains legible and does not visually merge together.
 
+## Longer-term direction after polishing
+
+The next major value of yesh is not another shell or its own backup system,
+but a verifiable operational path around familiar Linux tools. The practical
+center of that path is a backup that can be restored to a separate location
+and checked, not merely created.
+
+Keep these items in the longer-term plan:
+
+- document one canonical workflow: preflight → `rsync` dry run → copy →
+  publication → restore → content verification;
+- add a small repeatable restore test to the practical examples, using a
+  separate directory or temporary stand without touching the source;
+- report not only that a command succeeded, but also what yesh checked and what
+  remains the responsibility of `rsync`, the filesystem, or the remote host;
+- keep the navigator as a newcomer entry point for two bounded workflows:
+  backup and service inspection. In both, the form only builds text, while the
+  parser validates it before plan review and saving;
+- later separate the measurement target from the systemd adapter: consider
+  reading an arbitrary cgroup v2, a process tree, and, separately, a remote
+  target over SSH. Account for Alpine and other OpenRC systems where systemd
+  and journald may be absent; keep `service` as the first and strictest
+  adapter;
+- collect feedback from real scenarios and add built-in help only where it
+  reduces risk or makes the result easier to explain.
+
+This branch requires positive, negative, and `--plan` cases, plus demonstrated
+restoration for backups. A successful exit code or a newly created directory is
+not proof that a copy is usable.
+
+This direction does not change yesh's boundary: `rsync`, `rsnapshot`, SSH, and
+systemd remain external tools. yesh is responsible for visible ordering,
+checks, locking, publication, and understandable refusal.
+
+### Longer-term measurement target model
+
+The general future measurement shape is:
+
+```text
+target → confirmed identity → finite interval
+→ measurements → completeness → explainable result
+```
+
+Possible targets, in increasing order of complexity:
+
+1. a systemd service with `InvocationID`, cgroup, and journal;
+2. an arbitrary cgroup v2, including a container group;
+3. a process tree identified by PID;
+4. a remote target through an explicitly selected SSH path.
+
+On Alpine, `/proc` and `/sys/fs/cgroup` may be the primary sources, while
+service state and journal data must remain optional adapters. If cgroup v2, a
+required controller, or permissions are unavailable, the result must state
+the limitation rather than replacing it with zero.
+
+For a PID, verify start time and process membership: a PID number alone is not
+enough because processes exit and PIDs are reused. For a cgroup, retain the
+path, available controllers, and subtree boundary. A single discovered process
+must not be treated as proof of the whole target.
+
+Each new target type requires separate positive, negative, and `--plan` cases.
+Do not add a generalized measurement construct until at least two independent
+practical scenarios justify it.
+
+### Constrained OS stand: Alpine/OpenRC
+
+Before implementing an OpenRC adapter, proofread and validate the [design note
+on resource-constrained operating systems](underthehood/resource-constrained-os.md).
+The acceptance criteria include:
+
+- cgroup v2 is mounted before services start; already running processes must
+  not be treated as proof that each service has its own cgroup;
+- distinguish `rc-update add` (runlevel change) from an actual start through
+  `rc-service` or `openrc`;
+- do not treat `rc-status`, a PID file, or `zap` as complete proof of process
+  state;
+- for `supervise-daemon`, retain child PID, start time, respawns, and process
+  epoch changes;
+- keep OpenRC state, cgroup, processes, and syslog/file logs as separate layers;
+- test system and user services separately, including permissions and
+  `XDG_RUNTIME_DIR`;
+- report missing journald, PSI, a controller, or cgroup delegation as
+  `unavailable`/an incomplete observation.
+- [x] document checking `uname -m`/`apk --print-arch` before choosing an Alpine
+  executable;
+- [ ] verify building and running yesh on ARM64, ARMv7, or MIPS; cross-compiling
+  alone is not such a test.
+
+Alpine 3.24.3 with OpenRC 0.63.2 has been checked as a separate lower-level
+stand: machine-readable `rc-status`, separate supervisor and child PIDs, one
+shared cgroup, and an increased respawn count after terminating the child were
+confirmed. This proves only the selected kernel, Alpine, and OpenRC
+configuration. A positive run of the built yesh binary for the ordinary `sshd`
+service confirmed state, platform, supervisor, cgroup, process snapshot, and
+finite JSONL output; a missing-service request failed without false success.
+The dedicated `supervise-daemon` run confirmed a new child-process epoch: the
+measurement became incomplete after the restart without mixing the two runs.
+OpenRC user-service validation remains open.
+
 ## Do not do before the milestone is complete
 
 - do not add `observe`, `resume`, a general desired-state language, or new
@@ -533,11 +719,10 @@ distinct from a missing driver, filesystem, image, or `/boot` space problem.
 
 ## Next working step
 
-Repeat and review the `rsync`/`rsnapshot` matrix, separately verify restoration
-and negative cases, then proofread the tutorial against the real stand: default
-deletion flags, `/./` source layout, explicit confirmation, rotation, restore,
-and the unmounted refusal. Release `v0.2.0` is published; do not add network
-capabilities or metrics yet.
+Keep the backup boundary stable and use the completed `rsync`/`rsnapshot`
+examples as the acceptance reference. Do not add network capabilities or
+metrics yet; the next changes should be small documentation or test repairs
+against a real failure.
 
 ## Boundaries and documents
 

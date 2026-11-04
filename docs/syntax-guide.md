@@ -859,7 +859,9 @@ The next run can read the old history. `summarize ... since 1h` selects records
 from the last hour, compares the beginning and end of each measurement, combines
 them into one report, and shows changes in memory, RSS, CPU, OOM, and I/O. It
 does not continue an interrupted measurement and does not combine records from
-different service invocations. To continue, start a new explicit `measure`.
+different service invocations. The human report marks memory and RSS direction
+with `↑`, `↓`, `=`, or `~`; the navigator also shows the change between adjacent
+saved records. To continue, start a new explicit `measure`.
 
 Here RSS means resident memory: the amount of a process's memory currently held
 in RAM. Shared pages may be counted for more than one process, and swapped-out
