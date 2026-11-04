@@ -75,6 +75,11 @@ result visible and explainable. You choose an intention and fill in a form;
 the navigator builds an ordinary yesh text file and passes that text to the
 same parser used when a file is started from the terminal.
 
+The TUI is still experimental. It is planned to move out of the main `yesh`
+executable into a separate, optional `yesh-navigator` executable. Until that
+extraction is complete, the tagged build is a development artifact; use the
+regular `yesh` command to run scripts.
+
 The workflow is:
 
 1. fill in the form;
