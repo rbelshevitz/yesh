@@ -4,9 +4,9 @@ This is the short working map. It contains only the current milestone,
 verifiable tasks, and boundaries. Historical decisions and closed discussions
 are kept in the [archive](TODO-history.md).
 
-## Current focus: preparing `v0.2.2`
+## Current focus: after `v0.2.2`
 
-Release `v0.2.1` is published. The `v0.2.2` candidate is a technical release
+Releases `v0.2.1` and `v0.2.2` are published. `v0.2.2` is a technical release
 for polishing the implemented Linux scenarios, documentation, and checks. New
 language constructs are out of scope for now. The working boundary is
 Linux/amd64.
@@ -25,7 +25,7 @@ Linux/amd64.
 - [x] full release run: `go test ./...`, `go vet ./...`, a `-trimpath` build,
   and green CI;
 - [x] review release text and mark OpenRC as experimental support;
-- [ ] publish tag `v0.2.2` only after reviewing the file list and checksum.
+- [x] publish tag `v0.2.2` after reviewing the file list and checksum.
 
 `v0.2.2` does not claim production-ready support for every Linux system. It does
 not include supervisord, container diagnostics, continuous monitoring, ARM64, or

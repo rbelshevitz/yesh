@@ -41,6 +41,11 @@ the previous state is protected, and a report can be reproduced from saved
 observations. These are criteria for individual high-consequence scenarios, not
 a claim that yesh is better than Bash for every task.
 
+See the [careful Bash baseline](examples/bash-rsync-incremental-baseline.sh)
+next to the matching [yesh scenario](examples/rsync-incremental.yesh). It is
+not a caricature: it makes the manual bookkeeping around `rsync` visible so
+the difference in readability and review can be judged on one operation.
+
 ## Quick start
 
 Go 1.21 or newer is required; Linux is required for Linux-specific features:
@@ -57,50 +62,17 @@ Every file in `examples/` is checked for parsing. Some examples require
 separate fixture; without those conditions they stop before taking action.
 That is an environment boundary, not a syntax error.
 
-## Small systems: systemd and OpenRC
+## Resource-constrained Linux systems
 
-yesh supports service checks under both systemd and OpenRC. It does not assume
-that every system has journald or a permanent telemetry stack. On Alpine and
-other small OpenRC systems, yesh can report:
-
-- the platform and supervisor under which it is running;
-- service state and PID;
-- the visible cgroup and process table;
-- finite resource measurements with bounded JSONL history;
-- explicit unavailable fields when the kernel or environment cannot provide them.
-
-This is not continuous monitoring. A script answers one concrete question during
-a bounded period and leaves a result a person can read. When a process epoch
-changes, yesh does not merge two lifetimes and marks the measurement incomplete.
-
-See the [OpenRC example](examples/openrc-auto-resource-check.yesh) and the
+yesh supports read-only service checks under systemd and OpenRC: platform,
+supervisor, PID, cgroup, process, and finite resource observations. Missing host
+data is reported as unavailable; this is not continuous monitoring. See the
+[OpenRC example](examples/openrc-auto-resource-check.yesh) and the
 [resource-constrained systems note](docs/underthehood/resource-constrained-os.md).
-Future container checks will follow the same boundary: only `/proc`, cgroup,
-and supervisor data visible inside the environment can be reported.
 
-## What exists today
-
-- strings, lists, assignments, `if`, finite `for`, and explicit `$name` expansion;
-- commands, pipelines, redirections, and stop-on-error execution;
-- `--plan` with expanded arguments and both external-condition branches;
-- locks, atomic publication, and existence checks;
-- typed systemd/journal and OpenRC checks;
-- Linux process snapshots and finite service resource measurements;
-- storage, SSH/SCP, network, and backup preflight checks;
-- scripts around `rsync` and `rsnapshot`, which remain external programs.
-
-An operation is built in only when it makes a real scenario clearer or safer.
-yesh does not rewrite `rsync`, `mount`, `sed`, `awk`, package managers, or the shell.
-
-## Limits of the claim
-
-yesh reports observed facts and explicitly reports unavailable data. It does not
-prove the cause of a failure, make an external host safe, replace continuous
-monitoring, or sandbox untrusted code.
-
-Checks that require Linux, systemd, OpenRC, cgroups, root, SSH, devices, or a
-separate fixture prove behavior only in that environment. A skipped dependency
-is not evidence of support.
+Commands remain external: yesh does not rewrite `rsync`, `mount`, `sed`, `awk`,
+package managers, or the shell. Observations prove only the environment where
+they were collected; a skipped dependency is not evidence of support.
 
 ## Documentation
 
