@@ -138,6 +138,13 @@ universal operation in an image without a shell.
 multiple nodes, the database, migrator, or external `Job`—not yesh's local
 lock—must provide the single-run guarantee.
 
+On Linux, yesh implements this lock with `flock` on an open file descriptor.
+The kernel releases the lock when the process exits, including after `SIGKILL`.
+The lock-path file may remain, but its existence does not mean that a process
+still holds the lock. This stand does not yet test a killed process or an
+abruptly terminated container; those cases need a separate interruption-and-
+rerun test.
+
 Stand sources: [Dockerfile.sqlite-lab](../../Dockerfile.sqlite-lab),
 [yesh script](../../examples/container-sqlite-migrate.yesh),
 [positive migration](../../examples/container-sqlite-migration.sql), and

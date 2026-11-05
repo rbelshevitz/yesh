@@ -724,6 +724,12 @@ application image. First test a separate one-shot operational image containing
 yesh, exactly the required external programs, and explicitly mounted volumes or
 network access.
 
+This work also clarifies yesh's broader niche: yesh describes reviewable
+operational procedures. The procedure may run on a host or inside a container.
+The next serious acceptance gate is interruption and rerun: after an abrupt
+stop, the next run must establish whether the lock was released, what result
+was published, and what remains safe to retry.
+
 The absence of a shell is not, by itself, a yesh problem. If a scenario needs
 `tar`, `cp`, a diagnostic utility, or a database client, the image must provide
 it explicitly and that tool remains responsible for its work. yesh must not
@@ -788,6 +794,18 @@ Linux/amd64. A WSL2 bind mount of a temporary directory failed with a permission
 error in this Docker context; this is a separate Docker/WSL2 boundary, not proven
 yesh semantics. Kubernetes `Job`, CSI/NFS, `fsGroup`, distributed locking, and a
 real PostgreSQL setup remain untested.
+
+The Linux `with lock` implementation uses an advisory `flock` on an open file
+descriptor. The kernel releases that lock when the process exits, including
+`SIGKILL`; a remaining lock-path file is only a pathname and does not prove that
+the lock is held. Existing tests cover a body error and a competing holder, but
+they do not yet cover a killed yesh process or an abruptly terminated container.
+Add both tests before treating interruption and rerun behaviour as accepted:
+
+- kill a process while it owns the lock, then start a second run and verify that
+  it acquires the lock;
+- terminate the Alpine container, then rerun it on the same volume and verify
+  the published tree, incomplete tree, lock path, and result status.
 
 Documentation for the stand:
 
