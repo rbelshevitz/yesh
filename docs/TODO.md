@@ -167,9 +167,14 @@ through a trusted channel, and `BatchMode=yes`, `ConnectTimeout=5`, and
 `StrictHostKeyChecking=yes` prevent password waits or silent trust of a new
 host.
 
-💡 Problem solved by yesh: the operator can see the whole “check → transfer →
-  verify → publish” boundary instead of reconstructing it from fragile quoting
-  and shell defaults.
+yesh lets you build reviewable backup scenarios around standard Linux tools:
+`rsync` and `rsnapshot`.
+
+If a transfer fails, yesh does not publish the incomplete backup. The last
+successfully created backup remains available.
+
+yesh does not implement backup, restore, or rollback. It makes the execution of
+external commands predictable and controllable.
 
 Add a separate backup-result check to the practical example: verify expected
 files/content rather than only the `rsync` exit code, then perform a restore
