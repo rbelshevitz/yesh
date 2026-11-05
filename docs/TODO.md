@@ -798,14 +798,17 @@ real PostgreSQL setup remain untested.
 The Linux `with lock` implementation uses an advisory `flock` on an open file
 descriptor. The kernel releases that lock when the process exits, including
 `SIGKILL`; a remaining lock-path file is only a pathname and does not prove that
-the lock is held. Existing tests cover a body error and a competing holder, but
-they do not yet cover a killed yesh process or an abruptly terminated container.
-Add both tests before treating interruption and rerun behaviour as accepted:
+the lock is held. Automated tests cover a body error and a competing holder.
+Manual interruption checks are now complete:
 
-- kill a process while it owns the lock, then start a second run and verify that
-  it acquires the lock;
-- terminate the Alpine container, then rerun it on the same volume and verify
-  the published tree, incomplete tree, lock path, and result status.
+- [x] kill a yesh process while it owns the lock on the Alpine 3.24.3 stand;
+  a second process acquired the lock;
+- [x] run the same check in the WSL2 Docker stand with `docker kill` and the
+  same named volume; a second container acquired the lock.
+
+These checks prove lock release and reacquisition. They do not prove that an
+arbitrary interrupted migration or transfer leaves valid data; each operation
+still needs its own partial-result and rerun test.
 
 Documentation for the stand:
 
