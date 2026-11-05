@@ -821,21 +821,21 @@ escalates to `SIGKILL`, and waits for direct children. Existing POSIX tests cove
 process groups, cancellation, timeouts, and child reaping. They do not yet prove
 the container contract with yesh as PID 1.
 
-Add a Docker comparison on the same scenario:
+Add a Docker test on the same scenario. Test yesh's signal and child-process
+behaviour directly, and delegate the PID 1 role to the existing `tini` package
+or another mature init:
 
-- run yesh directly as PID 1 with the exec-form entrypoint;
-- run the same procedure under the existing `tini` package, if direct PID 1
-  ownership is not the appropriate deployment choice;
+- run the yesh procedure under `tini` with the exec-form entrypoint;
 - start a long-running external command and a descendant that ignores `SIGTERM`;
 - send `docker stop` and verify signal delivery, process-group cleanup, exit
   within the grace period, and no remaining descendant;
 - repeat with a partial-result scenario and verify that the next run sees the
   previous published result, not a false success.
 
-The result is a boundary statement, not a novelty claim. yesh must not become a
-supervisor or a `tini` replacement. It must either preserve the required
-process-group guarantee as PID 1 or use a mature external init while keeping the
-operational procedure and its failure result visible.
+The result is a boundary statement, not a novelty claim. yesh must not become an
+init, supervisor, or `tini` replacement. `tini` or another mature init owns the
+PID 1 role. yesh owns the predictable cancellation of the external commands it
+starts, process-group cleanup, child waits, and the visible failure result.
 
 Documentation for the stand:
 
