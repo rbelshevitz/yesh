@@ -15,27 +15,24 @@ migration.
 
 ## Why use yesh here?
 
-Consider a one-shot run. You mount a volume with the database and provide a
-migration file. The wrapper must check the paths, wait for the database, prevent
-two local runs, invoke the migrator, and verify the expected change. `sqlite3`,
-or another external tool, already knows how to apply the migration. The problem
-is the sequence around that tool.
+The migrator changes the schema. Docker starts the process and mounts the
+volume. But who checks that the right file is mounted, passes exact arguments,
+and verifies the result? You usually write that part in Bash.
 
-Without a separate language, you usually write this sequence as a short Bash
-script. It is easy to lose a quote, an argument boundary, an exit code, or an
-ordering rule. The problem is sharper in a minimal image: familiar shell and
-diagnostic tools may be absent, so you find the mistake only after the
-container starts.
+That wrapper is where the risk appears. A quoting mistake changes an argument.
+An ordering mistake starts the migrator too early. A successful exit code does
+not prove that the schema now has the intended change.
 
-yesh makes the sequence explicit. The script shows which database it checks,
-which `argv` it passes to `sqlite3`, when it takes the local lock, and which
-result it verifies after the migration. `--plan` lets you inspect those actions
-before the run.
+yesh makes the contract visible:
 
-That is the useful boundary for yesh: one understandable operational run on one
-node or in one container. yesh does not choose schema versions or protect a
-cluster. The database, migrator, and deployment system still provide distributed
-locking, transactions, backups, schema rollback, and deployment ordering.
+1. check the preconditions;
+2. define the order and local lock;
+3. show the external `argv` in `--plan`;
+4. verify the result and return an error.
+
+yesh does not manage schema versions or protect a cluster. The database,
+migrator, and deployment system still own transactions, distributed locking,
+backups, rollback, and release ordering.
 
 ## What happens
 
@@ -67,22 +64,6 @@ yesh does not know SQLite's schema model and does not execute SQL itself. If the
 external migrator later changes to PostgreSQL, yesh can keep the same role—check
 the environment, invoke the migrator, and verify its exit code—but the stand,
 readiness checks, and locking rules must change.
-
-### What yesh does
-
-In this example yesh owns the operational glue:
-
-- refuse to start when the database or migration file is missing;
-- prevent two local copies of the scenario from running at once;
-- pass `sqlite3` separate arguments without another shell parse;
-- stop when the external command fails;
-- verify an expected result after a successful call;
-- show the intended actions in `--plan`.
-
-yesh does not own migration version selection, old/new schema compatibility,
-arbitrary database transaction semantics, rollback of irreversible actions, or
-the guarantee that only one copy runs across multiple nodes. Those decisions
-belong to the database, external migrator, and deployment system.
 
 ## Why there is no Bash
 
