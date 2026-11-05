@@ -810,25 +810,32 @@ These checks prove lock release and reacquisition. They do not prove that an
 arbitrary interrupted migration or transfer leaves valid data; each operation
 still needs its own partial-result and rerun test.
 
-Signal handling is the next container acceptance gate. The current POSIX
-runtime turns `SIGTERM`, `SIGINT`, and `SIGHUP` into context cancellation, sends
-`SIGTERM` to the command's process group, waits two seconds, escalates to
-`SIGKILL`, and waits for direct children. Existing POSIX tests cover process
-groups, cancellation, timeouts, and child reaping. They do not yet prove the
-container contract with yesh as PID 1.
+Signal handling, child-process ownership, and PID 1 behaviour are established
+Linux and container responsibilities. yesh does not need to invent another
+init mechanism. The engineering task is narrower and necessary: verify that
+yesh preserves these existing guarantees when it runs an operational procedure.
 
-Add a Docker test with the exec-form entrypoint:
+The current POSIX runtime turns `SIGTERM`, `SIGINT`, and `SIGHUP` into context
+cancellation, sends `SIGTERM` to the command's process group, waits two seconds,
+escalates to `SIGKILL`, and waits for direct children. Existing POSIX tests cover
+process groups, cancellation, timeouts, and child reaping. They do not yet prove
+the container contract with yesh as PID 1.
 
+Add a Docker comparison on the same scenario:
+
+- run yesh directly as PID 1 with the exec-form entrypoint;
+- run the same procedure under the existing `tini` package, if direct PID 1
+  ownership is not the appropriate deployment choice;
 - start a long-running external command and a descendant that ignores `SIGTERM`;
-- send `docker stop` and verify that yesh receives `SIGTERM`, the group is
-  cleaned up, and the container exits within the grace period;
-- inspect the namespace after exit and prove that no descendant remains;
+- send `docker stop` and verify signal delivery, process-group cleanup, exit
+  within the grace period, and no remaining descendant;
 - repeat with a partial-result scenario and verify that the next run sees the
   previous published result, not a false success.
 
-Do not claim that yesh is a supervisor or `tini` replacement. The guarantee is
-narrower: yesh must clean up the process group it started and report an
-interrupted operation without publishing success.
+The result is a boundary statement, not a novelty claim. yesh must not become a
+supervisor or a `tini` replacement. It must either preserve the required
+process-group guarantee as PID 1 or use a mature external init while keeping the
+operational procedure and its failure result visible.
 
 Documentation for the stand:
 
