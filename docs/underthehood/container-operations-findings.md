@@ -91,8 +91,11 @@ signals and container shutdown surprising.
 - [PID 1, `--init`, and signals](https://docs.docker.com/reference/cli/docker/container/run)
 - [Practical `exec` and SIGTERM discussion](https://www.reddit.com/r/docker/comments/1vdt7id/why_docker_stop_takes_ten_seconds_on_a_container/)
 
-This is real pain but a low-priority yesh direction: otherwise the language
-quickly becomes `tini`, a supervisor, or a process manager.
+This is now a focused acceptance question for the one-shot container scenario.
+The useful guarantee is narrow: if yesh is PID 1, it must cancel and clean up
+the process group it started, wait for its children, and report interruption
+without publishing success. This does not make yesh `tini`, a supervisor, or a
+process manager.
 
 ## 5. Secrets, configuration, and certificates
 
