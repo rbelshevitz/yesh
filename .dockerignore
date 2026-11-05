@@ -1,0 +1,13 @@
+.git
+.gocache
+.gomodcache
+.tmp
+*.tmp
+*.log
+backup.lock
+why.md
+why.ru.md
+Dockerfile*
+docs/
+man/
+bench/

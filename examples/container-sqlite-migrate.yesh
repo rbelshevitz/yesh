@@ -1,0 +1,26 @@
+# One-shot container operation: apply and verify one SQLite migration.
+# sqlite3 remains the database tool; yesh owns ordering, locking, and refusal.
+
+database = environment YESH_DB
+migration = environment YESH_MIGRATION
+lock = environment YESH_LOCK
+
+if exists $database:
+    if exists $migration:
+        with lock $lock:
+            if sqlite3 $database "select count(*) from sqlite_master where type='table' and name='schema_migrations';" | grep -qx 1:
+                echo "migration already applied"
+            else:
+                sqlite3 $database < $migration
+
+            if sqlite3 $database "select count(*) from pragma_table_info('settings') where name='description';" | grep -qx 1:
+                echo "migration verified"
+            else:
+                echo "migration verification failed"
+                exit 4
+    else:
+        echo "migration file is missing"
+        exit 3
+else:
+    echo "database is missing"
+    exit 2

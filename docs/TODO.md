@@ -624,19 +624,18 @@ interface remains legible and does not visually merge together.
 
 ## Longer-term direction after polishing
 
-The next major value of yesh is not another shell or its own backup system,
-but a verifiable operational path around familiar Linux tools. The practical
-center of that path is a backup that can be restored to a separate location
-and checked, not merely created.
+The next major value of yesh is not another shell and not a replacement for
+mature Linux tools, but a verifiable operational path around them. The backup
+and restore path already belongs to the completed body of work; the longer-term
+search should look for other scenarios where the glue between commands is
+especially painful.
 
 Keep these items in the longer-term plan:
 
-- document one canonical workflow: preflight → `rsync` dry run → copy →
-  publication → restore → content verification;
-- add a small repeatable restore test to the practical examples, using a
-  separate directory or temporary stand without touching the source;
-- report not only that a command succeeded, but also what yesh checked and what
-  remains the responsibility of `rsync`, the filesystem, or the remote host;
+- do not expand the completed backup body without a new confirmed scenario;
+- for new operational scenarios, report not only that a command succeeded, but
+  also what yesh checked and what remains the responsibility of the external
+  command, filesystem, or remote host;
 - keep the navigator as a newcomer entry point for two bounded workflows:
   backup and service inspection. In both, the form only builds text, while the
   parser validates it before plan review and saving;
@@ -648,13 +647,183 @@ Keep these items in the longer-term plan:
 - collect feedback from real scenarios and add built-in help only where it
   reduces risk or makes the result easier to explain.
 
-This branch requires positive, negative, and `--plan` cases, plus demonstrated
-restoration for backups. A successful exit code or a newly created directory is
-not proof that a copy is usable.
+This branch requires positive, negative, and `--plan` cases. A successful exit
+code or a newly created directory is not proof of the intended operational
+result.
 
 This direction does not change yesh's boundary: `rsync`, `rsnapshot`, SSH, and
 systemd remain external tools. yesh is responsible for visible ordering,
 checks, locking, publication, and understandable refusal.
+
+### Longer-term search: scenarios where Bash is especially painful
+
+After `rsync` and `rsnapshot`, collect real examples where each Unix utility is
+mature on its own, but the connection between them is held together by fragile
+Bash. The target is not a reason to replace the shell wholesale, but a repeated
+pain around ordering, partial failure, reruns, and proof of the result.
+
+Candidates for investigation:
+
+1. version publication: `rsync`/`scp` → configuration validation → atomic
+   replacement → `systemctl restart` → readiness check → journal and return to
+   the previous version;
+2. service or container maintenance: preflight → lock → stop through an
+   external command → maintenance → start → readiness check;
+3. configuration publication that refuses before changing the active file;
+4. cron or systemd-timer jobs with locking, a finite deadline, result checks,
+   and an understandable failure notification;
+5. maintenance of a minimal Alpine/OpenRC host: transfer configuration or a
+   built artifact → external validation → publication → `rc-service` → process,
+   cgroup, and available-log checks. Test the case without systemd and
+   journald separately, where the result must be supported by OpenRC, `/proc`,
+   cgroup, and ordinary log files;
+6. updating one external Compose stack: check space and current containers →
+   pull selected images → recreate changed containers → verify readiness and the
+   previous version → defer cleanup until success;
+7. a constrained external `ssh` scenario for one host with explicit `argv`, a
+   result for each step, and termination after a partial failure.
+
+Start with version publication and service-state verification after the change.
+Do not start the other directions in parallel or turn them into new built-in
+modules until two independent scenarios show the same problem.
+
+#### Boundary: do not build a second Ansible
+
+yesh does not add inventory, roles, desired state, group variables, mass host
+management, a resident agent, a central state store, or automatic drift
+correction. An external SSH tool or fleet-management system may pass a scenario
+to several hosts; yesh remains a clear scenario for one host or one local
+operation. If the solution requires describing a fleet and its state, it is no
+longer a yesh problem.
+
+Alpine must not become a separate language model or a set of hidden wrappers
+around `apk`, OpenRC, and BusyBox. The useful scenario is a verifiable sequence
+around external commands on a minimal Linux host. Do not add a package manager,
+an OpenRC replacement, a general logging layer, or a promise of identical
+behaviour across all Alpine images and hosts.
+
+### Containerized environments without a shell
+
+[Containerized operational pain map](underthehood/container-operations-findings.md)
+collects the sources, primary constraints, and yesh applicability boundaries.
+
+Alpine is only the first practical stand. The next hypothesis is that yesh is
+useful in a minimal containerized environment where `bash` is absent, while a
+distroless image may have no shell, package manager, or ordinary utilities at
+all. Do not restore a shell to such an image and do not put yesh in every
+application image. First test a separate one-shot operational image containing
+yesh, exactly the required external programs, and explicitly mounted volumes or
+network access.
+
+The absence of a shell is not, by itself, a yesh problem. If a scenario needs
+`tar`, `cp`, a diagnostic utility, or a database client, the image must provide
+it explicitly and that tool remains responsible for its work. yesh must not
+replace missing programs with hidden built-ins.
+
+Investigate these scenarios:
+
+1. **One-shot operational image.** An Alpine image contains yesh, the required
+   external utility, and the application's command: for example, a database
+   migration, import/export, volume check, or configuration publication. yesh
+   owns preflight, ordering, locking, a finite deadline, and the exit code, but
+   does not replace the migrator, database, or container runtime.
+2. **A volume operation from a separate container.** A one-shot container with
+   an attached volume performs only explicitly requested reads, checks, or
+   publication. Source, destination, permissions, and mount boundary must be
+   visible in the plan; do not rely on interactive `exec` and hand-written Bash.
+3. **A verified application entrypoint.** Only after a separate experiment,
+   consider yesh as an explicit `ENTRYPOINT`: check environment, directories,
+   permissions, and volumes, then hand control to the application with exact
+   `argv`. Do not turn this into a supervisor, restarter, or `tini` replacement;
+   separately prove signal delivery and child-process termination.
+4. **Diagnosis without entering the image.** yesh runs outside and invokes
+   `docker`, `podman`, or `kubectl` with explicit `argv`, or runs in a separate
+   diagnostic container. It produces a finite report about the process,
+   environment, volumes, network check, and logs, but does not become a debug
+   system, container agent, or orchestrator.
+5. **Image-contract testing.** An external runtime builds and starts the image,
+   while yesh checks exit code, signal, readiness, expected logs, user,
+   permissions, and cleanup after failure. This tests the image and scenario;
+   it is not a new Dockerfile language or a replacement for `docker`/`kubectl`.
+
+First choose a one-shot Alpine operation without `bash`: a separate operational
+image, yesh, one mature external command, and a temporary mounted volume. Then
+separately test whether the same approach can work in a distroless image with
+only a static yesh binary and the explicitly required application command. If
+it requires adding `sh`, `ls`, `tar`, or a package manager, treat that as a
+negative result for the hypothesis, not as a reason to enlarge the image.
+
+The first concrete laboratory stand is an Alpine image with a static yesh binary
+and external `sqlite3`, a temporary mounted volume, an initial database, and one
+migration. The scenario must demonstrate successful application, failure without
+damaging the initial state, rerun behaviour, and a non-mutating `--plan`. SQLite
+is only a small laboratory stand for testing the model; the eventual question is
+whether the same ordering transfers to a one-shot PostgreSQL `Job`, not whether
+yesh should gain built-in database support.
+
+Result of the first stand:
+
+- [x] built a multi-stage Alpine image with a static Linux/amd64 yesh binary and
+  external `sqlite3`;
+- [x] positive migration passed on a named Docker volume;
+- [x] rerun reported that the migration was already applied;
+- [x] `--plan` showed the lock, external `argv`, redirection, and both check
+  branches without running the migration;
+- [x] the negative SQL migration failed and left no partial column after adding
+  `.bail on`;
+- [x] the image ran with `--read-only`, `--network none`, no added capabilities,
+  and an explicit Docker `ENTRYPOINT`/`CMD`.
+
+This stand proves only a one-shot Alpine operation with a named Docker volume on
+Linux/amd64. A WSL2 bind mount of a temporary directory failed with a permission
+error in this Docker context; this is a separate Docker/WSL2 boundary, not proven
+yesh semantics. Kubernetes `Job`, CSI/NFS, `fsGroup`, distributed locking, and a
+real PostgreSQL setup remain untested.
+
+Documentation for the stand:
+
+- [x] add a [practical explanation of the stand](underthehood/container-sqlite-lab.md);
+- [x] state the responsibility boundary explicitly: yesh owns ordering,
+  locking, checks, `--plan`, and the exit code; `sqlite3` owns the database,
+  SQL, and transaction; Docker owns the image, process, and volume;
+- [x] show a short Bash equivalent beside it for comparison only;
+- [x] document build and run commands, including a named volume and
+  `--network host` only as a WSL2 DNS workaround during the build;
+- [x] show the positive run, rerun, rollback failure, and `--plan`, and state
+  separately that the local lock is not distributed;
+- [x] do not present this stand as validation of Kubernetes, PostgreSQL, CSI/NFS,
+  or universal shell-less image support.
+
+The most concrete candidates for the first comparison are:
+
+- **a database migration as a one-shot Job**: wait for database availability,
+  validate configuration and secrets, run the external migrator, preserve its
+  exit code and log, and allow the next step only after success;
+- **volume preparation**: prove that the expected destination is mounted, then
+  use external `chown`/`chmod`/file checks to prepare it for a non-root process
+  without changing the wrong path after a failure;
+- **evidence collection from a shell-less image**: explicitly invoke available
+  read-only tools and produce a finite result about the process, environment,
+  permissions, volumes, and logs without installing tools into the application
+  image.
+
+For migrations, yesh must not present a local `with lock` as distributed
+protection: with multiple nodes, the database, migrator, or external `Job` owns
+the decision that only one migration runs. Volume preparation requires separate
+checks for permissions, ownership, mount point, and rootless operation. Diagnosis
+must prove that the report belongs to the intended process and namespace, not to
+the diagnostic container itself.
+
+Boundary: do not add a container runtime, Kubernetes API, process supervisor,
+ephemeral-container system, package manager, interactive shell, or a language
+for describing an entire CI pipeline. yesh may be one explicit step inside a
+container or an external scenario around one; it does not manage a cluster and
+does not become a second Ansible.
+
+For every candidate, prepare a positive scenario, partial failure and rerun,
+negative scenario with no data change, `--plan` with expanded external `argv`,
+a short Bash equivalent, and the boundary of proven behaviour. If a visible
+external command is already clear enough, do not add a new language construct.
 
 ### Longer-term measurement target model
 

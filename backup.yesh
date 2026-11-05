@@ -1,0 +1,14 @@
+source = "/etc/nginx"
+target = "/tmp/backup"
+lock = "backup.lock"
+
+if exists $source:
+    if exists $target:
+        with lock $lock:
+            rsync -a --itemize-changes -- $source $target
+    else:
+        echo "destination directory is missing"
+        exit 2
+else:
+    echo "source directory is missing"
+    exit 2

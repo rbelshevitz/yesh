@@ -1,0 +1,27 @@
+FROM golang:1.21-alpine AS build
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath \
+      -ldflags="-s -w -X main.version=container-lab" \
+      -o /out/yesh ./cmd/yesh
+
+FROM alpine:3.24
+
+RUN apk add --no-cache sqlite
+
+COPY --from=build /out/yesh /usr/local/bin/yesh
+COPY examples/container-sqlite-migrate.yesh /app/migrate.yesh
+COPY examples/container-sqlite-migration.sql /app/migration.sql
+COPY examples/container-sqlite-failing-migration.sql /app/migration-fail.sql
+
+WORKDIR /app
+
+ENTRYPOINT ["/usr/local/bin/yesh"]
+CMD ["/app/migrate.yesh"]
