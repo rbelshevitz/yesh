@@ -29,9 +29,11 @@ yesh targets small administrative scripts: backups, configuration publication,
 service checks, diagnostics, and individual CI/CD steps. It is not an interactive
 shell or a fleet-management system.
 
-For backups, `rsync` and `rsnapshot` perform the transfer and restore. yesh does
-not copy data itself. It checks the destination, controls order and locking,
-keeps incomplete results unpublished, and verifies the outcome.
+For backups, `rsync` performs transfers and can restore a selected snapshot;
+`rsnapshot` performs transfers and snapshot rotation. A restore command remains
+external. yesh does not copy or restore data itself: it checks the destination,
+controls order and locking, keeps incomplete results unpublished, and verifies
+the outcome.
 
 Its niche is a script of roughly 100–200 lines that is becoming difficult to
 read in Bash, while Ansible or a separate application would be excessive.

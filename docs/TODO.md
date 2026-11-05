@@ -173,8 +173,9 @@ yesh lets you build reviewable backup scenarios around standard Linux tools:
 If a transfer fails, yesh does not publish the incomplete backup. The last
 successfully created backup remains available.
 
-`rsync` and `rsnapshot` perform the transfer and restore. yesh does not copy or
-restore data itself. It prepares and checks the scenario around those tools:
+`rsync` performs transfers and can restore a selected snapshot. `rsnapshot`
+performs transfers and snapshot rotation. A restore command remains external.
+yesh does not copy or restore data itself. It prepares and checks the scenario:
 it verifies the destination, defines the order, locks the run, keeps incomplete
 trees unpublished, and checks the result. This makes external command execution
 predictable and controllable without hiding the tools' responsibility.
