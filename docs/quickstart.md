@@ -1,18 +1,18 @@
-# yesh quickstart
+# yesh Quickstart
 
-yesh is a small Go-based language and interpreter for bounded Linux operations.
-It is intended for small Linux operations where mistakes can be costly: the plan
-is visible before execution and the result can be checked afterwards. For these
-scenarios, yesh is easier to read and review than an equivalent Bash script. It
-is not an interactive shell and does not replace Bash, Ansible, or the external
-Linux tools it invokes.
+yesh is a small Go-based language and interpreter for Linux operational tasks.
+It is intended for small scenarios where mistakes can be costly: the plan is
+visible before execution and the result can be checked afterwards. These
+scenarios are easier to read and review in yesh than as equivalent Bash
+scripts. yesh is not an interactive shell and does not replace Bash, Ansible,
+or the external Linux tools it invokes.
 
 > **Bash without the historical syntax complexity.**
 
 This page uses only syntax supported by the current runtime. It is not a
 promise of future builtins or declarative configuration features.
 
-## One small health check
+## A small service check
 
 The task: check a list of services and stop if any active-state check fails.
 This needs an accessible systemd manager and installed services; replace
@@ -55,11 +55,11 @@ failure stops the script before any service-state message. If access is
 lost later, `active check failed` reports an unsuccessful check rather than
 claiming the service is stopped. Diagnostic details remain on stderr.
 
-The yesh version reads as a sequence of ordinary sentences:
+The yesh version reads as a plain sequence of steps:
 
 1. define a list;
 2. check access to systemd;
-3. for each service;
+3. check each service;
 4. check the command result;
 5. report the result;
 6. stop explicitly on failure.
@@ -124,7 +124,7 @@ else:
 `exists path` is a yesh predicate. It is not a hidden shell test and does not
 claim that the file will remain accessible after the check.
 
-## A real-world service-log scenario
+## A practical service-log scenario
 
 After the basic syntax, look at a common Linux maintenance task: rotating
 nginx's text logs. There are two separate sources: service output is read from
