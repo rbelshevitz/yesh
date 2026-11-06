@@ -322,7 +322,62 @@ or alerting system itself.
 🚫 Do not add a daemon, alerting system, `pkill`, `cgroup.kill`, limit writes, or
   automatic container ownership claims here.
 
-### 4. Polish tutorial and manuals
+### 4. One container service on a small node
+
+This is not a new “container” niche. yesh's general niche is a finite,
+verifiable operation on one Linux node where external tools already do the work
+but shell glue hides ordering, failure boundaries, and result checks. The
+container case is the next concrete example after static release publication.
+
+The first stand should replace one service without an orchestrator:
+
+```text
+verify image by digest → start the new container beside the old one
+→ check state and HTTP → switch the external entry point
+→ remove the old container only after success
+```
+
+Keep Docker/Podman, the registry, volumes, networking, nginx, and lighttpd as
+external owners. yesh supplies visible `argv`, locking, conditions, plans,
+error codes, and result checks. Before the switch, the old state must remain
+working; after the switch, any return is a compensating rollback, not a
+transaction.
+
+- [ ] Debian or Alpine with two local containers from one small image;
+- [ ] nginx or lighttpd in front of two local ports;
+- [ ] rootless Podman and a separate Docker run, with the privilege boundary
+  documented;
+- [ ] success, failure before switching, failure after switching, held lock,
+  rerun, stale temporary object, and `--plan`;
+- [ ] image admission by digest and a separate DNS/TLS/HTTP preflight;
+- [ ] no new `container run`, OCI, DNS/TLS, firewall, signature-policy, or
+  Kubernetes built-in.
+
+#### Further image and network scenarios
+
+Prioritize scenarios that connect several external evidence sources and refuse
+before changing state:
+
+1. **Image admission:** `skopeo inspect` → `cosign verify` → pull by digest →
+   `podman image inspect` → temporary start → HTTP check. Cover wrong digest,
+   missing signature, wrong architecture, forbidden root user, and failed
+   startup.
+2. **Network preflight:** DNS A/AAAA → route → TLS/SNI → HTTP `Host` → status
+   and control response. Cover a broken AAAA, wrong certificate, wrong virtual
+   host, 404/500, and finite timeout.
+3. **Exposure audit:** compare runtime port/network descriptions with `ss`,
+   `ip`, and firewall rules. Reject unexpected `0.0.0.0`, IPv6, administrative
+   ports, or networks; test rootless and rootful runtimes separately.
+4. **Safe image cleanup:** preserve current and rollback digests, include
+   stopped containers when checking references, show deletion candidates in
+   `--plan`, and make reruns safe. Do not begin with broad `prune`.
+
+Do not add a container runtime, OCI model, built-in DNS/TLS or firewall module,
+signature policy, Compose model, or Kubernetes API. If two independent stands
+do not expose the same ordering or proof problem, keep the solution in external
+commands.
+
+### 5. Polish tutorial and manuals
 
 Every practical chapter must state:
 

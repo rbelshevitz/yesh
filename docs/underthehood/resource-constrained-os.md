@@ -99,6 +99,77 @@ universal deployment mechanism. Compose can remain an external command for a
 later scenario; Kubernetes, rolling updates, and distributed locks are outside
 this boundary.
 
+## Next practical body: image and network checks
+
+After replacing one container, the next useful body is not a container-control
+API. It is a set of checks around a state transition.
+
+### Image admission before startup
+
+A mutable tag such as `latest` is not a provable version. The script should
+connect the remote description, signature, local digest, and temporary startup:
+
+```text
+skopeo inspect → cosign verify → pull by digest
+→ podman image inspect → check the startup contract
+→ start a temporary container → curl → remove the temporary object
+```
+
+Check the OS and architecture, user, startup command, required port, and
+healthcheck. Signature verification does not prove that the application is
+safe, and `inspect` does not prove runtime behavior; a short startup and an
+observable HTTP response are still required. Do not create the permanent
+container before this chain succeeds.
+
+The positive stand should use a known digest and a valid signature. Negative
+cases must cover a changed digest, a missing or wrong signature, an unsupported
+architecture, root instead of the permitted user, and a failing startup
+command. `jq` may remain an external command for structured JSON extraction;
+yesh does not acquire an OCI type.
+
+### Network preflight before switching traffic
+
+A TCP check answers only whether something accepted a connection. Before
+publication, check that the expected application is answering through the full
+identity chain:
+
+```text
+name → A/AAAA → route → TLS/SNI → HTTP Host → code and control response
+```
+
+Use `dig`, `ip route get`, `curl`, or `openssl s_client` with finite timeouts.
+The stand must expose a wrong address, a broken AAAA record, a certificate for
+the wrong name, a wrong virtual host, and a 404/500 response. A check from one
+node does not prove reachability for every client; this is a pre-publication
+check, not network monitoring.
+
+### External exposure audit
+
+For a container service, compare four evidence sources:
+
+```text
+Podman/Docker description → published ports → ss/ip → firewall
+```
+
+The stand should accept publication only on an allowed address, such as
+`127.0.0.1`, and reject `0.0.0.0`, an unexpected administrative port, an extra
+network, or a mismatch with `nft` rules. Test rootless and rootful runtimes
+separately: identical yesh text does not prove identical network behavior.
+
+### Cleaning old images
+
+Freeing space is not a reason to start with a broad `prune`. First obtain the
+current and previous digests and all running and stopped containers, then show
+explicitly permitted candidates. Keep the rollback image and any image
+referenced by a stopped container. A repeat run should be safe, and failure to
+remove one candidate must remain visible.
+
+All four scenarios use existing yesh capabilities: explicit `argv`, external
+conditions, locks, stop-on-error behavior, and `--plan`. Do not add
+`container run`, a built-in image inspector, DNS/TLS or firewall modules,
+signature policy, or a Kubernetes API. The container runtime, registry,
+signatures, network, and firewall remain owners of their semantics.
+
 ## Why Alpine is an important reference
 
 As of this note, Alpine's stable release branch is 3.24. Alpine is built

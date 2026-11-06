@@ -123,6 +123,27 @@ trust models.
   they do not prove the base image, dependencies, signature, or application are
   trustworthy. Keep only the external tools required by the scenario.
 
+## Network and exposure checks
+
+- A successful TCP connection proves only that something accepted a connection
+  on that address and port. It does not prove that the expected application is
+  serving there. Before switching traffic, check the expected DNS records,
+  route, SNI/certificate, HTTP `Host`, status, and a bounded control response.
+- Treat a published container port as an exposure decision. Check the runtime's
+  published address and port against `ss`, interface addresses, and firewall
+  rules. Reject an unexpected `0.0.0.0`, IPv6 exposure, administrative port, or
+  network attachment.
+- Test rootless and rootful runtimes separately. A local check does not prove
+  reachability from every external network, and runtime metadata does not prove
+  the actual packet path.
+- Treat `nft -c` or an equivalent syntax check as necessary but insufficient.
+  Applying a firewall ruleset can terminate the only management path; test
+  changes on an isolated node or with console access and retain a reviewed
+  recovery path.
+- DNS, TLS, HTTP, and firewall checks are observations around an external
+  operation. They do not make yesh a network monitor, certificate authority,
+  firewall policy engine, or transaction manager.
+
 ## Operational rules
 
 - Treat an external command name and its arguments as policy, not merely as
