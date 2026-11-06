@@ -99,7 +99,7 @@
 - `backup-mounted-rwe.yesh` — резервное копирование на проверенное хранилище;
 - `config-systemd-rwe.yesh` — проверка конфигурации, публикация и systemd;
 - `cron-backup-rwe.yesh` — блокировка, окружение, тайм-аут и результат;
-- `deploy-release-rwe.yesh` — удалённая публикация и откат;
+- `deploy-release-rwe.yesh` — удалённая публикация и безусловный учебный откат;
 - `incident-report-rwe.yesh` — объединение сведений о службе, журнале,
   процессах и хранилище;
 - `rsnapshot-local.yesh` — локальный запуск rsnapshot после проверки;

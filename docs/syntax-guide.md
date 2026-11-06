@@ -578,11 +578,13 @@ explicit failure. `publish` uses a same-filesystem rename and refuses an
 existing destination; `ln` and `mv -T` therefore remain visible as the separate
 steps that switch `current`.
 
-If the HTTP check fails, the previous symlink is restored and the script exits
-with code `4`. This is compensation for an action that already happened, not a
-filesystem transaction. If the process is interrupted between the switch and
-the compensation, there is no automatic guarantee that the old release will be
-restored. The example does not delete either release directory.
+If the HTTP check fails, the previous symlink is restored, the same HTTP URL is
+checked again, and the script exits with code `4`. The second check confirms
+that the restored release is reachable through HTTP; it does not decide whether
+the restoration is attempted. This is compensation for an action that already
+happened, not a filesystem transaction. If the process is interrupted between
+the switch and the compensation, there is no automatic guarantee that the old
+release will be restored. The example does not delete either release directory.
 
 Privileges are another explicit boundary. yesh does not call `sudo` or grant
 privileges. Run the complete script as `root`, or prepare a narrowly scoped
@@ -600,7 +602,8 @@ Debian/systemd/nginx fixtures verify that:
 - a held lock prevents the body from starting;
 - an invalid web-server configuration stops execution before publication;
 - a successful HTTP response leaves the new release active;
-- an HTTP failure restores the supplied previous release and returns code `4`;
+- an HTTP failure restores the supplied previous release, checks it through the
+  same HTTP URL, and returns code `4`;
 - an existing `current.next` stops execution before changing state.
 
 The systemd fixture is

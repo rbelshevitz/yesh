@@ -34,10 +34,10 @@ partial files, and lock cleanup.
 | Archive published after success | [`backup.yesh`](../examples/backup.yesh) | missing source or failed `tar`/`gzip` |
 | Backup to a verified filesystem | [`backup-mounted-rwe.yesh`](../examples/backup-mounted-rwe.yesh) | wrong UUID, unmounted filesystem, low space |
 | Configuration publication and restart | [`config-systemd-rwe.yesh`](../examples/config-systemd-rwe.yesh) | validator rejects the configuration |
-| Static release publication with OpenRC | [`deploy-static.yesh`](../examples/deploy-static.yesh) | missing file, unsafe current path, or failed HTTP check |
-| Static release publication with OpenRC/lighttpd | [`deploy-static-openrc-lighttpd.yesh`](../examples/deploy-static-openrc-lighttpd.yesh) | missing file, invalid lighttpd configuration, or failed HTTP check |
-| Static release publication with systemd | [`deploy-static-systemd.yesh`](../examples/deploy-static-systemd.yesh) | missing file, unsafe current path, or failed HTTP check |
-| Release deployment with rollback | [`deploy-release-rwe.yesh`](../examples/deploy-release-rwe.yesh) | missing source or incomplete staging |
+| Static release publication with OpenRC | [`deploy-static.yesh`](../examples/deploy-static.yesh) | missing file, unsafe current path, failed HTTP check, or failed HTTP check after rollback |
+| Static release publication with OpenRC/lighttpd | [`deploy-static-openrc-lighttpd.yesh`](../examples/deploy-static-openrc-lighttpd.yesh) | missing file, invalid lighttpd configuration, failed HTTP check, or failed HTTP check after rollback |
+| Static release publication with systemd | [`deploy-static-systemd.yesh`](../examples/deploy-static-systemd.yesh) | missing file, unsafe current path, failed HTTP check, or failed HTTP check after rollback |
+| Release switching and unconditional rollback | [`deploy-release-rwe.yesh`](../examples/deploy-release-rwe.yesh) | missing source or incomplete staging |
 | Read-only incident report | [`incident-report-rwe.yesh`](../examples/incident-report-rwe.yesh) | unavailable service, journal, or diagnostic source |
 | Networked rsync snapshot | [`rsync-networked-incremental-rwe.yesh`](../examples/rsync-networked-incremental-rwe.yesh) | DNS, route, SSH, or remote-path failure |
 | Selected-snapshot restore | [`rsync-selected-restore.yesh`](../examples/rsync-selected-restore.yesh) | symlink source or non-empty target |
@@ -374,7 +374,9 @@ that the caller has the required filesystem or service-manager privileges.
 `current` name is then switched by `ln -s` followed by `mv -T`, because yesh's
 `publish` deliberately refuses to replace an existing destination. The HTTP
 check runs after the switch; on failure the script restores the supplied
-previous release and exits non-zero.
+previous release, performs the same HTTP check again, and exits non-zero. The
+second check observes the result of the restoration; it does not decide whether
+the restoration is attempted.
 
 The example proves ordering, same-filesystem publication, lock ownership, and
 the selected HTTP check on one host. It does not prove DNS, TLS, client caches,

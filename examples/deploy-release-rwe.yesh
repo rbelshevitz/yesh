@@ -1,7 +1,8 @@
 # RWE: upload one release, publish it remotely, and exercise rollback.
 # Goal: make a complete release visible through one remote rename, then prove
-# that the previous release can be selected. The script does not build the
-# release or restart a service.
+# that the previous release can be selected. The rollback is unconditional:
+# this is an exercise in switching release names, not a health-check failure
+# path. The script does not build the release or restart a service.
 # Remote paths are complete values; rsync and ssh remain visible engines.
 #
 # Required environment: YESH_DEPLOY_HOST, YESH_DEPLOY_SOURCE,

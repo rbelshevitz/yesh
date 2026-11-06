@@ -82,12 +82,11 @@ echo 'positive publication passed'
 
 mkdir -p "$fixture/incoming/release-bad"
 printf '%s\n' 'bad release' > "$fixture/incoming/release-bad/index.html"
-printf '%s\n' 'bad health' > "$fixture/incoming/release-bad/health.html"
 export YESH_RELEASE="$fixture/incoming/release-bad"
 export YESH_RELEASE_INDEX="$fixture/incoming/release-bad/index.html"
 export YESH_RELEASE_FINAL="$fixture/releases/release-bad"
 export YESH_PREVIOUS="$fixture/releases/release-1"
-export YESH_HEALTH_URL="$health_base/$(basename "$fixture")/current/does-not-exist"
+export YESH_HEALTH_URL="$health_base/$(basename "$fixture")/current/health.html"
 
 echo '--- failed HTTP and rollback ---'
 if "$yesh_bin" "$yesh_script"; then

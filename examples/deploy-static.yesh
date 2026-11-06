@@ -43,44 +43,45 @@ health_url = environment YESH_HEALTH_URL
 
 if exists $release:
     with lock $lock:
-        if exists $release_index:
-            if test -L $current:
-                if test -d $previous:
-                    if test ! -e $release_final:
-                        if test ! -L $release_final:
-                            if test ! -e $current_next:
-                                if test ! -L $current_next:
-                                    rc-service nginx status
-                                    /usr/sbin/nginx -t
-                                    publish $release to $release_final
-                                    ln -s -- $release_final $current_next
-                                    mv -T -- $current_next $current
-
-                                    if curl --fail --silent --show-error --max-time 10 $health_url:
-                                        echo "HTTP check passed"
-                                    else:
-                                        echo "HTTP check failed; restoring previous release"
-                                        ln -s -- $previous $current_next
-                                        mv -T -- $current_next $current
-                                        exit 4
-                            else:
-                                echo "temporary current symlink already exists"
-                                exit 3
-                        else:
-                            echo "final release path is a symlink"
-                            exit 3
-                    else:
-                        echo "final release path already exists"
-                        exit 3
-                else:
-                    echo "previous release is missing"
-                    exit 2
-            else:
-                echo "current is not a symlink"
-                exit 3
-        else:
+        if test ! -e $release_index:
             echo "index.html missing"
             exit 3
+        if test ! -L $current:
+            echo "current is not a symlink"
+            exit 3
+        if test ! -d $previous:
+            echo "previous release is missing"
+            exit 2
+        if test -e $release_final:
+            echo "final release path already exists"
+            exit 3
+        if test -L $release_final:
+            echo "final release path is a symlink"
+            exit 3
+        if test -e $current_next:
+            echo "temporary current symlink already exists"
+            exit 3
+        if test -L $current_next:
+            echo "temporary current symlink already exists"
+            exit 3
+
+        rc-service nginx status
+        /usr/sbin/nginx -t
+        publish $release to $release_final
+        ln -s -- $release_final $current_next
+        mv -T -- $current_next $current
+
+        if curl --fail --silent --show-error --max-time 10 $health_url:
+            echo "HTTP check passed"
+        else:
+            echo "HTTP check failed; restoring previous release"
+            ln -s -- $previous $current_next
+            mv -T -- $current_next $current
+            if curl --fail --silent --show-error --max-time 10 $health_url:
+                echo "HTTP rollback check passed"
+            else:
+                echo "HTTP rollback check failed"
+            exit 4
 else:
     echo "release directory missing"
     exit 2
