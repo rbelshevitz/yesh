@@ -518,7 +518,114 @@ This still does not show that the application can use the new configuration.
 That requires an application-specific check and, when needed, a service
 operation followed by a check for the required state.
 
-## 13a. Practical example: rsnapshot
+## 13a. Safe static release deployment
+
+This scenario assembles a small static-site deployment from existing yesh
+constructs. It does not add `deploy`, `http`, `sudo`, or `rollback` as language
+features: service checks, publication, symlink switching, and the HTTP request
+remain visible external actions.
+
+The complete examples are [`deploy-static.yesh`](../examples/deploy-static.yesh)
+for nginx under OpenRC,
+[`deploy-static-openrc-lighttpd.yesh`](../examples/deploy-static-openrc-lighttpd.yesh)
+for lighttpd under OpenRC on Alpine, and
+[`deploy-static-systemd.yesh`](../examples/deploy-static-systemd.yesh) for nginx
+under systemd. The yesh structure is the same; only the service and web-server
+configuration checks differ.
+
+The prepared directory is not made visible as `current` immediately. First it
+receives its final release name; only then is the `current` symlink replaced:
+
+```yesh
+release = environment YESH_RELEASE
+release_index = environment YESH_RELEASE_INDEX
+release_final = environment YESH_RELEASE_FINAL
+current = environment YESH_CURRENT
+current_next = environment YESH_CURRENT_NEXT
+previous = environment YESH_PREVIOUS
+lock = environment YESH_DEPLOY_LOCK
+health_url = environment YESH_HEALTH_URL
+```
+
+yesh does not concatenate text onto a variable reference: `$release/index.html`
+is not a path inside `$release`. The complete path is therefore supplied as
+`YESH_RELEASE_INDEX`. This keeps argument boundaries explicit and avoids adding
+another path-substitution model to the language.
+
+The central order is:
+
+```yesh
+if exists $release:
+    with lock $lock:
+        if exists $release_index:
+            /usr/sbin/nginx -t
+            publish $release to $release_final
+            ln -s -- $release_final $current_next
+            mv -T -- $current_next $current
+
+            if curl --fail --silent --show-error --max-time 10 $health_url:
+                echo "HTTP check passed"
+            else:
+                ln -s -- $previous $current_next
+                mv -T -- $current_next $current
+                exit 4
+```
+
+The full examples also verify that `current` and the previous release have the
+expected shape, and that the new release and temporary symlink names are free.
+Those checks prevent accidental replacement and make an unsafe rerun an
+explicit failure. `publish` uses a same-filesystem rename and refuses an
+existing destination; `ln` and `mv -T` therefore remain visible as the separate
+steps that switch `current`.
+
+If the HTTP check fails, the previous symlink is restored and the script exits
+with code `4`. This is compensation for an action that already happened, not a
+filesystem transaction. If the process is interrupted between the switch and
+the compensation, there is no automatic guarantee that the old release will be
+restored. The example does not delete either release directory.
+
+Privileges are another explicit boundary. yesh does not call `sudo` or grant
+privileges. Run the complete script as `root`, or prepare a narrowly scoped
+non-interactive external policy for a dedicated deployment account. An
+interactive password prompt is not a reliable unattended deployment design.
+In particular, `nginx -t` opens the PID file and every file named by the
+configuration; access to `/run/nginx.pid` alone is not enough.
+
+### What the fixture proves
+
+The practical result is not a promise of safe deployment in every environment.
+It is a checked sequence on a particular host. The Alpine/OpenRC/lighttpd and
+Debian/systemd/nginx fixtures verify that:
+
+- a held lock prevents the body from starting;
+- an invalid web-server configuration stops execution before publication;
+- a successful HTTP response leaves the new release active;
+- an HTTP failure restores the supplied previous release and returns code `4`;
+- an existing `current.next` stops execution before changing state.
+
+The systemd fixture is
+[`scripts/yesh-deploy-static-systemd-fixture.sh`](../scripts/yesh-deploy-static-systemd-fixture.sh).
+It creates a unique directory under the web root, runs `--plan`, performs a
+successful publication, forces an HTTP failure, and verifies the rollback. It
+also interrupts a run after `current` has switched. The expected result of that
+last check is that the new release remains active: yesh does not claim a
+transactional rollback after an abrupt process exit.
+
+Run it on the systemd host with the actual nginx document root:
+
+```text
+sudo YESH_BIN=/path/to/yesh \
+  YESH_SCRIPT=/path/to/yesh/examples/deploy-static-systemd.yesh \
+  YESH_WEB_ROOT=/var/www/html \
+  /path/to/yesh/scripts/yesh-deploy-static-systemd-fixture.sh
+```
+
+The fixture does not restart nginx or edit its configuration. It proves the
+ordering, the selected HTTP check, and the compensation path on that node; it
+does not prove DNS, TLS, client caches, or application behavior outside the
+selected URL.
+
+## 13b. Practical example: rsnapshot
 
 ### What problem does yesh solve?
 
@@ -753,7 +860,7 @@ key, a missing `known_hosts` entry, a changed fingerprint, a forbidden command,
 or missing `rsync` on the remote host. Test the same SSH call separately, inspect
 the yesh plan, and only then run the changing step.
 
-## 13b. Measuring a systemd service over a fixed period
+## 13c. Measuring a systemd service over a fixed period
 
 New in `0.2.0`: read-only service resource snapshots and finite measurements with
 bounded JSONL history. This chapter describes the current Linux/systemd backend.
@@ -920,7 +1027,7 @@ or how to avoid mixing different service invocations. These boundaries are
 explicit in yesh. Linux, an available systemd manager, and readable cgroup v2
 are required.
 
-## 13c. Rotating a service's text logs
+## 13d. Rotating a service's text logs
 
 ### What problem does yesh solve?
 

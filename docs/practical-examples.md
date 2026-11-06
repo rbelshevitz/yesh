@@ -34,6 +34,9 @@ partial files, and lock cleanup.
 | Archive published after success | [`backup.yesh`](../examples/backup.yesh) | missing source or failed `tar`/`gzip` |
 | Backup to a verified filesystem | [`backup-mounted-rwe.yesh`](../examples/backup-mounted-rwe.yesh) | wrong UUID, unmounted filesystem, low space |
 | Configuration publication and restart | [`config-systemd-rwe.yesh`](../examples/config-systemd-rwe.yesh) | validator rejects the configuration |
+| Static release publication with OpenRC | [`deploy-static.yesh`](../examples/deploy-static.yesh) | missing file, unsafe current path, or failed HTTP check |
+| Static release publication with OpenRC/lighttpd | [`deploy-static-openrc-lighttpd.yesh`](../examples/deploy-static-openrc-lighttpd.yesh) | missing file, invalid lighttpd configuration, or failed HTTP check |
+| Static release publication with systemd | [`deploy-static-systemd.yesh`](../examples/deploy-static-systemd.yesh) | missing file, unsafe current path, or failed HTTP check |
 | Release deployment with rollback | [`deploy-release-rwe.yesh`](../examples/deploy-release-rwe.yesh) | missing source or incomplete staging |
 | Read-only incident report | [`incident-report-rwe.yesh`](../examples/incident-report-rwe.yesh) | unavailable service, journal, or diagnostic source |
 | Networked rsync snapshot | [`rsync-networked-incremental-rwe.yesh`](../examples/rsync-networked-incremental-rwe.yesh) | DNS, route, SSH, or remote-path failure |
@@ -319,6 +322,65 @@ not establish that the remote files are correct or that the host is trusted:
 the operator must verify the host fingerprint and prepare `known_hosts` first.
 See [the SSH key section](syntax-guide.ru.md#ssh-ключи-для-источника-на-другом-узле)
 for that setup.
+
+## Static release publication with OpenRC and systemd
+
+[`deploy-static.yesh`](../examples/deploy-static.yesh) and its paired
+[`deploy-static-systemd.yesh`](../examples/deploy-static-systemd.yesh) are small
+deployment scenarios for a static site served by nginx. The first targets
+OpenRC and calls `rc-service nginx status`; the second targets systemd and uses
+the typed `service status nginx.service` operation.
+
+Both examples check the prepared release, the previous release, the current
+symlink, and private temporary names while holding a lock. `nginx -t`, the
+publication commands, and `curl` remain visible.
+
+For the Alpine/OpenRC fixture, use
+[`deploy-static-openrc-lighttpd.yesh`](../examples/deploy-static-openrc-lighttpd.yesh).
+It validates the supplied `lighttpd` configuration with `lighttpd -tt -f` and
+checks `rc-service lighttpd status`; the publication and HTTP boundaries are
+the same.
+
+For a disposable positive and rollback check on a systemd host, use
+[`scripts/yesh-deploy-static-systemd-fixture.sh`](../scripts/yesh-deploy-static-systemd-fixture.sh).
+It creates a unique directory under the configured web root, runs `--plan`,
+publishes one release, then forces a failed HTTP check and verifies the return
+to the previous release. It requires root only because the example's
+`nginx -t` checks the real nginx configuration; it does not restart nginx or
+edit that configuration. The same fixture also interrupts a run after
+`current` switches and verifies that no automatic rollback is claimed. Set
+`YESH_WEB_ROOT` when the site's document root is not `/var/www/html`; set
+`KEEP_FIXTURE=1` to inspect the fixture after the run.
+
+### Privileges are an explicit boundary
+
+These examples do not call `sudo` and do not raise privileges. The operator must
+choose the privilege boundary before running them:
+
+- run the complete yesh script as `root` on a controlled deployment host; or
+- use a dedicated deployment account that owns the release tree and has a
+  narrowly scoped, non-interactive external policy for the web-server
+  configuration check.
+
+On the Debian systemd fixture, `/usr/sbin/nginx -t` reports valid syntax but
+also needs access to `/run/nginx.pid`; an ordinary user can therefore see the
+configuration check fail with `Permission denied`. A password-protected
+interactive `sudo` is not a valid unattended deployment design. If a policy is
+used, it must be prepared outside yesh and must not turn into a hidden password
+prompt. The script's lock, publication, rollback, and HTTP check do not prove
+that the caller has the required filesystem or service-manager privileges.
+
+`publish` gives the new release its final immutable directory name. The active
+`current` name is then switched by `ln -s` followed by `mv -T`, because yesh's
+`publish` deliberately refuses to replace an existing destination. The HTTP
+check runs after the switch; on failure the script restores the supplied
+previous release and exits non-zero.
+
+The example proves ordering, same-filesystem publication, lock ownership, and
+the selected HTTP check on one host. It does not prove DNS, TLS, client caches,
+or behavior outside the requested URL. Run `--plan` first and use a disposable
+tree; the real positive, failed-health, stale-temporary-link, and missing-file
+cases still need a fixture-backed integration test.
 
 ## Read-only process and service checks
 

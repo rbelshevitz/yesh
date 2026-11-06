@@ -1,0 +1,81 @@
+# Publish one prepared static release behind lighttpd managed by OpenRC.
+# Platform: parsing is portable; execution requires Linux/POSIX utilities and OpenRC.
+# Alpine packages: openrc, lighttpd, curl, coreutils; add ca-certificates for HTTPS.
+# Install yesh separately from the built project binary.
+# Run yesh with permission to inspect the service and switch the release paths;
+# yesh does not invoke sudo or raise privileges.
+# For unattended deployment, run the whole script as root or use a dedicated
+# deployment account with a narrowly scoped external policy. Do not rely on an
+# interactive sudo password prompt.
+# yesh does not restart lighttpd or manage OpenRC. rc-service, lighttpd, ln,
+# mv, and curl remain visible external commands.
+#
+# Required environment:
+#   YESH_RELEASE         prepared directory, on the same filesystem;
+#   YESH_RELEASE_INDEX   full path to the required index.html inside it;
+#   YESH_LIGHTTPD_CONFIG lighttpd configuration to validate;
+#   YESH_RELEASE_FINAL   new immutable release directory, must not exist;
+#   YESH_CURRENT         current symlink exposed by lighttpd;
+#   YESH_CURRENT_NEXT    private temporary symlink, must not exist;
+#   YESH_PREVIOUS        release target used for rollback after a failed check;
+#   YESH_DEPLOY_LOCK     lock path shared by all deployers;
+#   YESH_HEALTH_URL      URL served by this lighttpd instance.
+#
+# The release is published first, then current is replaced by a same-filesystem
+# symlink rename. If the HTTP check fails, the previous symlink is restored.
+# This proves the deployment result on this node; it does not prove clients'
+# DNS, caches, TLS trust, or application behavior beyond the selected URL.
+
+release = environment YESH_RELEASE
+release_index = environment YESH_RELEASE_INDEX
+lighttpd_config = environment YESH_LIGHTTPD_CONFIG
+release_final = environment YESH_RELEASE_FINAL
+current = environment YESH_CURRENT
+current_next = environment YESH_CURRENT_NEXT
+previous = environment YESH_PREVIOUS
+lock = environment YESH_DEPLOY_LOCK
+health_url = environment YESH_HEALTH_URL
+
+if exists $release:
+    with lock $lock:
+        if exists $release_index:
+            if test -L $current:
+                if test -d $previous:
+                    if test ! -e $release_final:
+                        if test ! -L $release_final:
+                            if test ! -e $current_next:
+                                if test ! -L $current_next:
+                                    rc-service lighttpd status
+                                    /usr/sbin/lighttpd -tt -f $lighttpd_config
+                                    publish $release to $release_final
+                                    ln -s -- $release_final $current_next
+                                    mv -T -- $current_next $current
+
+                                    if curl --fail --silent --show-error --max-time 10 $health_url:
+                                        echo "HTTP check passed"
+                                    else:
+                                        echo "HTTP check failed; restoring previous release"
+                                        ln -s -- $previous $current_next
+                                        mv -T -- $current_next $current
+                                        exit 4
+                            else:
+                                echo "temporary current symlink already exists"
+                                exit 3
+                        else:
+                            echo "final release path is a symlink"
+                            exit 3
+                    else:
+                        echo "final release path already exists"
+                        exit 3
+                else:
+                    echo "previous release is missing"
+                    exit 2
+            else:
+                echo "current is not a symlink"
+                exit 3
+        else:
+            echo "index.html missing"
+            exit 3
+else:
+    echo "release directory missing"
+    exit 2

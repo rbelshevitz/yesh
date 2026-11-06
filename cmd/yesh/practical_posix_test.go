@@ -67,6 +67,9 @@ func TestPOSIXCorpusAdaptationSafetyContracts(t *testing.T) {
 		{name: "rsync retention quarantine", file: "rsync-retention-quarantine.yesh", must: []string{"with lock $lock:", "rsync retention quarantine in $root keep $keep to $quarantine"}, forbid: []string{"rm ", "delete ", "unlink "}},
 		{name: "selected restore", file: "rsync-selected-restore.yesh", must: []string{"findmnt --target $target", "rsync -a -- $source $target"}, forbid: []string{"rm ", "delete ", "--delete"}},
 		{name: "config systemd RWE", file: "config-systemd-rwe.yesh", must: []string{"grep -q", "publish $next to $active", "service restart yesh-config-rwe.service until active within 10s", "journal yesh-config-rwe.service since 5m lines 20"}, forbid: []string{"sudo ", "systemctl daemon-reload", "--delete"}},
+		{name: "static deploy without systemd", file: "deploy-static.yesh", must: []string{"with lock $lock:", "/usr/sbin/nginx -t", "publish $release to $release_final", "mv -T -- $current_next $current", "curl --fail --silent --show-error --max-time 10 $health_url", "restoring previous release"}, forbid: []string{"service restart", "systemctl"}},
+		{name: "static deploy with systemd", file: "deploy-static-systemd.yesh", must: []string{"with lock $lock:", "service status nginx.service", "/usr/sbin/nginx -t", "publish $release to $release_final", "mv -T -- $current_next $current", "curl --fail --silent --show-error --max-time 10 $health_url", "restoring previous release"}, forbid: []string{"service restart", "systemctl"}},
+		{name: "static deploy with OpenRC lighttpd", file: "deploy-static-openrc-lighttpd.yesh", must: []string{"with lock $lock:", "rc-service lighttpd status", "/usr/sbin/lighttpd -tt -f $lighttpd_config", "publish $release to $release_final", "mv -T -- $current_next $current", "curl --fail --silent --show-error --max-time 10 $health_url", "restoring previous release"}, forbid: []string{"service restart", "systemctl"}},
 		{name: "deploy release RWE", file: "deploy-release-rwe.yesh", must: []string{"rsync -az --delay-updates -- $source $stage", "mv -T -- $current_next $current", "mv -T -- $rollback_next $current"}, forbid: []string{"sudo ", "--delete", "StrictHostKeyChecking=no"}},
 		{name: "incident report RWE", file: "incident-report-rwe.yesh", must: []string{"journal yesh-incident-rwe.service since 15m lines 20", "show $systemd fields pid ppid uid state rss start_time cgroup", "findmnt --target /", "df -P -h -- /"}, forbid: []string{"service restart", "service start", "umount", "mount "}},
 		{name: "rsync network preflight", file: "rsync-network-preflight.yesh", must: []string{"getent ahosts $dns_name", "ip route get $route_target", "BatchMode=yes", "StrictHostKeyChecking=yes", "rsync -a --dry-run --itemize-changes -e $ssh_command -- $source $target"}, forbid: []string{"--delete", "StrictHostKeyChecking=no", "sudo "}},
@@ -254,6 +257,153 @@ func TestPOSIXPracticalConfigValidation(t *testing.T) {
 				t.Fatalf("temporary config remains: %v", err)
 			}
 		})
+	}
+}
+
+func TestPOSIXPracticalStaticDeployPublishesAndRollsBack(t *testing.T) {
+	if _, err := os.Stat("/usr/sbin/lighttpd"); err != nil {
+		t.Skipf("missing /usr/sbin/lighttpd; install package lighttpd to run this practical test: %v", err)
+	}
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "rc-service"), []byte("#!/bin/sh\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "curl"), []byte("#!/bin/sh\nif [ \"$YESH_TEST_HTTP_FAIL\" = 1 ]; then exit 22; fi\nprintf 'health ok\\n'\n"), 0700)
+	config := filepath.Join(dir, "lighttpd.conf")
+	writeTestFile(t, config, []byte("server.document-root = \""+dir+"\"\nserver.pid-file = \""+filepath.Join(dir, "lighttpd.pid")+"\"\nserver.port = 18080\n"), 0600)
+	root := filepath.Join(dir, "site")
+	incoming := filepath.Join(root, "incoming")
+	releases := filepath.Join(root, "releases")
+	if err := os.MkdirAll(releases, 0700); err != nil {
+		t.Fatal(err)
+	}
+	previous := filepath.Join(releases, "release-0")
+	if err := os.Mkdir(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(previous, "index.html"), []byte("old release\n"), 0600)
+	current := filepath.Join(root, "current")
+	if err := os.Symlink(previous, current); err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(root, "deploy.lock")
+	newRelease := filepath.Join(incoming, "release-1")
+	if err := os.MkdirAll(newRelease, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(newRelease, "index.html"), []byte("new release\n"), 0600)
+
+	baseEnv := append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"YESH_RELEASE="+newRelease,
+		"YESH_RELEASE_INDEX="+filepath.Join(newRelease, "index.html"),
+		"YESH_LIGHTTPD_CONFIG="+config,
+		"YESH_RELEASE_FINAL="+filepath.Join(releases, "release-1"),
+		"YESH_CURRENT="+current,
+		"YESH_CURRENT_NEXT="+filepath.Join(root, "current.next"),
+		"YESH_PREVIOUS="+previous,
+		"YESH_DEPLOY_LOCK="+lock,
+		"YESH_HEALTH_URL=http://example.invalid/health",
+	)
+	cmd := practicalCommand(t, dir, practicalExample(t, "deploy-static-openrc-lighttpd.yesh"))
+	cmd.Env = append(append([]string{}, baseEnv...), "YESH_TEST_HTTP_FAIL=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("static deployment: %v\n%s", err, out)
+	}
+	if got, err := os.Readlink(current); err != nil || got != filepath.Join(releases, "release-1") {
+		t.Fatalf("current after publish = %q, %v", got, err)
+	}
+	if got := string(readTestFile(t, filepath.Join(current, "index.html"))); got != "new release\n" {
+		t.Fatalf("published content = %q", got)
+	}
+	if _, err := os.Stat(newRelease); !os.IsNotExist(err) {
+		t.Fatalf("incoming release was not moved: %v", err)
+	}
+
+	rollbackSource := filepath.Join(incoming, "release-2")
+	if err := os.MkdirAll(rollbackSource, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(rollbackSource, "index.html"), []byte("bad release\n"), 0600)
+	env := append([]string{}, baseEnv...)
+	for i := range env {
+		if strings.HasPrefix(env[i], "YESH_RELEASE=") {
+			env[i] = "YESH_RELEASE=" + rollbackSource
+		} else if strings.HasPrefix(env[i], "YESH_RELEASE_INDEX=") {
+			env[i] = "YESH_RELEASE_INDEX=" + filepath.Join(rollbackSource, "index.html")
+		} else if strings.HasPrefix(env[i], "YESH_RELEASE_FINAL=") {
+			env[i] = "YESH_RELEASE_FINAL=" + filepath.Join(releases, "release-2")
+		}
+	}
+	cmd = practicalCommand(t, dir, practicalExample(t, "deploy-static-openrc-lighttpd.yesh"))
+	cmd.Env = append(env, "YESH_TEST_HTTP_FAIL=1")
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 4 {
+		t.Fatalf("HTTP failure code: %v\n%s", err, out)
+	}
+	if got, err := os.Readlink(current); err != nil || got != filepath.Join(releases, "release-0") {
+		t.Fatalf("current after rollback = %q, %v", got, err)
+	}
+	if got := string(readTestFile(t, filepath.Join(current, "index.html"))); got != "old release\n" {
+		t.Fatalf("rollback content = %q", got)
+	}
+}
+
+func TestPOSIXPracticalStaticDeployPlanPreservesArgvOrder(t *testing.T) {
+	dir := t.TempDir()
+	release := filepath.Join(dir, "incoming", "release-1")
+	previous := filepath.Join(dir, "releases", "release-0")
+	if err := os.MkdirAll(release, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(release, "index.html"), []byte("new\n"), 0600)
+	current := filepath.Join(dir, "current")
+	if err := os.Symlink(previous, current); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "lighttpd.conf")
+	writeTestFile(t, config, []byte("unused\n"), 0600)
+	values := []string{
+		"YESH_RELEASE=" + release,
+		"YESH_RELEASE_INDEX=" + filepath.Join(release, "index.html"),
+		"YESH_LIGHTTPD_CONFIG=" + config,
+		"YESH_RELEASE_FINAL=" + filepath.Join(dir, "releases", "release-1"),
+		"YESH_CURRENT=" + current,
+		"YESH_CURRENT_NEXT=" + filepath.Join(dir, "current.next"),
+		"YESH_PREVIOUS=" + previous,
+		"YESH_DEPLOY_LOCK=" + filepath.Join(dir, "deploy.lock"),
+		"YESH_HEALTH_URL=http://127.0.0.1/health",
+	}
+	cmd := posixCLI(t, context.Background(), "--plan", practicalExample(t, "deploy-static-openrc-lighttpd.yesh"))
+	cmd.Env = append(append(os.Environ(), "YESH_TEST_CLI=1"), values...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	ordered := []string{
+		`PLAN ["rc-service" "lighttpd" "status"]`,
+		`PLAN ["/usr/sbin/lighttpd" "-tt" "-f" "<environment value>"]`,
+		`PLAN ["ln" "-s" "--" "<environment value>" "<environment value>"]`,
+		`PLAN ["mv" "-T" "--" "<environment value>" "<environment value>"]`,
+		`PLAN IF ["curl" "--fail" "--silent" "--show-error" "--max-time" "10" "<environment value>"]`,
+	}
+	last := -1
+	for _, want := range ordered {
+		at := strings.Index(text, want)
+		if at < 0 {
+			t.Fatalf("plan is missing %q:\n%s", want, text)
+		}
+		if at <= last {
+			t.Fatalf("plan order is wrong for %q:\n%s", want, text)
+		}
+		last = at
 	}
 }
 

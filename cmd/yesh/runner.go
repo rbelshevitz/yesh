@@ -475,6 +475,10 @@ func (r *runtime) runWithin(text string, line int, fatal bool, timeout time.Dura
 		if result.err != nil && !failureFound && shouldCancelPipeline(result.err) {
 			failureFound = true
 			cancel()
+			// A sibling can deliberately ignore TERM.  Do not wait for that
+			// sibling before the escalation path gets a chance to reap the
+			// pipeline; the failing stage already established the result.
+			_ = group.kill()
 		}
 	}
 	failure := selectStageFailure(allResults)
