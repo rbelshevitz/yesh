@@ -4,9 +4,62 @@
 [![CI](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/yesh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-yesh is a readable language for Linux automation and preflight checks.
+yesh is readable Linux automation you can explain.
 
-> Bash without the historical syntax complexity.
+> Make the checks, exact `argv`, order of operations, and failure boundary
+> visible before a small administrative script changes a real node.
+
+## The niche
+
+yesh is for the awkward middle ground between a shell one-liner and a full
+automation system: one Linux node, one bounded operation, several things that
+must be checked, and a failure that must not be mistaken for success.
+
+| If the task is... | Use... |
+| --- | --- |
+| one transparent command | the command itself or a small shell script |
+| a fleet, inventory, or desired state | Ansible or an orchestrator |
+| one host, several checks, a lock, visible commands, and a verified result | yesh |
+
+For example, a static release should not become visible just because a copy
+finished. The operator may need to validate the web-server configuration,
+prevent two deploys, switch one name atomically, check HTTP, and restore the
+previous name when the new release fails:
+
+```yesh
+with lock $lock:
+    /usr/sbin/nginx -t
+    publish $release to $release_final
+    ln -s -- $release_final $current_next
+    mv -T -- $current_next $current
+
+    if curl --fail --silent --show-error --max-time 10 $health_url:
+        echo "release is serving"
+    else:
+        ln -s -- $previous $current_next
+        mv -T -- $current_next $current
+        exit 4
+```
+
+The web server, `curl`, filesystem, and permissions still belong to the host.
+yesh makes the order and the failure boundary reviewable; it does not become a
+web server, a container runtime, or a privilege manager.
+
+## See it run
+
+```console
+$ go build -trimpath -o yesh ./cmd/yesh
+$ ./yesh --plan examples/hello.yesh
+PLAN ["echo" "hello" "world"]
+PLAN ["echo" "item:" "one"]
+PLAN ["echo" "item:" "two"]
+PLAN ["echo" "item:" "three"]
+```
+
+The plan is produced from the same parsed script that would run, without
+starting external commands or opening redirections. For a real scenario, start
+with the [static-release examples](docs/practical-examples.md#static-release-publication-with-openrc-and-systemd)
+or the [incremental rsync example](examples/rsync-incremental.yesh).
 
 yesh is a language for bounded Linux operations where it is clear what will run,
 what will change, and how the result will be checked. Commands remain ordinary
@@ -17,11 +70,11 @@ can be costly. The plan is visible before execution and the result can be checke
 afterwards. For these scenarios, yesh is easier to read and review than an
 equivalent Bash script.
 
-yesh removes more than Bash's historical syntax noise. It makes recurring
+yesh removes more than shell syntax noise. It makes recurring
 protective code visible and reusable: preflight checks, failure boundaries,
 argument inspection, locks, cleanup, planning, and result verification.
-The intended effect is similar to Go's relationship with Java: less ceremony
-and less repeated scaffolding, while the underlying operations remain explicit.
+The result is a small executable operation card: less repeated scaffolding,
+while the underlying Linux operations remain explicit.
 
 ## What it is for
 

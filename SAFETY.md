@@ -99,6 +99,30 @@ controlled `PATH` and environment, filesystem permissions, and operating-system
 controls such as namespaces, cgroups, seccomp, MAC policy, and executable
 allowlists.
 
+## Containers and images
+
+yesh is not a container boundary. `docker`, `podman`, `skopeo`, `cosign`,
+`buildah`, and `umoci` remain external programs with their own authority and
+trust models.
+
+- Treat a Docker or Podman socket, a rootful runtime, `--privileged`, host
+  namespaces, host networking, and host-path mounts as high-impact privileges.
+- Prefer an image reference by digest. Check the digest, policy or signature,
+  and runtime configuration before starting a temporary container; start the
+  same digest that was checked, not a mutable tag.
+- Keep the old container, volume, and external entry point until the new
+  container passes its finite state and HTTP checks. Removing the old object is
+  a separate action after success.
+- Call a return to the previous container or unit a compensating rollback, not
+  a transaction. An interruption after the external switch can leave the new
+  container active.
+- Do not put registry credentials, tokens, or private keys in a yesh script or
+  an argument that `--plan` or an error may display. Use the runtime's external
+  credential mechanism.
+- A multi-stage image and a small runtime reduce contents and attack surface;
+  they do not prove the base image, dependencies, signature, or application are
+  trustworthy. Keep only the external tools required by the scenario.
+
 ## Operational rules
 
 - Treat an external command name and its arguments as policy, not merely as

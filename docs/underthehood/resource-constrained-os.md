@@ -15,6 +15,25 @@ or full user-service support.
 
 ## yesh's role on a small system
 
+In one sentence, yesh's niche is: **an executable, explainable operational
+script for one Linux node when external tools already know how to do the work,
+but a short shell wrapper hides the order, failure boundary, and result check**.
+
+This is not specifically a container, Alpine, or minimal-image niche.
+Container replacement, volume preparation, backup, and initrd checks are
+different examples of the same shape:
+
+```text
+precondition → lock → external action
+→ result check → clear error code
+```
+
+yesh is useful when several boundaries matter at once: two runs must not
+overlap, old state must not change before the new state is checked, the real
+`argv` must remain visible, and an error must leave a known account of what has
+already changed. yesh is not needed for a simple `podman run` or `cp` where a
+shell wrapper does not hide important operational mechanics.
+
 On a resource-constrained node, yesh is a finite checking and measurement
 script. It answers “what can be proven on this node right now?” and leaves an
 explainable result for an operator or an external tool that invoked the script.
@@ -40,6 +59,45 @@ confidence: `unavailable` and `partial` are better than a zero counter or a
 guessed state. Writes are limited to an explicitly selected measurement journal
 and temporary artifacts owned by the script; yesh does not reconfigure OpenRC,
 Supervisor, services, or cgroups.
+
+## Practical niche: replacing one container without an orchestrator
+
+The narrowest useful niche is not image building or cluster management. It is
+updating one service on one small Linux node: a home server, single-board
+computer, edge node, or small VPS without Kubernetes.
+
+The operator can already build or obtain the image. The operational problem is
+to replace the running container without declaring an unhealthy new process a
+success:
+
+```text
+verify the image by digest
+→ check space, volume, and permissions
+→ start the new container beside the old one
+→ check state, the required response, and HTTP
+→ switch the external entry point
+→ remove the old container only after success
+```
+
+If a check fails before the switch, the old container remains active. After the
+switch, only a visible compensating rollback is possible; this is not a
+transaction. This is where yesh helps: locks, visible `argv`, conditions,
+plans, error codes, and result checks already exist in the language, while
+Docker or Podman, nginx, volumes, and networking retain ownership of their
+state.
+
+The first practical stand should be small: two containers from one local image
+on Debian or Alpine, two local ports, one nginx or lighttpd in front of them,
+one rootless user, and an intentionally bad HTTP response from the new
+container. Acceptance must cover successful replacement, failure before the
+switch, failure after the switch, a held lock, a repeat run, and `--plan`. A
+second independent run should use the other runtime: rootless Podman and the
+Docker daemon.
+
+This is a scenario for “one-node administration without an orchestrator”, not a
+universal deployment mechanism. Compose can remain an external command for a
+later scenario; Kubernetes, rolling updates, and distributed locks are outside
+this boundary.
 
 ## Why Alpine is an important reference
 
