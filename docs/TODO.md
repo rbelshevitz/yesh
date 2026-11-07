@@ -4,12 +4,12 @@ This is the short working map. It contains only the current milestone,
 verifiable tasks, and boundaries. Historical decisions and closed discussions
 are kept in the [archive](TODO-history.md).
 
-## Current focus: after `v0.2.2`
+## Current focus: preparing `v0.3.0`
 
-Releases `v0.2.1` and `v0.2.2` are published. `v0.2.2` is a technical release
-for polishing the implemented Linux scenarios, documentation, and checks. New
-language constructs are out of scope for now. The working boundary is
-Linux/amd64.
+Releases `v0.2.1` and `v0.2.2` are published. The working tree now prepares
+`v0.3.0` as a stabilization milestone for the implemented Linux scenarios,
+documentation, and checks. No `v0.3.0` tag has been created. New language
+constructs remain out of scope. The working boundary is Linux/amd64.
 
 ### `v0.2.2` acceptance
 
