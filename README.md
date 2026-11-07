@@ -9,6 +9,10 @@ yesh is readable Linux automation you can explain.
 > Make the checks, exact `argv`, order of operations, and failure boundary
 > visible before a small administrative script changes a real node.
 
+yesh coordinates the checks, order, locking, and result handling; Linux commands
+perform the domain work and remain the source of its result. yesh is not a
+shell, a monitoring agent, or a container and fleet manager.
+
 ## What yesh is for
 
 yesh is for the awkward middle ground between a shell one-liner and a full
@@ -80,8 +84,7 @@ does not depend on it.
 ## How yesh helps
 
 yesh targets small administrative scripts: backups, configuration publication,
-service checks, diagnostics, and individual CI/CD steps. It is not an interactive
-shell or a fleet-management system.
+service checks, diagnostics, and individual CI/CD steps.
 
 For backups, `rsync` performs transfers and can restore a selected snapshot;
 `rsnapshot` performs transfers and snapshot rotation. A restore command remains
@@ -131,8 +134,9 @@ That is an environment boundary, not a syntax error.
 ## Resource-constrained Linux systems
 
 yesh supports read-only service checks under systemd and OpenRC: platform,
-supervisor, PID, cgroup, process, and finite resource observations. Missing host
-data is reported as unavailable; this is not continuous monitoring. See the
+supervisor, PID, cgroup, process, and finite resource observations. These are
+finite snapshots or bounded measurements inside one scenario, not a monitoring
+agent. Missing host data is reported as unavailable. See the
 [OpenRC example](examples/openrc-auto-resource-check.yesh) and the
 [resource-constrained systems note](docs/underthehood/resource-constrained-os.md).
 
