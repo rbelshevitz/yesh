@@ -94,7 +94,7 @@ word splitting that can turn spaces inside a value into extra arguments.
 ps -eo pid=,ppid=,user=,rss=,stat=,comm= | sort -k 4,4nr
 ```
 
-Pipelines, redirections, and command arguments keep their familiar Unix form.
+Pipelines, redirections, and command arguments keep their familiar Linux form.
 yesh executes the command arguments directly through its Go runtime; it does
 not reparse the whole line through another shell.
 
@@ -134,7 +134,7 @@ yesh connects the checks and order; it is not a third rotation system.
 The scenario checks the service and disk space, previews the real `logrotate`
 policy, requires an explicit confirmation file before changing anything, and
 then reads a bounded journal window. The full tutorial explanation and Bash
-comparison are in the [Russian syntax guide](syntax-guide.ru.md); the script is
+comparison are in the [syntax guide](syntax-guide.md); the script is
 [`examples/nginx-logrotate-maintenance.yesh`](../examples/nginx-logrotate-maintenance.yesh).
 
 Start with the plan:
@@ -218,7 +218,7 @@ named lines such as `PLAN publish ...` are built-in yesh operations.
 yesh is a small language for Linux automation, not a shell and not Python with a
 command shortcut. It deliberately keeps its language surface small:
 
-- use Unix tools such as `grep`, `sed`, `awk`, `ssh`, `systemctl`, and `rsync`;
+- use Linux tools such as `grep`, `sed`, `awk`, `ssh`, `systemctl`, and `rsync`;
 - use yesh for readable control flow, typed strings/lists, direct arguments,
   bounded execution, and failure handling;
 - do not expect unsupported shell features such as command substitution,
