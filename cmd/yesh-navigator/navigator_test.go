@@ -750,15 +750,16 @@ func TestNavigatorBackupReviewShowsScenarioPathAndSaveState(t *testing.T) {
 	drawNavigator(screen, navigatorModel{page: navigatorReview, outputPath: path})
 	screen.Show()
 	text := navigatorScreenText(screen)
-	if !strings.Contains(text, "Status: Not saved") || !strings.Contains(text, "Parser: OK") || !strings.Contains(text, "Save as:") || !strings.Contains(text, navigatorScenarioPath(path)) {
-		t.Fatalf("unsaved review does not show status and absolute path: %q", text)
+	wantPath := navigatorFitPath(navigatorScenarioPath(path), 90)
+	if !strings.Contains(text, "Status: Not saved") || !strings.Contains(text, "Parser: OK") || !strings.Contains(text, "Save as:") || !strings.Contains(text, wantPath) {
+		t.Fatalf("unsaved review does not show status and visible scenario path %q: %q", wantPath, text)
 	}
 
 	drawNavigator(screen, navigatorModel{page: navigatorReview, saved: true, savedPath: path})
 	screen.Show()
 	text = navigatorScreenText(screen)
-	if !strings.Contains(text, "Status: Saved") || !strings.Contains(text, "Parser: OK") || !strings.Contains(text, "Scenario file:") || !strings.Contains(text, navigatorScenarioPath(path)) {
-		t.Fatalf("saved review does not show confirmation and absolute path: %q", text)
+	if !strings.Contains(text, "Status: Saved") || !strings.Contains(text, "Parser: OK") || !strings.Contains(text, "Scenario file:") || !strings.Contains(text, wantPath) {
+		t.Fatalf("saved review does not show confirmation and visible scenario path %q: %q", wantPath, text)
 	}
 }
 
@@ -791,15 +792,16 @@ func TestNavigatorServiceReviewShowsScenarioPathAndSaveError(t *testing.T) {
 	drawNavigator(screen, navigatorModel{page: navigatorServiceReview, serviceOutput: path, serviceScript: "service status system example.service\n", servicePlanOutput: "PLAN service status\n"})
 	screen.Show()
 	text := navigatorScreenText(screen)
-	if !strings.Contains(text, "Status: Not saved") || !strings.Contains(text, "Parser: OK") || !strings.Contains(text, "Scenario file:") || !strings.Contains(text, navigatorScenarioPath(path)) {
-		t.Fatalf("service review does not show unsaved path: %q", text)
+	wantPath := navigatorFitPath(navigatorScenarioPath(path), 90)
+	if !strings.Contains(text, "Status: Not saved") || !strings.Contains(text, "Parser: OK") || !strings.Contains(text, "Scenario file:") || !strings.Contains(text, wantPath) {
+		t.Fatalf("service review does not show unsaved visible scenario path %q: %q", wantPath, text)
 	}
 
 	drawNavigator(screen, navigatorModel{page: navigatorServiceReview, serviceOutput: path, serviceSaved: true, serviceSavedPath: path, serviceScript: "service status system example.service\n", servicePlanOutput: "PLAN service status\n"})
 	screen.Show()
 	text = navigatorScreenText(screen)
-	if !strings.Contains(text, "Status: Saved") || !strings.Contains(text, navigatorScenarioPath(path)) {
-		t.Fatalf("service review does not show saved path: %q", text)
+	if !strings.Contains(text, "Status: Saved") || !strings.Contains(text, wantPath) {
+		t.Fatalf("service review does not show saved visible scenario path %q: %q", wantPath, text)
 	}
 
 	drawNavigator(screen, navigatorModel{page: navigatorServiceReview, serviceOutput: path, serviceSaveError: errors.New("file already exists"), serviceScript: "service status system example.service\n", servicePlanOutput: "PLAN service status\n"})
