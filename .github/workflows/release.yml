@@ -125,6 +125,8 @@ jobs:
           - finite, read-only service and cgroup resource observation;
           - an explicit Bash comparison baseline for the incremental rsync case;
           - explicit `--plan`, locking, rerun, failure, and recovery scenarios;
+          - the separate `yesh-navigator` TUI assistant for first-time users,
+            with parser-checked scripts and an explicit review before saving;
           - Linux/amd64 binaries `yesh` and `yesh-navigator`, README files, and
             the MIT license.
 
