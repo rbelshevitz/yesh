@@ -1,0 +1,173 @@
+//go:build !navigator
+
+package yeshcore
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestParserRejectsWhile(t *testing.T) {
+	_, err := parse("while true:\n    echo loop\n", "test.yesh")
+	if err == nil {
+		t.Fatal("while must be rejected")
+	}
+}
+
+func TestParserAcceptsScopedLock(t *testing.T) {
+	items, err := parse("lock = \"/tmp/yesh.lock\"\nwith lock $lock:\n    echo protected\n", "test.yesh")
+	if err != nil {
+		t.Fatalf("parse scoped lock: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected assignment and lock, got %#v", items)
+	}
+	if _, ok := items[1].(lockStmt); !ok {
+		t.Fatalf("expected lock statement, got %#v", items[1])
+	}
+}
+
+func TestParserRejectsLockWithoutPathOrBody(t *testing.T) {
+	for _, source := range []string{"with lock:\n    echo protected\n", "with lock /tmp/yesh.lock:\n"} {
+		if _, err := parse(source, "test.yesh"); err == nil {
+			t.Errorf("expected scoped lock rejection for %q", source)
+		}
+	}
+}
+
+func TestParserAcceptsRetentionPlan(t *testing.T) {
+	items, err := parse("rsync retention plan in $root keep $keep\n", "test.yesh")
+	if err != nil {
+		t.Fatalf("parse retention plan: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items=%#v", items)
+	}
+	if _, ok := items[0].(retentionPlanStmt); !ok {
+		t.Fatalf("expected retention plan statement, got %#v", items[0])
+	}
+}
+
+func TestParserAcceptsPublish(t *testing.T) {
+	items, err := parse("publish \"temporary tree\" to current\n", "test.yesh")
+	if err != nil {
+		t.Fatalf("parse publish: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one statement, got %#v", items)
+	}
+	if _, ok := items[0].(publishStmt); !ok {
+		t.Fatalf("expected publish statement, got %#v", items[0])
+	}
+}
+
+func TestParserRejectsAmbiguousPublish(t *testing.T) {
+	for _, source := range []string{"publish source destination\n", "publish source to\n", "publish source to destination extra\n"} {
+		if _, err := parse(source, "test.yesh"); err == nil {
+			t.Errorf("expected publish rejection for %q", source)
+		}
+	}
+}
+
+func TestRuntimeRejectsUnsafeCommandForms(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	for _, command := range []string{
+		"echo loop &",
+		"echo loop |",
+		"bash -c echo",
+		"echo $(whoami)",
+	} {
+		if err := r.run(command, 1, true); err == nil {
+			t.Errorf("expected %q to be rejected", command)
+		}
+	}
+}
+
+func TestRuntimeCommandFailureIncludesExitCode(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	err := r.run("false", 4, true)
+	if err == nil || !strings.Contains(err.Error(), "exit code 1") || !strings.Contains(err.Error(), "false") {
+		t.Fatalf("command failure lost its cause: %v", err)
+	}
+}
+
+func TestJSONDiagnosticIncludesStructuredCommandFields(t *testing.T) {
+	code := 23
+	err := &commandDiagnostic{
+		Message: "test failure", Stage: 2, Stages: 3,
+		Argv: []string{"rsync", "<environment value>"}, ExitCode: code,
+		Stderr: "partial\n", StderrTruncated: true,
+		Duration: 125 * time.Millisecond,
+		Cause:    errors.New("cause"),
+	}
+	var out bytes.Buffer
+	writeJSONDiagnostic(&out, err, true)
+	var report map[string]any
+	if json.Unmarshal(out.Bytes(), &report) != nil {
+		t.Fatalf("invalid diagnostic JSON: %q", out.String())
+	}
+	if report["stage"] != float64(2) || report["stages"] != float64(3) || report["exit_code"] != float64(23) || report["stderr_truncated"] != true || report["execution_stopped"] != true || report["duration_ms"] != float64(125) {
+		t.Fatalf("unexpected diagnostic JSON: %s", out.String())
+	}
+	argv, ok := report["argv"].([]any)
+	if !ok || argv[1] != "<environment value>" {
+		t.Fatalf("secret was not represented safely: %s", out.String())
+	}
+}
+
+func TestParserRejectsCommandSyntaxBeforeExecution(t *testing.T) {
+	if _, err := parse("echo before\ncat \"unterminated\n", "syntax.yesh"); err == nil || !strings.Contains(err.Error(), "unterminated") {
+		t.Fatalf("syntax error was not reported during parsing: %v", err)
+	}
+}
+
+func TestPipelineIsParsedBeforeExecution(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	stages, err := r.parseCommand("first hello | second world > output.txt", 1)
+	if err != nil {
+		t.Fatalf("pipeline parse failed: %v", err)
+	}
+	if len(stages) != 2 || stages[0].argv[0] != "first" || stages[1].argv[0] != "second" {
+		t.Fatalf("unexpected pipeline: %#v", stages)
+	}
+	if stages[1].output != "output.txt" {
+		t.Fatalf("expected output redirection, got %#v", stages[1])
+	}
+}
+
+func TestConditionDistinguishesFalseFromExecutionError(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	if ok, err := r.condition("false", 1); err != nil || ok {
+		t.Fatalf("false should be a normal false condition, got ok=%v err=%v", ok, err)
+	}
+	if _, err := r.condition("command-that-does-not-exist", 1); err == nil {
+		t.Fatal("missing command must be an execution error, not false")
+	}
+}
+
+func TestRegexValueMatchesWithoutShell(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	v, err := r.eval(`regex '^api-[0-9]+$'`, 3)
+	if err != nil {
+		t.Fatalf("regex compile failed: %v", err)
+	}
+	r.values["name"] = value{scalar: "api-42"}
+	r.values["pattern"] = v
+	ok, err := r.condition("$name matches $pattern", 4)
+	if err != nil || !ok {
+		t.Fatalf("expected regex match, got ok=%v err=%v", ok, err)
+	}
+}
+
+func TestRegexRejectsInvalidAndDuplicateNames(t *testing.T) {
+	r := &runtime{values: map[string]value{}, filename: "test.yesh"}
+	for _, raw := range []string{`regex '['`, `regex '^(?P<x>a)(?P<x>b)$'`} {
+		if _, err := r.eval(raw, 7); err == nil {
+			t.Errorf("expected regex %q to fail", raw)
+		}
+	}
+}

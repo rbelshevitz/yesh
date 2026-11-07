@@ -61,6 +61,20 @@ starting external commands or opening redirections. For a real scenario, start
 with the [static-release examples](docs/practical-examples.md#static-release-publication-with-openrc-and-systemd)
 or the [incremental rsync example](examples/rsync-incremental.yesh).
 
+If yesh is new to you, the separate TUI assistant offers a gentle first path
+through it. It leads from a task choice to a small form, explains the checks,
+shows the real script plan, and makes the saved file explicit. The assistant
+does not run the generated script or hide its external commands; it is a guided
+introduction through two bounded workflows: backups and read-only service
+inspection.
+
+Run it from a working tree:
+
+    go run -tags navigator ./cmd/yesh-navigator
+
+The assistant is built as a separate companion binary; the regular `yesh` binary
+does not depend on it.
+
 yesh is a language for bounded Linux operations where it is clear what will run,
 what will change, and how the result will be checked. Commands remain ordinary
 Linux commands, while the script makes its preconditions, order of operations,

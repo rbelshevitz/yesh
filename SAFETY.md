@@ -44,7 +44,7 @@ The source of a `.yesh` script is limited to 4 MiB before parsing. Additional
 limits apply to loops, process snapshots, regular expressions, and Linux
 storage-query output.
 
-## Current guarantees
+## Confirmed behavior within the tested scope
 
 - commands are started as argument vectors, without reparsing a command string
   through a shell;
@@ -60,11 +60,17 @@ storage-query output.
 - `--plan` displays expanded arguments without starting commands or opening
   redirect files.
 
-These are language and runtime guarantees, not isolation. The current
-prototype does not protect against an arbitrary dangerous external program.
+This is confirmed language and runtime behavior, not isolation. The current
+implementation does not protect against an arbitrary dangerous external
+program and does not promise that an external command will succeed.
 
 The POSIX process model, signal and pipeline behavior, and the scope of the
-test corpus are documented in [POSIX runtime details](POSIX.md).
+test corpus are documented in [POSIX runtime details](POSIX.md). The actual
+Linux checks and their limits are collected in the [Linux integration matrix](docs/underthehood/linux-integration.md);
+positive and negative operational scenarios are listed in [Practical Examples](docs/practical-examples.md)
+and the [current project plan](docs/TODO.md). A result from one fixture does not
+mean support for every operating system, filesystem, privilege policy, or
+external command.
 
 ## Two separate safety layers
 

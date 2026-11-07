@@ -1,0 +1,2077 @@
+//go:build !windows && !navigator
+
+package yeshcore
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+)
+
+func practicalExample(t *testing.T, name string) string {
+	t.Helper()
+	name = filepath.Join("..", "..", "examples", name)
+	path, err := filepath.Abs(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+func practicalDependencies(t *testing.T, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		if _, err := exec.LookPath(name); err != nil {
+			packageName := map[string]string{"pv": "pv", "rsnapshot": "rsnapshot", "rsync": "rsync", "tar": "tar", "gzip": "gzip", "install": "coreutils", "grep": "grep", "mv": "coreutils", "cat": "coreutils", "cp": "coreutils", "rm": "coreutils", "sort": "coreutils", "df": "coreutils", "du": "coreutils", "findmnt": "util-linux", "lsinitramfs": "initramfs-tools-core", "cpio": "cpio", "zstd": "zstd"}[name]
+			t.Skipf("missing utility %s; install package %s on Debian/Ubuntu to run this practical test: %v", name, packageName, err)
+		}
+	}
+}
+func practicalCommand(t *testing.T, dir, script string) *exec.Cmd {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	t.Cleanup(cancel)
+	cmd := posixCLI(t, ctx, script)
+	cmd.Dir = dir
+	return cmd
+}
+
+// The first licensed-corpus adaptations deliberately keep their safety
+// properties visible in the source: preview before copy, an explicit mount
+// check, and non-interactive SSH host verification. This test guards those
+// reviewable contracts without requiring a live remote host or a real backup
+// device.
+func TestPOSIXCorpusAdaptationSafetyContracts(t *testing.T) {
+	cases := []struct {
+		name   string
+		file   string
+		must   []string
+		forbid []string
+	}{
+		{name: "rsync preview", file: "rsync-preview.yesh", must: []string{"rsync -a --dry-run", "--itemize-changes", "-- $source $target"}},
+		{name: "incremental rsync", file: "rsync-incremental.yesh", must: []string{"with lock $lock:", "--delay-updates", "--link-dest $previous"}, forbid: []string{"--delete", "--delete-excluded", "--delete-missing-args", "--remove-source-files", "--ignore-errors"}},
+		{name: "rsync retention plan", file: "rsync-retention-plan.yesh", must: []string{"rsync retention plan in $root keep $keep"}, forbid: []string{"unlink ", "delete ", "find "}},
+		{name: "rsync retention quarantine", file: "rsync-retention-quarantine.yesh", must: []string{"with lock $lock:", "rsync retention quarantine in $root keep $keep to $quarantine"}, forbid: []string{"rm ", "delete ", "unlink "}},
+		{name: "selected restore", file: "rsync-selected-restore.yesh", must: []string{"findmnt --target $target", "rsync -a -- $source $target"}, forbid: []string{"rm ", "delete ", "--delete"}},
+		{name: "config systemd RWE", file: "config-systemd-rwe.yesh", must: []string{"grep -q", "publish $next to $active", "service restart yesh-config-rwe.service until active within 10s", "journal yesh-config-rwe.service since 5m lines 20"}, forbid: []string{"sudo ", "systemctl daemon-reload", "--delete"}},
+		{name: "static deploy without systemd", file: "deploy-static.yesh", must: []string{"with lock $lock:", "/usr/sbin/nginx -t", "publish $release to $release_final", "mv -T -- $current_next $current", "curl --fail --silent --show-error --max-time 10 $health_url", "restoring previous release"}, forbid: []string{"service restart", "systemctl"}},
+		{name: "static deploy with systemd", file: "deploy-static-systemd.yesh", must: []string{"with lock $lock:", "service status nginx.service", "/usr/sbin/nginx -t", "publish $release to $release_final", "mv -T -- $current_next $current", "curl --fail --silent --show-error --max-time 10 $health_url", "restoring previous release"}, forbid: []string{"service restart", "systemctl"}},
+		{name: "static deploy with OpenRC lighttpd", file: "deploy-static-openrc-lighttpd.yesh", must: []string{"with lock $lock:", "rc-service lighttpd status", "/usr/sbin/lighttpd -tt -f $lighttpd_config", "publish $release to $release_final", "mv -T -- $current_next $current", "curl --fail --silent --show-error --max-time 10 $health_url", "restoring previous release"}, forbid: []string{"service restart", "systemctl"}},
+		{name: "deploy release RWE", file: "deploy-release-rwe.yesh", must: []string{"rsync -az --delay-updates -- $source $stage", "mv -T -- $current_next $current", "mv -T -- $rollback_next $current"}, forbid: []string{"sudo ", "--delete", "StrictHostKeyChecking=no"}},
+		{name: "incident report RWE", file: "incident-report-rwe.yesh", must: []string{"journal yesh-incident-rwe.service since 15m lines 20", "show $systemd fields pid ppid uid state rss start_time cgroup", "findmnt --target /", "df -P -h -- /"}, forbid: []string{"service restart", "service start", "umount", "mount "}},
+		{name: "rsync network preflight", file: "rsync-network-preflight.yesh", must: []string{"getent ahosts $dns_name", "ip route get $route_target", "BatchMode=yes", "StrictHostKeyChecking=yes", "rsync -a --dry-run --itemize-changes -e $ssh_command -- $source $target"}, forbid: []string{"--delete", "StrictHostKeyChecking=no", "sudo "}},
+		{name: "networked incremental RWE", file: "rsync-networked-incremental-rwe.yesh", must: []string{"rsync -a --fsync --delay-updates --timeout=30 -e $ssh_command -- $source $temporary", "publish $temporary to $current", "remote source path check failed"}, forbid: []string{"--delete", "StrictHostKeyChecking=no", "sudo "}},
+		{name: "IP CIDR preflight", file: "ip-cidr-check.yesh", must: []string{"network = cidr 192.0.2.0/24", "address = ip 192.0.2.42", "if contains $network $address:"}, forbid: []string{"ip route", "ip address add", "iptables"}},
+		{name: "IP CIDR overlap", file: "ip-cidr-overlap.yesh", must: []string{"network = masked cidr 192.0.2.17/24", "if overlaps $network $more_specific:"}, forbid: []string{"ip route", "ip address add", "iptables"}},
+		{name: "IP class preflight", file: "ip-class-check.yesh", must: []string{"address = ip fe80::1%eth0", "if is link-local $address:"}, forbid: []string{"ip route", "ip address add", "iptables"}},
+		{name: "IP CIDR bounds", file: "ip-cidr-bounds.yesh", must: []string{"first_address = first $network", "last_address = last $network", "if contains $network $first_address:"}, forbid: []string{"ping ", "ip route", "ip address add"}},
+		{name: "network interface report", file: "network-interface-report.yesh", must: []string{"ip -br address show"}, forbid: []string{"ip address add", "ip address change", "ip address replace", "ip address flush", "sudo "}},
+		{name: "network route report", file: "network-route-report.yesh", must: []string{"ip route show"}, forbid: []string{"ip route add", "ip route change", "ip route replace", "ip route flush", "sudo "}},
+		{name: "network neighbour report", file: "network-neighbour-report.yesh", must: []string{"ip neigh show"}, forbid: []string{"ip neigh add", "ip neigh change", "ip neigh replace", "ip neigh del", "sudo "}},
+		{name: "network listener report", file: "network-listener-report.yesh", must: []string{"ss -H -n -l -t -u | head -n 200"}, forbid: []string{"ss -K", "kill", "sudo "}},
+		{name: "arp scan dependency", file: "arp-scan-by-mac.yesh", must: []string{"arp-scan --interface $interface --numeric --quiet $network", "grep -v '^Interface:'"}, forbid: []string{"apt install", "dnf install", "sudo ", "--localnet"}},
+		{name: "cron backup RWE", file: "cron-backup-rwe.yesh", must: []string{"with lock $lock:", "sleep $delay", "rsync -a --fsync --delay-updates --timeout=30 -- $source $temporary", "publish $temporary to $current"}, forbid: []string{"crontab ", "sudo ", "--delete"}},
+		{name: "rsync destination preflight", file: "rsync-destination-preflight.yesh", must: []string{"findmnt --target $root", "stat -c", "df -P -h -- $root", "rsync retention plan in $root keep $keep"}, forbid: []string{"rsync -", "publish ", "delete ", "unlink "}},
+		{name: "rsnapshot preflight", file: "rsnapshot-preflight.yesh", must: []string{"rsnapshot -c $config configtest", "rsnapshot -c $config -t $level"}},
+		{name: "rsnapshot guarded apply", file: "rsnapshot-apply.yesh", must: []string{"findmnt --source $mount_source --target $root", "df -P -h -- $root", "free_space $root at_least 20MiB", "rsnapshot -c $config -t $level", "YESH_RSNAPSHOT_CONFIRM"}},
+		{name: "backup with progress", file: "backup-with-progress.yesh", must: []string{"tar -C $source -cf - -- . | $pv --numeric --bytes | gzip > $partial", "publish $partial to $published"}, forbid: []string{"sudo ", "--delete"}},
+		{name: "mount preflight", file: "storage-check.yesh", must: []string{"findmnt --target $mountpoint", "df -P -h -- $mountpoint"}},
+		{name: "nginx logrotate maintenance", file: "nginx-logrotate-maintenance.yesh", must: []string{"service status nginx.service", "$binary -d -v -s $state $config", "$binary -s $state $config", "journal nginx.service since 5m lines 40"}, forbid: []string{"find -P", "service restart", "--force"}},
+		{name: "ssh health", file: "ssh-health.yesh", must: []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ConnectTimeout=5"}, forbid: []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := string(readTestFile(t, practicalExample(t, tc.file)))
+			for _, want := range tc.must {
+				if !strings.Contains(data, want) {
+					t.Fatalf("%s missing safety contract %q", tc.file, want)
+				}
+			}
+			for _, banned := range tc.forbid {
+				if strings.Contains(data, banned) {
+					t.Fatalf("%s contains unsafe contract %q", tc.file, banned)
+				}
+			}
+		})
+	}
+}
+
+func TestPOSIXPracticalBackupRoundTrip(t *testing.T) {
+	practicalDependencies(t, "tar", "gzip", "mv")
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{"settings.ini": []byte("mode=production\n"), "file with spaces": []byte("payload\n"), "binary": {0, 1, 10, 128, 255}}
+	for name, data := range files {
+		writeTestFile(t, filepath.Join(source, name), data, 0600)
+	}
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup.yesh"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("backup: %v\n%s", err, out)
+	}
+	archive, err := os.Open(filepath.Join(dir, "backup.tar.gz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	gz, err := gzip.NewReader(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+	reader := tar.NewReader(gz)
+	restored := map[string][]byte{}
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		name := strings.TrimPrefix(strings.TrimPrefix(header.Name, "./"), "source/")
+		data, err := io.ReadAll(io.LimitReader(reader, 1024*1024))
+		if err != nil {
+			t.Fatal(err)
+		}
+		restored[name] = data
+	}
+	// Drain the gzip stream so its checksum/trailer is checked as well.
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		t.Fatal(err)
+	}
+	if len(restored) != len(files) {
+		t.Fatalf("archive members: %v", restored)
+	}
+	for name, want := range files {
+		if !bytes.Equal(restored[name], want) {
+			t.Fatalf("restore mismatch for %q", name)
+		}
+	}
+	var state struct {
+		Schema  int    `json:"schema"`
+		Status  string `json:"status"`
+		Archive string `json:"archive"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(readTestFile(t, filepath.Join(dir, "backup-state.json"))))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state.Schema != 1 || state.Status != "complete" || state.Archive != "backup.tar.gz" {
+		t.Fatalf("bad completion state: %+v", state)
+	}
+	for _, name := range []string{"backup.tar.gz.partial", "backup-state.json.partial"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("unpublished partial remains: %s %v", name, err)
+		}
+	}
+}
+
+func TestPOSIXPracticalBackupDoesNotPublishFailure(t *testing.T) {
+	practicalDependencies(t, "tar", "gzip", "mv")
+	if os.Geteuid() == 0 {
+		t.Skip("needs unprivileged permission failure")
+	}
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "data"), []byte("new"), 0600)
+	if err := os.Chmod(source, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(source, 0700)
+	writeTestFile(t, filepath.Join(dir, "backup.tar.gz"), []byte("previous archive"), 0600)
+	writeTestFile(t, filepath.Join(dir, "backup-state.json"), []byte("previous state"), 0600)
+	out, err := practicalCommand(t, dir, practicalExample(t, "backup.yesh")).CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("expected pipeline failure: %v %s", err, out)
+	}
+	if got := string(readTestFile(t, filepath.Join(dir, "backup.tar.gz"))); got != "previous archive" {
+		t.Fatalf("failed backup replaced archive: %q", got)
+	}
+	if got := string(readTestFile(t, filepath.Join(dir, "backup-state.json"))); got != "previous state" {
+		t.Fatalf("failed backup published success: %q", got)
+	}
+}
+
+func TestPOSIXPracticalConfigValidation(t *testing.T) {
+	practicalDependencies(t, "grep", "install", "mv")
+	for _, tc := range []struct {
+		name, source string
+		code         int
+	}{
+		{"valid", "mode=production\n", 0}, {"invalid", "mode=development\n", 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			active := filepath.Join(dir, "active.conf")
+			writeTestFile(t, active, []byte("previous\n"), 0600)
+			writeTestFile(t, filepath.Join(dir, "staged.conf"), []byte(tc.source), 0600)
+			out, err := practicalCommand(t, dir, practicalExample(t, "config-apply.yesh")).CombinedOutput()
+			code := 0
+			if exit, ok := err.(*exec.ExitError); ok {
+				code = exit.ExitCode()
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if code != tc.code {
+				t.Fatalf("code=%d want=%d: %s", code, tc.code, out)
+			}
+			info, err := os.Stat(active)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, mode := "previous\n", os.FileMode(0600)
+			if tc.code == 0 {
+				want, mode = tc.source, 0640
+			}
+			if got := string(readTestFile(t, active)); got != want {
+				t.Fatalf("active config=%q want=%q", got, want)
+			}
+			if info.Mode().Perm() != mode {
+				t.Fatalf("active mode=%04o want=%04o", info.Mode().Perm(), mode)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "active.conf.next")); !os.IsNotExist(err) {
+				t.Fatalf("temporary config remains: %v", err)
+			}
+		})
+	}
+}
+
+func TestPOSIXPracticalStaticDeployPublishesAndRollsBack(t *testing.T) {
+	if _, err := os.Stat("/usr/sbin/lighttpd"); err != nil {
+		t.Skipf("missing /usr/sbin/lighttpd; install package lighttpd to run this practical test: %v", err)
+	}
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "rc-service"), []byte("#!/bin/sh\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "curl"), []byte("#!/bin/sh\nif [ \"$YESH_TEST_HTTP_FAIL\" = 1 ]; then exit 22; fi\nprintf 'health ok\\n'\n"), 0700)
+	config := filepath.Join(dir, "lighttpd.conf")
+	writeTestFile(t, config, []byte("server.document-root = \""+dir+"\"\nserver.pid-file = \""+filepath.Join(dir, "lighttpd.pid")+"\"\nserver.port = 18080\n"), 0600)
+	root := filepath.Join(dir, "site")
+	incoming := filepath.Join(root, "incoming")
+	releases := filepath.Join(root, "releases")
+	if err := os.MkdirAll(releases, 0700); err != nil {
+		t.Fatal(err)
+	}
+	previous := filepath.Join(releases, "release-0")
+	if err := os.Mkdir(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(previous, "index.html"), []byte("old release\n"), 0600)
+	current := filepath.Join(root, "current")
+	if err := os.Symlink(previous, current); err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(root, "deploy.lock")
+	newRelease := filepath.Join(incoming, "release-1")
+	if err := os.MkdirAll(newRelease, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(newRelease, "index.html"), []byte("new release\n"), 0600)
+
+	baseEnv := append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"YESH_RELEASE="+newRelease,
+		"YESH_RELEASE_INDEX="+filepath.Join(newRelease, "index.html"),
+		"YESH_LIGHTTPD_CONFIG="+config,
+		"YESH_RELEASE_FINAL="+filepath.Join(releases, "release-1"),
+		"YESH_CURRENT="+current,
+		"YESH_CURRENT_NEXT="+filepath.Join(root, "current.next"),
+		"YESH_PREVIOUS="+previous,
+		"YESH_DEPLOY_LOCK="+lock,
+		"YESH_HEALTH_URL=http://example.invalid/health",
+	)
+	cmd := practicalCommand(t, dir, practicalExample(t, "deploy-static-openrc-lighttpd.yesh"))
+	cmd.Env = append(append([]string{}, baseEnv...), "YESH_TEST_HTTP_FAIL=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("static deployment: %v\n%s", err, out)
+	}
+	if got, err := os.Readlink(current); err != nil || got != filepath.Join(releases, "release-1") {
+		t.Fatalf("current after publish = %q, %v", got, err)
+	}
+	if got := string(readTestFile(t, filepath.Join(current, "index.html"))); got != "new release\n" {
+		t.Fatalf("published content = %q", got)
+	}
+	if _, err := os.Stat(newRelease); !os.IsNotExist(err) {
+		t.Fatalf("incoming release was not moved: %v", err)
+	}
+
+	rollbackSource := filepath.Join(incoming, "release-2")
+	if err := os.MkdirAll(rollbackSource, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(rollbackSource, "index.html"), []byte("bad release\n"), 0600)
+	env := append([]string{}, baseEnv...)
+	for i := range env {
+		if strings.HasPrefix(env[i], "YESH_RELEASE=") {
+			env[i] = "YESH_RELEASE=" + rollbackSource
+		} else if strings.HasPrefix(env[i], "YESH_RELEASE_INDEX=") {
+			env[i] = "YESH_RELEASE_INDEX=" + filepath.Join(rollbackSource, "index.html")
+		} else if strings.HasPrefix(env[i], "YESH_RELEASE_FINAL=") {
+			env[i] = "YESH_RELEASE_FINAL=" + filepath.Join(releases, "release-2")
+		}
+	}
+	cmd = practicalCommand(t, dir, practicalExample(t, "deploy-static-openrc-lighttpd.yesh"))
+	cmd.Env = append(env, "YESH_TEST_HTTP_FAIL=1")
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 4 {
+		t.Fatalf("HTTP failure code: %v\n%s", err, out)
+	}
+	if got, err := os.Readlink(current); err != nil || got != filepath.Join(releases, "release-0") {
+		t.Fatalf("current after rollback = %q, %v", got, err)
+	}
+	if got := string(readTestFile(t, filepath.Join(current, "index.html"))); got != "old release\n" {
+		t.Fatalf("rollback content = %q", got)
+	}
+}
+
+func TestPOSIXPracticalStaticDeployPlanPreservesArgvOrder(t *testing.T) {
+	dir := t.TempDir()
+	release := filepath.Join(dir, "incoming", "release-1")
+	previous := filepath.Join(dir, "releases", "release-0")
+	if err := os.MkdirAll(release, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(release, "index.html"), []byte("new\n"), 0600)
+	current := filepath.Join(dir, "current")
+	if err := os.Symlink(previous, current); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "lighttpd.conf")
+	writeTestFile(t, config, []byte("unused\n"), 0600)
+	values := []string{
+		"YESH_RELEASE=" + release,
+		"YESH_RELEASE_INDEX=" + filepath.Join(release, "index.html"),
+		"YESH_LIGHTTPD_CONFIG=" + config,
+		"YESH_RELEASE_FINAL=" + filepath.Join(dir, "releases", "release-1"),
+		"YESH_CURRENT=" + current,
+		"YESH_CURRENT_NEXT=" + filepath.Join(dir, "current.next"),
+		"YESH_PREVIOUS=" + previous,
+		"YESH_DEPLOY_LOCK=" + filepath.Join(dir, "deploy.lock"),
+		"YESH_HEALTH_URL=http://127.0.0.1/health",
+	}
+	cmd := posixCLI(t, context.Background(), "--plan", practicalExample(t, "deploy-static-openrc-lighttpd.yesh"))
+	cmd.Env = append(append(os.Environ(), "YESH_TEST_CLI=1"), values...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	ordered := []string{
+		`PLAN ["rc-service" "lighttpd" "status"]`,
+		`PLAN ["/usr/sbin/lighttpd" "-tt" "-f" "<environment value>"]`,
+		`PLAN ["ln" "-s" "--" "<environment value>" "<environment value>"]`,
+		`PLAN ["mv" "-T" "--" "<environment value>" "<environment value>"]`,
+		`PLAN IF ["curl" "--fail" "--silent" "--show-error" "--max-time" "10" "<environment value>"]`,
+	}
+	last := -1
+	for _, want := range ordered {
+		at := strings.Index(text, want)
+		if at < 0 {
+			t.Fatalf("plan is missing %q:\n%s", want, text)
+		}
+		if at <= last {
+			t.Fatalf("plan order is wrong for %q:\n%s", want, text)
+		}
+		last = at
+	}
+}
+
+func TestPOSIXPracticalConfigPlanDoesNotChangeFiles(t *testing.T) {
+	practicalDependencies(t, "grep", "install", "mv")
+	dir := t.TempDir()
+	active := filepath.Join(dir, "active.conf")
+	staged := filepath.Join(dir, "staged.conf")
+	writeTestFile(t, active, []byte("previous\n"), 0600)
+	writeTestFile(t, staged, []byte("mode=production\n"), 0600)
+
+	cmd := posixCLI(t, context.Background(), "--plan", practicalExample(t, "config-apply.yesh"))
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{
+		`PLAN IF ["grep" "-q" "^mode=production$" "staged.conf"]`,
+		`PLAN ["install" "-m" "0640" "--" "staged.conf" "active.conf.next"]`,
+		`PLAN ["mv" "--" "active.conf.next" "active.conf"]`,
+		`PLAN ELSE`,
+		`PLAN exit 3`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("plan output missing %q: %s", want, text)
+		}
+	}
+	if got := string(readTestFile(t, active)); got != "previous\n" {
+		t.Fatalf("plan changed active config: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "active.conf.next")); !os.IsNotExist(err) {
+		t.Fatalf("plan created temporary config: %v", err)
+	}
+}
+
+func TestPOSIXPracticalDeployArguments(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"rsync", "ssh"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	trace := filepath.Join(dir, "trace")
+	cmd := practicalCommand(t, dir, practicalExample(t, "deploy.yesh"))
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("deploy fixture: %v %s", err, out)
+	}
+	want := []string{"rsync", "-az", "build/current/", "web-1:/srv/app/", "ssh", "web-1", "systemctl", "restart", "api", "ssh", "web-1", "systemctl", "is-active", "api", ""}
+	if got := strings.Split(string(readTestFile(t, trace)), "\x00"); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("unexpected remote argv: %q", got)
+	}
+}
+
+func TestPOSIXPracticalSSHHealthAndSCPArguments(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ssh", "scp"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	trace := filepath.Join(dir, "trace")
+	env := []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"), "TRACE_FILE=" + trace}
+	writeTestFile(t, filepath.Join(dir, "backup.tar.gz"), []byte("fixture\n"), 0600)
+
+	health := practicalCommand(t, dir, practicalExample(t, "ssh-health.yesh"))
+	health.Env = append(health.Env, env...)
+	if out, err := health.CombinedOutput(); err != nil {
+		t.Fatalf("ssh health fixture: %v %s", err, out)
+	}
+
+	scp := practicalCommand(t, dir, practicalExample(t, "scp-copy.yesh"))
+	scp.Env = append(scp.Env, env...)
+	if out, err := scp.CombinedOutput(); err != nil {
+		t.Fatalf("scp fixture: %v %s", err, out)
+	}
+
+	want := []string{
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-1", "hostname",
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-1", "uptime",
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-2", "hostname",
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-2", "uptime",
+		"scp", "-P", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "--", "backup.tar.gz", "user@backup-1:/srv/incoming/backup.tar.gz",
+		"",
+	}
+	if got := strings.Split(string(readTestFile(t, trace)), "\x00"); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("unexpected SSH/SCP argv: %q", got)
+	}
+
+	missing := practicalCommand(t, dir, practicalExample(t, "scp-copy.yesh"))
+	missing.Dir = filepath.Join(dir, "missing-source")
+	if err := os.Mkdir(missing.Dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	missing.Env = append(missing.Env, env...)
+	out, err := missing.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 || string(out) != "source file is missing\n" {
+		t.Fatalf("missing source: %v %s", err, out)
+	}
+	if got := string(readTestFile(t, trace)); strings.Count(got, "scp\x00") != 1 {
+		t.Fatalf("scp ran for missing source: %q", got)
+	}
+}
+
+func TestPOSIXPracticalSSHHealthFailureStopsLoop(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	ssh := "#!/bin/sh\nprintf '%s\\000' ssh \"$@\" >> \"$TRACE_FILE\"\nexit 255\n"
+	writeTestFile(t, filepath.Join(bin, "ssh"), []byte(ssh), 0700)
+	script := practicalExample(t, "ssh-health.yesh")
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte("web-1 health check failed")) {
+		t.Fatalf("SSH failure: code=%v output=%q", err, out)
+	}
+	want := []string{
+		"ssh", "-p", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "web-1", "hostname",
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("SSH failure argv: %q want %q", got, want)
+	}
+	if bytes.Contains(readTestFile(t, trace), []byte("web-2")) {
+		t.Fatal("health check continued to the next host after failure")
+	}
+}
+
+func TestPOSIXPracticalSCPFailureDoesNotPublish(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	scp := "#!/bin/sh\nprintf '%s\\000' scp \"$@\" >> \"$TRACE_FILE\"\nexit 23\n"
+	writeTestFile(t, filepath.Join(bin, "scp"), []byte(scp), 0700)
+	writeTestFile(t, filepath.Join(dir, "backup.tar.gz"), []byte("fixture\n"), 0600)
+	script := filepath.Join(dir, "copy.yesh")
+	source := readTestFile(t, practicalExample(t, "scp-copy.yesh"))
+	writeTestFile(t, script, append(source, []byte("\ntouch published\n")...), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("SCP failure: code=%v output=%q", err, out)
+	}
+	want := []string{
+		"scp", "-P", "22", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "--", "backup.tar.gz", "user@backup-1:/srv/incoming/backup.tar.gz",
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("SCP failure argv: %q want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("script continued after failed SCP: %v", err)
+	}
+}
+
+func TestPOSIXPracticalServiceFailureStopsScript(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte(quickstartSystemctlFixture), 0700)
+	script := filepath.Join(dir, "check.yesh")
+	source := readTestFile(t, practicalExample(t, "service-check.yesh"))
+	writeTestFile(t, script, append(source, []byte("\ntouch after\n")...), 0600)
+	trace := filepath.Join(dir, "trace")
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace, "CHECK_MODE=inactive")
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("service failure: %v %s", err, out)
+	}
+	for _, want := range []string{"nginx is active", "sshd active check failed"} {
+		if !bytes.Contains(out, []byte(want)) {
+			t.Fatalf("missing %q: %s", want, out)
+		}
+	}
+	if got := string(readTestFile(t, trace)); got != "show --property=Version\nis-active --quiet -- nginx\nis-active --quiet -- sshd\n" {
+		t.Fatalf("service calls: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "after")); !os.IsNotExist(err) {
+		t.Fatalf("continued after failed service: %v", err)
+	}
+}
+
+func TestPOSIXPracticalTypedSystemdExamples(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	systemctl := "#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nif [ \"$1\" = restart ]; then printf '%s' 300 > \"$TIMESTAMP_FILE\"; exit 0; fi\nunit=\"$4\"\nts=200\nif [ -f \"$TIMESTAMP_FILE\" ]; then read ts < \"$TIMESTAMP_FILE\"; fi\nprintf '%s\\n' \"Id=$unit\" 'LoadState=loaded' 'ActiveState=active' 'SubState=running' 'Result=success' 'ExecMainCode=0' 'ExecMainStatus=0' \"ActiveEnterTimestampMonotonic=$ts\"\n"
+	journalctl := "#!/bin/sh\nprintf 'journalctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nprintf '%s\\n' '{\"MESSAGE\":\"resolver ready\"}'\n"
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte(systemctl), 0700)
+	writeTestFile(t, filepath.Join(bin, "journalctl"), []byte(journalctl), 0700)
+	env := []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"), "TRACE_FILE=" + trace, "TIMESTAMP_FILE=" + filepath.Join(dir, "timestamp")}
+
+	cmd := practicalCommand(t, dir, practicalExample(t, "service-status.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err := cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_STATUS id=systemd-journald.service load_state=loaded active_state=active sub_state=running")) {
+		t.Fatalf("typed status: %v %s", err, out)
+	}
+
+	cmd = practicalCommand(t, dir, practicalExample(t, "service-restart.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_RESTART id=yesh-codex-fixture.service active_state=active sub_state=running result=success exec_main_code=0 exec_main_status=0 active_enter_timestamp_monotonic=300")) {
+		t.Fatalf("typed restart: %v %s", err, out)
+	}
+
+	cmd = practicalCommand(t, dir, practicalExample(t, "service-journal.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte(`"MESSAGE":"resolver ready"`)) {
+		t.Fatalf("typed journal: %v %s", err, out)
+	}
+
+	cmd = practicalCommand(t, dir, practicalExample(t, "service-wait.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	out, err = cmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("SERVICE_WAIT id=systemd-journald.service active_state=active sub_state=running")) {
+		t.Fatalf("typed wait: %v %s", err, out)
+	}
+	traceText := string(readTestFile(t, trace))
+	for _, want := range []string{
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState systemd-journald.service",
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,ActiveEnterTimestampMonotonic yesh-codex-fixture.service",
+		"systemctl restart yesh-codex-fixture.service",
+		"systemctl show --no-pager --property=Id,LoadState,ActiveState,SubState systemd-journald.service",
+		"journalctl --no-pager --output=json --unit systemd-journald.service --since -15m --lines 80",
+	} {
+		if !strings.Contains(traceText, want) {
+			t.Fatalf("missing exact systemd argv %q in trace %q", want, traceText)
+		}
+	}
+}
+
+func TestPOSIXPracticalTypedSystemdFailureAndPlan(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte("#!/bin/sh\nif [ \"$1\" = restart ]; then exit 0; fi\nprintf '%s\\n' \"Id=$4\" 'LoadState=loaded' 'ActiveState=failed' 'SubState=failed'\n"), 0700)
+	script := filepath.Join(dir, "failure.yesh")
+	writeTestFile(t, script, []byte("service restart systemd-resolved.service until active within 2s\ntouch after\n"), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte("postcondition failed")) {
+		t.Fatalf("postcondition failure: %v %s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "after")); !os.IsNotExist(err) {
+		t.Fatalf("script continued after failed postcondition: %v", err)
+	}
+	waitCmd := practicalCommand(t, dir, practicalExample(t, "service-wait.yesh"))
+	waitCmd.Env = append(waitCmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err = waitCmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte("active_state=failed")) {
+		t.Fatalf("wait failure: %v %s", err, out)
+	}
+
+	planDir := t.TempDir()
+	plan := filepath.Join(planDir, "plan.yesh")
+	writeTestFile(t, plan, []byte("service status systemd-journald.service\nservice restart systemd-resolved.service until active within 2s\nservice wait systemd-resolved.service until active within 2s\njournal systemd-journald.service since 15m lines 2\n"), 0600)
+	planCmd := posixCLI(t, context.Background(), "--plan", plan)
+	planCmd.Env = append(planCmd.Env, "PATH="+filepath.Join(planDir, "empty-bin"), "TRACE_FILE="+filepath.Join(planDir, "trace"))
+	out, err = planCmd.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte(`PLAN detect systemd or OpenRC for service "systemd-journald.service"`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "restart" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["systemctl" "show" "--no-pager" "--property=Id,LoadState,ActiveState,SubState" "systemd-resolved.service"] until active within 2s`)) || !bytes.Contains(out, []byte(`PLAN ["journalctl" "--no-pager" "--output=json" "--unit" "systemd-journald.service" "--since" "-15m" "--lines" "2"]`)) {
+		t.Fatalf("typed plan: %v %s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(planDir, "trace")); !os.IsNotExist(err) {
+		t.Fatalf("plan ran an external systemd command: %v", err)
+	}
+}
+
+func TestPOSIXPracticalLogrotateMaintenance(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	writeTestFile(t, filepath.Join(bin, "systemctl"), []byte("#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'Id=nginx.service' 'LoadState=loaded' 'ActiveState=active' 'SubState=running'\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "journalctl"), []byte("#!/bin/sh\nprintf 'journalctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nprintf '%s\\n' '{\"MESSAGE\":\"rotation complete\"}'\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "logrotate"), []byte("#!/bin/sh\nprintf 'logrotate %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 0\n"), 0700)
+	config := filepath.Join(dir, "nginx.logrotate")
+	state := filepath.Join(dir, "logrotate.status")
+	confirm := filepath.Join(dir, "confirm")
+	writeTestFile(t, config, []byte("/var/log/nginx/*.log { rotate 7 }\n"), 0600)
+	writeTestFile(t, confirm, []byte("reviewed\n"), 0600)
+	env := []string{
+		"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"TRACE_FILE=" + trace,
+		"YESH_NGINX_LOGROTATE_CONFIG=" + config,
+		"YESH_NGINX_LOGROTATE_STATE=" + state,
+		"YESH_NGINX_LOGROTATE_LOCK=" + filepath.Join(dir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM=" + confirm,
+		"YESH_NGINX_LOGROTATE_BIN=" + filepath.Join(bin, "logrotate"),
+	}
+	cmd := practicalCommand(t, dir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env, env...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("logrotate apply: %v %s", err, out)
+	}
+	traceText := string(readTestFile(t, trace))
+	if !strings.Contains(traceText, "logrotate -d -v -s "+state+" "+config) || !strings.Contains(traceText, "logrotate -s "+state+" "+config) {
+		t.Fatalf("missing logrotate check/apply: %q", traceText)
+	}
+	if strings.Contains(traceText, "systemctl restart") {
+		t.Fatalf("logrotate workflow restarted service: %q", traceText)
+	}
+
+	planDir := t.TempDir()
+	planTrace := filepath.Join(planDir, "trace")
+	plan := posixCLI(t, context.Background(), "--plan", practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	plan.Env = append(plan.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+planTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(planDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(planDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+confirm,
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(bin, "logrotate"),
+	)
+	out, err := plan.CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("PLAN")) {
+		t.Fatalf("logrotate plan: %v %s", err, out)
+	}
+	if _, err := os.Stat(planTrace); !os.IsNotExist(err) {
+		t.Fatalf("plan ran an external command: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(planDir, "logrotate.lock")); !os.IsNotExist(err) {
+		t.Fatalf("plan created lock: %v", err)
+	}
+
+	failingDir := t.TempDir()
+	failingBin := filepath.Join(failingDir, "bin")
+	if err := os.Mkdir(failingBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	failingTrace := filepath.Join(failingDir, "trace")
+	for _, name := range []string{"systemctl", "journalctl"} {
+		data, err := os.ReadFile(filepath.Join(bin, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestFile(t, filepath.Join(failingBin, name), data, 0700)
+	}
+	writeTestFile(t, filepath.Join(failingBin, "logrotate"), []byte("#!/bin/sh\nprintf 'logrotate %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 23\n"), 0700)
+	failingConfirm := filepath.Join(failingDir, "confirm")
+	writeTestFile(t, failingConfirm, []byte("reviewed\n"), 0600)
+	cmd = practicalCommand(t, failingDir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env,
+		"PATH="+failingBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+failingTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(failingDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(failingDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+failingConfirm,
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(failingBin, "logrotate"),
+	)
+	out, err = cmd.CombinedOutput()
+	if err == nil || !bytes.Contains(out, []byte("logrotate")) {
+		t.Fatalf("logrotate failure was hidden: %v %s", err, out)
+	}
+	failingTraceText := string(readTestFile(t, failingTrace))
+	if strings.Count(failingTraceText, "logrotate ") != 1 || strings.Contains(failingTraceText, "journalctl ") {
+		t.Fatalf("logrotate failure continued: %q", failingTraceText)
+	}
+
+	serviceDir := t.TempDir()
+	serviceBin := filepath.Join(serviceDir, "bin")
+	if err := os.Mkdir(serviceBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	serviceTrace := filepath.Join(serviceDir, "trace")
+	writeTestFile(t, filepath.Join(serviceBin, "systemctl"), []byte("#!/bin/sh\nprintf 'systemctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 7\n"), 0700)
+	writeTestFile(t, filepath.Join(serviceBin, "logrotate"), []byte("#!/bin/sh\nprintf 'logrotate %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(serviceBin, "journalctl"), []byte("#!/bin/sh\nprintf 'journalctl %s\\n' \"$*\" >> \"$TRACE_FILE\"\nexit 0\n"), 0700)
+	serviceConfirm := filepath.Join(serviceDir, "confirm")
+	writeTestFile(t, serviceConfirm, []byte("reviewed\n"), 0600)
+	cmd = practicalCommand(t, serviceDir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env,
+		"PATH="+serviceBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+serviceTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(serviceDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(serviceDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+serviceConfirm,
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(serviceBin, "logrotate"),
+	)
+	if out, err = cmd.CombinedOutput(); err == nil {
+		t.Fatalf("service failure was hidden: %s", out)
+	}
+	serviceTraceText := string(readTestFile(t, serviceTrace))
+	if strings.Contains(serviceTraceText, "logrotate ") {
+		t.Fatalf("logrotate ran after service failure: %q", serviceTraceText)
+	}
+
+	negativeDir := t.TempDir()
+	negativeBin := filepath.Join(negativeDir, "bin")
+	if err := os.Mkdir(negativeBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"systemctl", "journalctl", "logrotate"} {
+		data, err := os.ReadFile(filepath.Join(bin, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeTestFile(t, filepath.Join(negativeBin, name), data, 0700)
+	}
+	negativeTrace := filepath.Join(negativeDir, "trace")
+	cmd = practicalCommand(t, negativeDir, practicalExample(t, "nginx-logrotate-maintenance.yesh"))
+	cmd.Env = append(cmd.Env,
+		"PATH="+negativeBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+negativeTrace,
+		"YESH_NGINX_LOGROTATE_CONFIG="+config,
+		"YESH_NGINX_LOGROTATE_STATE="+filepath.Join(negativeDir, "logrotate.status"),
+		"YESH_NGINX_LOGROTATE_LOCK="+filepath.Join(negativeDir, "logrotate.lock"),
+		"YESH_NGINX_LOGROTATE_CONFIRM="+filepath.Join(negativeDir, "missing-confirm"),
+		"YESH_NGINX_LOGROTATE_BIN="+filepath.Join(negativeBin, "logrotate"),
+	)
+	out, err = cmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 5 || !bytes.Contains(out, []byte("confirmation file is missing")) {
+		t.Fatalf("logrotate confirmation refusal: %v %s", err, out)
+	}
+	negativeTraceText := string(readTestFile(t, negativeTrace))
+	if strings.Count(negativeTraceText, "logrotate ") != 1 || strings.Contains(negativeTraceText, "journalctl ") {
+		t.Fatalf("confirmation refusal ran extra actions: %q", negativeTraceText)
+	}
+}
+
+func TestPOSIXPracticalRsyncPreviewAndCopy(t *testing.T) {
+	practicalDependencies(t, "rsync", "findmnt", "df")
+	dir := t.TempDir()
+	source, target := filepath.Join(dir, "source"), filepath.Join(dir, "target")
+	for _, name := range []string{source, target} {
+		if err := os.Mkdir(name, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTestFile(t, filepath.Join(source, "file with spaces"), []byte("new payload\n"), 0600)
+	writeTestFile(t, filepath.Join(target, "keep-extra"), []byte("do not delete\n"), 0600)
+	out, err := practicalCommand(t, dir, practicalExample(t, "rsync-preview.yesh")).CombinedOutput()
+	if err != nil || !bytes.Contains(out, []byte("file with spaces")) {
+		t.Fatalf("preview: %v %s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(target, "file with spaces")); !os.IsNotExist(err) {
+		t.Fatalf("preview copied data: %v", err)
+	}
+	if out, err := practicalCommand(t, dir, practicalExample(t, "rsync-copy.yesh")).CombinedOutput(); err != nil {
+		t.Fatalf("copy: %v %s", err, out)
+	}
+	if got := string(readTestFile(t, filepath.Join(target, "file with spaces"))); got != "new payload\n" {
+		t.Fatalf("copied data: %q", got)
+	}
+	if got := string(readTestFile(t, filepath.Join(target, "keep-extra"))); got != "do not delete\n" {
+		t.Fatal("extra destination data deleted")
+	}
+	if got := string(readTestFile(t, filepath.Join(source, "file with spaces"))); got != "new payload\n" {
+		t.Fatal("source changed")
+	}
+}
+
+func TestPOSIXPracticalIncrementalRsyncRoundTrip(t *testing.T) {
+	practicalDependencies(t, "rsync")
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "changed.txt"), []byte("version one\n"), 0600)
+	writeTestFile(t, filepath.Join(source, "unchanged.txt"), []byte("shared payload\n"), 0600)
+
+	run := func(previous, current, temporary string) {
+		env := append(os.Environ(),
+			"YESH_TEST_CLI=1",
+			"YESH_RSYNC_SOURCE="+source+string(os.PathSeparator),
+			"YESH_RSYNC_ROOT="+root,
+			"YESH_RSYNC_PREVIOUS="+previous,
+			"YESH_RSYNC_CURRENT="+current,
+			"YESH_RSYNC_TEMPORARY="+temporary,
+			"YESH_RSYNC_LOCK="+filepath.Join(root, ".rsync.lock"),
+		)
+		cmd := practicalCommand(t, dir, practicalExample(t, "rsync-incremental.yesh"))
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("incremental rsync %s: %v\n%s", filepath.Base(current), err, out)
+		}
+		if _, err := os.Stat(current); err != nil {
+			t.Fatalf("published snapshot %s: %v\n%s", current, err, out)
+		}
+		if _, err := os.Stat(temporary); !os.IsNotExist(err) {
+			t.Fatalf("temporary snapshot remains: %v", err)
+		}
+	}
+
+	first := filepath.Join(root, "snapshot.0")
+	run(filepath.Join(root, "missing-previous"), first, filepath.Join(root, "snapshot.0.tmp"))
+	if got := string(readTestFile(t, filepath.Join(first, "changed.txt"))); got != "version one\n" {
+		t.Fatalf("first snapshot content: %q", got)
+	}
+
+	// Replace the source atomically so rsync never observes a partially written file.
+	writeTestFile(t, filepath.Join(source, "changed.next"), []byte("version two, changed size\n"), 0600)
+	if err := os.Rename(filepath.Join(source, "changed.next"), filepath.Join(source, "changed.txt")); err != nil {
+		t.Fatal(err)
+	}
+	second := filepath.Join(root, "snapshot.1")
+	run(first, second, filepath.Join(root, "snapshot.1.tmp"))
+	if got := string(readTestFile(t, filepath.Join(second, "changed.txt"))); got != "version two, changed size\n" {
+		t.Fatalf("second snapshot content: %q", got)
+	}
+	if got := string(readTestFile(t, filepath.Join(second, "unchanged.txt"))); got != "shared payload\n" {
+		t.Fatalf("second snapshot unchanged content: %q", got)
+	}
+	one, err := os.Stat(filepath.Join(first, "unchanged.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := os.Stat(filepath.Join(second, "unchanged.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(one, two) {
+		t.Fatal("unchanged file was not reused through --link-dest")
+	}
+	// A rerun cannot merge into an already published destination.
+	rerun := practicalCommand(t, dir, practicalExample(t, "rsync-incremental.yesh"))
+	rerun.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_SOURCE="+source+string(os.PathSeparator),
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_PREVIOUS="+first,
+		"YESH_RSYNC_CURRENT="+second,
+		"YESH_RSYNC_TEMPORARY="+filepath.Join(root, "snapshot.1.tmp"),
+		"YESH_RSYNC_LOCK="+filepath.Join(root, ".rsync.lock"),
+	)
+	if out, err := rerun.CombinedOutput(); err == nil {
+		t.Fatalf("rerun unexpectedly succeeded: %s", out)
+	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 3 {
+		t.Fatalf("rerun exit=%v output=%q", err, out)
+	}
+	if got := string(readTestFile(t, filepath.Join(second, "changed.txt"))); got != "version two, changed size\n" {
+		t.Fatalf("rerun changed published data: %q", got)
+	}
+	// A missing source is reported by rsync. It must fail before taking the old
+	// published snapshot away; yesh cannot inspect a remote source with exists.
+	missing := practicalCommand(t, dir, practicalExample(t, "rsync-incremental.yesh"))
+	missing.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_SOURCE="+filepath.Join(dir, "missing-source"),
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_PREVIOUS="+second,
+		"YESH_RSYNC_CURRENT="+filepath.Join(root, "snapshot.2"),
+		"YESH_RSYNC_TEMPORARY="+filepath.Join(root, "snapshot.2.tmp"),
+		"YESH_RSYNC_LOCK="+filepath.Join(root, ".rsync.lock"),
+	)
+	if out, err := missing.CombinedOutput(); err == nil {
+		t.Fatalf("missing source unexpectedly succeeded: %s", out)
+	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() == 0 {
+		t.Fatalf("missing source exit=%v output=%q", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "snapshot.2")); !os.IsNotExist(err) {
+		t.Fatalf("failed run published a snapshot: %v", err)
+	}
+
+	// Restore is intentionally performed by the external rsync utility; yesh
+	// owns the selection and publication boundary, not a second copy engine.
+	restore := filepath.Join(dir, "restore")
+	if err := os.Mkdir(restore, 0700); err != nil {
+		t.Fatal(err)
+	}
+	copy := exec.Command("rsync", "-a", second+string(os.PathSeparator), restore+string(os.PathSeparator))
+	if out, err := copy.CombinedOutput(); err != nil {
+		t.Fatalf("restore: %v\n%s", err, out)
+	}
+	for name, want := range map[string]string{
+		"changed.txt":   "version two, changed size\n",
+		"unchanged.txt": "shared payload\n",
+	} {
+		if got := string(readTestFile(t, filepath.Join(restore, name))); got != want {
+			t.Fatalf("restored %s: %q", name, got)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, ".rsync.lock")); err != nil {
+		t.Fatalf("rsync lock path disappeared: %v", err)
+	}
+}
+
+func TestPOSIXPracticalIncrementalRsyncPartialFailureDoesNotPublish(t *testing.T) {
+	practicalDependencies(t, "rsync")
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "kept.txt"), []byte("published version\n"), 0600)
+	writeTestFile(t, filepath.Join(source, "partial.txt"), []byte("must not publish\n"), 0600)
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\n/usr/bin/rsync \"$@\"\nstatus=$?\nif test \"$status\" -eq 0; then exit 23; fi\nexit \"$status\"\n"), 0700)
+
+	run := func(source, previous, current, temporary, path string) ([]byte, error) {
+		cmd := practicalCommand(t, dir, practicalExample(t, "rsync-incremental.yesh"))
+		cmd.Env = append(os.Environ(),
+			"YESH_TEST_CLI=1",
+			"PATH="+path,
+			"YESH_RSYNC_SOURCE="+source+string(os.PathSeparator),
+			"YESH_RSYNC_ROOT="+root,
+			"YESH_RSYNC_PREVIOUS="+previous,
+			"YESH_RSYNC_CURRENT="+current,
+			"YESH_RSYNC_TEMPORARY="+temporary,
+			"YESH_RSYNC_LOCK="+filepath.Join(root, ".rsync.lock"),
+		)
+		return cmd.CombinedOutput()
+	}
+
+	first := filepath.Join(root, "snapshot.0")
+	path := os.Getenv("PATH")
+	if out, err := run(source, filepath.Join(root, "missing-previous"), first, filepath.Join(root, "snapshot.0.tmp"), path); err != nil {
+		t.Fatalf("initial snapshot: %v\n%s", err, out)
+	}
+	keptBefore := readTestFile(t, filepath.Join(first, "kept.txt"))
+
+	failed := filepath.Join(root, "snapshot.1")
+	partial := filepath.Join(root, "snapshot.1.tmp")
+	out, err := run(source, first, failed, partial, bin+string(os.PathListSeparator)+path)
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("partial rsync exit=%v output=%q", err, out)
+	}
+	if _, err := os.Stat(failed); !os.IsNotExist(err) {
+		t.Fatalf("partial failure published snapshot: %v", err)
+	}
+	if _, err := os.Stat(partial); err != nil {
+		t.Fatalf("partial staging disappeared before cleanup check: %v", err)
+	}
+	if got := readTestFile(t, filepath.Join(first, "kept.txt")); !bytes.Equal(got, keptBefore) {
+		t.Fatalf("partial failure changed previous snapshot: %q", got)
+	}
+
+	second := filepath.Join(root, "snapshot.2")
+	if out, err := run(source, first, second, filepath.Join(root, "snapshot.2.tmp"), path); err != nil {
+		t.Fatalf("retry after partial failure: %v\n%s", err, out)
+	}
+	if got := string(readTestFile(t, filepath.Join(second, "partial.txt"))); got != "must not publish\n" {
+		t.Fatalf("retry content: %q", got)
+	}
+}
+
+func TestPOSIXPracticalIncrementalRsyncHeldLockStopsRsync(t *testing.T) {
+	practicalDependencies(t, "rsync")
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "kept.txt"), []byte("previous\n"), 0600)
+	previous := filepath.Join(root, "snapshot.0")
+	if err := os.Mkdir(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(previous, "kept.txt"), []byte("previous\n"), 0600)
+	lockPath := filepath.Join(root, ".rsync.lock")
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lockFile.Close()
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+
+	trace := filepath.Join(dir, "rsync.trace")
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\nexit 99\n"), 0700)
+	cmd := practicalCommand(t, dir, practicalExample(t, "rsync-incremental.yesh"))
+	cmd.Env = append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_SOURCE="+source+string(os.PathSeparator),
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_PREVIOUS="+previous,
+		"YESH_RSYNC_CURRENT="+filepath.Join(root, "snapshot.1"),
+		"YESH_RSYNC_TEMPORARY="+filepath.Join(root, "snapshot.1.tmp"),
+		"YESH_RSYNC_LOCK="+lockPath,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("held lock exit=%v output=%q", err, out)
+	}
+	if _, err := os.Stat(trace); !os.IsNotExist(err) {
+		t.Fatalf("rsync started despite held lock: %v", err)
+	}
+	if got := string(readTestFile(t, filepath.Join(previous, "kept.txt"))); got != "previous\n" {
+		t.Fatalf("held lock changed previous snapshot: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, "snapshot.1")); !os.IsNotExist(err) {
+		t.Fatalf("held lock published snapshot: %v", err)
+	}
+}
+
+func TestPOSIXPracticalIncrementalRsyncPlanDoesNotMutate(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "input.txt"), []byte("payload\n"), 0600)
+	previous := filepath.Join(root, "snapshot.0")
+	if err := os.Mkdir(previous, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "rsync.trace")
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\nexit 99\n"), 0700)
+
+	plan := posixCLI(t, context.Background(), "--plan", practicalExample(t, "rsync-incremental.yesh"))
+	plan.Dir = dir
+	plan.Env = append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_SOURCE="+source+string(os.PathSeparator),
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_PREVIOUS="+previous,
+		"YESH_RSYNC_CURRENT="+filepath.Join(root, "snapshot.1"),
+		"YESH_RSYNC_TEMPORARY="+filepath.Join(root, "snapshot.1.tmp"),
+		"YESH_RSYNC_LOCK="+filepath.Join(root, ".rsync.lock"),
+	)
+	out, err := plan.CombinedOutput()
+	if err != nil {
+		t.Fatalf("incremental plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{"PLAN", "rsync", "publish"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("incremental plan missing %q: %s", want, out)
+		}
+	}
+	if _, err := os.Stat(trace); !os.IsNotExist(err) {
+		t.Fatalf("plan started rsync: %v", err)
+	}
+	for _, name := range []string{"snapshot.1", "snapshot.1.tmp", ".rsync.lock"} {
+		if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Fatalf("plan created %s: %v", name, err)
+		}
+	}
+}
+
+func TestPOSIXPracticalIncrementalRsyncRetentionPlanDoesNotMutate(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"snapshot.0", "snapshot.1", "snapshot.2", "snapshot.2.tmp", ".rsync.lock"} {
+		path := filepath.Join(root, name)
+		if strings.HasSuffix(name, ".lock") {
+			writeTestFile(t, path, []byte("lock marker\n"), 0600)
+		} else if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	symlink := filepath.Join(root, "snapshot.link")
+	if err := os.Symlink("snapshot.0", symlink); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := posixCLI(t, context.Background(), "--plan", practicalExample(t, "rsync-retention-plan.yesh"))
+	plan.Dir = dir
+	plan.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_KEEP=2",
+	)
+	out, err := plan.CombinedOutput()
+	if err != nil {
+		t.Fatalf("retention plan: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{
+		`PLAN retention keep 2 KEEP ["snapshot.2" "snapshot.1"] PRUNE ["snapshot.0"]`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("retention plan missing %q: %s", want, out)
+		}
+	}
+	for _, name := range []string{"snapshot.0", "snapshot.1", "snapshot.2", "snapshot.2.tmp", ".rsync.lock", "snapshot.link"} {
+		if _, err := os.Lstat(filepath.Join(root, name)); err != nil {
+			t.Fatalf("plan changed %s: %v", name, err)
+		}
+	}
+}
+
+func TestPOSIXPracticalRsyncDestinationPreflightDoesNotMutate(t *testing.T) {
+	practicalDependencies(t, "findmnt", "stat", "df")
+	dir := t.TempDir()
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"snapshot.1", "snapshot.2", "snapshot.3", "snapshot.3.tmp"} {
+		path := filepath.Join(root, name)
+		if strings.HasSuffix(name, ".tmp") {
+			writeTestFile(t, path, []byte("staging\n"), 0600)
+		} else if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cmd := posixCLI(t, context.Background(), practicalExample(t, "rsync-destination-preflight.yesh"))
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSYNC_ROOT="+root,
+		"YESH_RSYNC_KEEP=2",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("destination preflight: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Filesystem",
+		"KEEP [\"snapshot.3\" \"snapshot.2\"]",
+		"PRUNE [\"snapshot.1\"]",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("destination preflight missing %q: %s", want, out)
+		}
+	}
+	for _, name := range []string{"snapshot.1", "snapshot.2", "snapshot.3", "snapshot.3.tmp"} {
+		if _, err := os.Lstat(filepath.Join(root, name)); err != nil {
+			t.Fatalf("preflight changed %s: %v", name, err)
+		}
+	}
+}
+
+func TestPOSIXPracticalRsyncPreviewIntegration(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	// Keep the fixtures intentionally tiny: the test is about yesh's process
+	// orchestration and argv preservation, not rsync/findmnt implementation.
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nprintf '%s\\000' findmnt \"$@\" >> \"$TRACE_FILE\"\nexit \"${FINDMNT_STATUS:-0}\"\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "df"), []byte("#!/bin/sh\nprintf '%s\\000' df \"$@\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsync"), []byte("#!/bin/sh\nprintf '%s\\000' rsync \"$@\" >> \"$TRACE_FILE\"\nexit \"${RSYNC_STATUS:-0}\"\n"), 0700)
+
+	if err := os.Mkdir(filepath.Join(dir, "source"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "target"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "preview.yesh")
+	writeTestFile(t, script, readTestFile(t, practicalExample(t, "rsync-preview.yesh")), 0600)
+
+	run := func(findmntStatus string) (int, []byte, string) {
+		writeTestFile(t, trace, nil, 0600)
+		cmd := practicalCommand(t, dir, script)
+		cmd.Env = append(cmd.Env,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+trace,
+			"FINDMNT_STATUS="+findmntStatus,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, out, string(readTestFile(t, trace))
+	}
+
+	if code, out, got := run("0"); code != 0 {
+		t.Fatalf("preview success: code=%d output=%q trace=%q", code, out, got)
+	} else {
+		want := []string{
+			"findmnt", "--target", "target/",
+			"findmnt", "--target", "target/",
+			"df", "-P", "-h", "--", "target/",
+			"rsync", "-a", "--dry-run", "--itemize-changes", "--", "source/", "target/",
+		}
+		gotArgs := strings.Split(strings.TrimSuffix(got, "\x00"), "\x00")
+		if strings.Join(gotArgs, "|") != strings.Join(want, "|") {
+			t.Fatalf("preview argv: %q want %q", gotArgs, want)
+		}
+	}
+
+	if code, out, got := run("1"); code != 3 || !bytes.Contains(out, []byte("target is not on a mounted filesystem")) {
+		t.Fatalf("unmounted target: code=%d output=%q trace=%q", code, out, got)
+	} else if strings.Contains(got, "rsync\x00") || strings.Contains(got, "df\x00") {
+		t.Fatalf("preflight failure ran later commands: %q", got)
+	}
+
+	copyScript := filepath.Join(dir, "copy.yesh")
+	copySource := readTestFile(t, practicalExample(t, "rsync-copy.yesh"))
+	writeTestFile(t, copyScript, append(copySource, []byte("\ntouch published\n")...), 0600)
+	writeTestFile(t, trace, nil, 0600)
+	cmd := practicalCommand(t, dir, copyScript)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"RSYNC_STATUS=23",
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("rsync failure: code=%v output=%q", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("script continued after failed rsync: %v", err)
+	}
+
+	if err := os.RemoveAll(filepath.Join(dir, "target")); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, got := run("0"); code != 2 || !bytes.Contains(out, []byte("target directory is missing")) {
+		t.Fatalf("missing target: code=%d output=%q trace=%q", code, out, got)
+	} else if got != "" {
+		t.Fatalf("missing target invoked external commands: %q", got)
+	}
+}
+
+func TestPOSIXPracticalStorageCheck(t *testing.T) {
+	practicalDependencies(t, "findmnt", "df", "du")
+	for _, tc := range []struct {
+		name, mountpoint string
+		wantCode         int
+		wantOutput       []string
+	}{
+		{"mounted directory", t.TempDir(), 0, []string{"Filesystem"}},
+		{"missing directory", filepath.Join(t.TempDir(), "missing"), 2, []string{"backup mount is missing"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := readTestFile(t, practicalExample(t, "storage-check.yesh"))
+			source = bytes.Replace(source, []byte("mountpoint = /backup"), []byte("mountpoint = "+tc.mountpoint), 1)
+			script := filepath.Join(t.TempDir(), "storage-check.yesh")
+			writeTestFile(t, script, source, 0600)
+			cmd := practicalCommand(t, filepath.Dir(script), script)
+			out, err := cmd.CombinedOutput()
+			code := 0
+			if exit, ok := err.(*exec.ExitError); ok {
+				code = exit.ExitCode()
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if code != tc.wantCode {
+				t.Fatalf("code=%d want=%d: %s", code, tc.wantCode, out)
+			}
+			for _, want := range tc.wantOutput {
+				if !bytes.Contains(out, []byte(want)) {
+					t.Fatalf("output %q does not contain %q", out, want)
+				}
+			}
+		})
+	}
+}
+
+func TestPOSIXPracticalStorageDeviceCheck(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	for _, name := range []string{"findmnt", "lsblk", "blkid", "stat"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		if name == "findmnt" {
+			body += "exit \"${FINDMNT_STATUS:-0}\"\n"
+		}
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	script := filepath.Join(dir, "device-check.yesh")
+	source := readTestFile(t, practicalExample(t, "storage-device-check.yesh"))
+	source = bytes.Replace(source, []byte("mountpoint = /backup"), []byte("mountpoint = "+dir), 1)
+	writeTestFile(t, script, source, 0600)
+
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("device report: %v %s", err, out)
+	}
+	want := []string{
+		"findmnt", "--target", dir,
+		"findmnt", "--target", dir,
+		"findmnt", "-no", "SOURCE,FSTYPE,OPTIONS", "--target", dir,
+		"lsblk", "--fs", "--output", "NAME,TYPE,FSTYPE,LABEL,UUID,PARTUUID,MOUNTPOINTS",
+		"blkid", "--output", "full",
+		"stat", "-c", "type=%F mode=%a owner=%U:%G", "--", dir,
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("device report argv: %q want %q", got, want)
+	}
+
+	writeTestFile(t, trace, nil, 0600)
+	cmd = practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace, "FINDMNT_STATUS=1")
+	if out, err := cmd.CombinedOutput(); err == nil || !bytes.Contains(out, []byte("path is not on a mounted filesystem")) {
+		t.Fatalf("missing mount: %v %s", err, out)
+	}
+	traceData := readTestFile(t, trace)
+	for _, name := range []string{"lsblk", "blkid", "stat"} {
+		if bytes.Contains(traceData, []byte(name+"\x00")) {
+			t.Fatalf("%s ran after failed mount: %q", name, traceData)
+		}
+	}
+}
+
+func TestPOSIXPracticalStorageIdentityCheck(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	findmnt := "#!/bin/sh\nprintf '%s\\000' findmnt \"$@\" >> \"$TRACE_FILE\"\nexit \"${FINDMNT_STATUS:-0}\"\n"
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte(findmnt), 0700)
+	script := filepath.Join(dir, "identity-check.yesh")
+	source := readTestFile(t, practicalExample(t, "storage-identity-check.yesh"))
+	source = bytes.Replace(source, []byte("mountpoint = /backup"), []byte("mountpoint = "+dir), 1)
+	source = bytes.Replace(source, []byte("UUID=replace-with-the-real-uuid"), []byte("UUID=11111111-2222-3333-4444-555555555555"), 1)
+	writeTestFile(t, script, source, 0600)
+
+	run := func(status string) (int, []byte) {
+		writeTestFile(t, filepath.Join(dir, "trace"), nil, 0600)
+		cmd := practicalCommand(t, dir, script)
+		cmd.Env = append(cmd.Env,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+filepath.Join(dir, "trace"),
+			"FINDMNT_STATUS="+status,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, out
+	}
+
+	if code, out := run("0"); code != 0 || !bytes.Contains(out, []byte("identity is correct")) {
+		t.Fatalf("matching identity: code=%d output=%s", code, out)
+	}
+	want := []string{"findmnt", "--source", "UUID=11111111-2222-3333-4444-555555555555", "--target", dir, "findmnt", "--source", "UUID=11111111-2222-3333-4444-555555555555", "--target", dir}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, filepath.Join(dir, "trace"))), "\x00"), "\x00")
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("identity argv: %q want %q", got, want)
+	}
+	if code, out := run("1"); code != 3 || !bytes.Contains(out, []byte("identity does not match")) {
+		t.Fatalf("mismatching identity: code=%d output=%s", code, out)
+	}
+}
+
+func TestPOSIXPracticalRsyncSafeCopyChecksIdentity(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "trace")
+	for _, name := range []string{"findmnt", "df", "rsync"} {
+		body := "#!/bin/sh\nprintf '%s\\000' " + name + " \"$@\" >> \"$TRACE_FILE\"\n"
+		if name == "findmnt" {
+			body += "exit \"${FINDMNT_STATUS:-0}\"\n"
+		}
+		writeTestFile(t, filepath.Join(bin, name), []byte(body), 0700)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "source"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "target"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "safe-copy.yesh")
+	source := readTestFile(t, practicalExample(t, "rsync-safe-copy.yesh"))
+	writeTestFile(t, script, source, 0600)
+
+	run := func(status string) (int, []byte) {
+		writeTestFile(t, trace, nil, 0600)
+		cmd := practicalCommand(t, dir, script)
+		cmd.Env = append(cmd.Env,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+trace,
+			"YESH_BACKUP_SOURCE=UUID=11111111-2222-3333-4444-555555555555",
+			"FINDMNT_STATUS="+status,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, out
+	}
+
+	if code, out := run("0"); code != 0 || len(out) != 0 {
+		t.Fatalf("matching safe copy: code=%d output=%s", code, out)
+	}
+	traceData := readTestFile(t, trace)
+	for _, name := range []string{"findmnt\x00", "df\x00", "rsync\x00"} {
+		if !bytes.Contains(traceData, []byte(name)) {
+			t.Fatalf("matching safe copy did not run %s: %q", name, traceData)
+		}
+	}
+	if code, out := run("1"); code != 3 || !bytes.Contains(out, []byte("identity does not match")) {
+		t.Fatalf("mismatching safe copy: code=%d output=%s", code, out)
+	}
+	if bytes.Contains(readTestFile(t, trace), []byte("rsync\x00")) {
+		t.Fatal("rsync ran after identity mismatch")
+	}
+}
+
+func TestPOSIXPracticalPVPreservesData(t *testing.T) {
+	practicalDependencies(t, "pv", "cat")
+	dir := t.TempDir()
+	input, output := filepath.Join(dir, "input"), filepath.Join(dir, "output")
+	data := bytes.Repeat([]byte("binary\x00payload\n"), 10000)
+	writeTestFile(t, input, data, 0600)
+	script := filepath.Join(dir, "progress.yesh")
+	writeTestFile(t, script, []byte("cat < input | pv --numeric --bytes > output\n"), 0600)
+	cmd := practicalCommand(t, dir, script)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("pv: %v %s", err, stderr.String())
+	}
+	if !bytes.Equal(readTestFile(t, output), data) {
+		t.Fatal("progress data leaked into payload or bytes lost")
+	}
+	if stdout.Len() != 0 || stderr.Len() == 0 {
+		t.Fatalf("progress streams: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+}
+
+func TestPOSIXPracticalBackupWithProgressRoundTrip(t *testing.T) {
+	practicalDependencies(t, "tar", "pv", "gzip")
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{
+		"settings.ini":     []byte("mode=production\n"),
+		"file with spaces": []byte("payload\n"),
+		"binary":           bytes.Repeat([]byte{0, 1, 10, 128, 255}, 20000),
+	}
+	for name, data := range files {
+		writeTestFile(t, filepath.Join(source, name), data, 0600)
+	}
+	partial := filepath.Join(dir, "backup.tar.gz.partial")
+	published := filepath.Join(dir, "backup.tar.gz")
+	pv, err := exec.LookPath("pv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup-with-progress.yesh"))
+	cmd.Env = append(cmd.Env,
+		"YESH_ARCHIVE_SOURCE="+source,
+		"YESH_ARCHIVE_PARTIAL="+partial,
+		"YESH_ARCHIVE_PUBLISHED="+published,
+		"YESH_PV="+pv,
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("backup with progress: %v\n%s", err, stderr.String())
+	}
+	if stdout.Len() != 0 || stderr.Len() == 0 {
+		t.Fatalf("progress streams: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	archive, err := os.Open(published)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	gz, err := gzip.NewReader(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+	reader := tar.NewReader(gz)
+	restored := map[string][]byte{}
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		data, err := io.ReadAll(io.LimitReader(reader, 2*1024*1024))
+		if err != nil {
+			t.Fatal(err)
+		}
+		restored[strings.TrimPrefix(header.Name, "./")] = data
+	}
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range files {
+		if !bytes.Equal(restored[name], want) {
+			t.Fatalf("restore mismatch for %q", name)
+		}
+	}
+	if _, err := os.Stat(partial); !os.IsNotExist(err) {
+		t.Fatalf("partial archive remains after publish: %v", err)
+	}
+}
+
+func TestPOSIXPracticalBackupWithProgressDoesNotPublishFailure(t *testing.T) {
+	practicalDependencies(t, "tar", "pv", "gzip")
+	if os.Geteuid() == 0 {
+		t.Skip("needs unprivileged permission failure")
+	}
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "data"), []byte("new\n"), 0600)
+	if err := os.Chmod(source, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(source, 0700)
+	partial := filepath.Join(dir, "backup.tar.gz.partial")
+	published := filepath.Join(dir, "backup.tar.gz")
+	pv, err := exec.LookPath("pv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, published, []byte("previous archive"), 0600)
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup-with-progress.yesh"))
+	cmd.Env = append(cmd.Env,
+		"YESH_ARCHIVE_SOURCE="+source,
+		"YESH_ARCHIVE_PARTIAL="+partial,
+		"YESH_ARCHIVE_PUBLISHED="+published,
+		"YESH_PV="+pv,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("expected pipeline failure: %v\n%s", err, out)
+	}
+	if got := string(readTestFile(t, published)); got != "previous archive" {
+		t.Fatalf("failed backup replaced archive: %q", got)
+	}
+}
+
+func TestPOSIXPracticalBackupWithProgressMissingPVStopsBeforePipeline(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(source, "data"), []byte("input\n"), 0600)
+	partial := filepath.Join(dir, "backup.tar.gz.partial")
+	published := filepath.Join(dir, "backup.tar.gz")
+	cmd := practicalCommand(t, dir, practicalExample(t, "backup-with-progress.yesh"))
+	cmd.Env = append(cmd.Env,
+		"YESH_ARCHIVE_SOURCE="+source,
+		"YESH_ARCHIVE_PARTIAL="+partial,
+		"YESH_ARCHIVE_PUBLISHED="+published,
+		"YESH_PV="+filepath.Join(dir, "missing-pv"),
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 {
+		t.Fatalf("expected missing pv failure: %v\n%s", err, out)
+	}
+	for _, name := range []string{partial, published} {
+		if _, err := os.Stat(name); !os.IsNotExist(err) {
+			t.Fatalf("archive path was created before pv check: %s (%v)", name, err)
+		}
+	}
+}
+
+func TestPOSIXPracticalRsnapshotRotation(t *testing.T) {
+	practicalDependencies(t, "rsnapshot", "rsync", "cp", "rm")
+	dir := t.TempDir()
+	source, root := filepath.Join(dir, "source"), filepath.Join(dir, "snapshots")
+	for _, name := range []string{source, root} {
+		if err := os.Mkdir(name, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// rsnapshot's native format uses tabs and is not sourced as shell code.
+	rsync, _ := exec.LookPath("rsync")
+	cp, _ := exec.LookPath("cp")
+	rm, _ := exec.LookPath("rm")
+	config := "config_version\t1.2\nsnapshot_root\t" + root + "/\nno_create_root\t1\n" +
+		"cmd_rsync\t" + rsync + "\ncmd_cp\t" + cp + "\ncmd_rm\t" + rm + "\n" +
+		"retain\tdaily\t2\nverbose\t5\nloglevel\t2\nlockfile\t" + filepath.Join(dir, "rsnapshot.pid") + "\n" +
+		// The /./ pivot limits --relative to the owned source subtree,
+		// excluding unrelated /tmp ancestor ownership from the snapshot.
+		"backup\t" + source + "/./\tlocal/\n"
+	writeTestFile(t, filepath.Join(dir, "rsnapshot.conf"), []byte(config), 0600)
+	payload := filepath.Join(source, "payload")
+	writeTestFile(t, payload, []byte("version one\n"), 0600)
+	writeTestFile(t, filepath.Join(source, "unchanged"), []byte("shared snapshot data\n"), 0600)
+	example := practicalExample(t, "rsnapshot-local.yesh")
+	if out, err := practicalCommand(t, dir, example).CombinedOutput(); err != nil {
+		t.Fatalf("snapshot one: %v %s", err, out)
+	}
+	// Atomic replacement avoids modifying any existing hard-linked snapshot inode.
+	writeTestFile(t, filepath.Join(source, "next"), []byte("version two, changed size\n"), 0600)
+	if err := os.Rename(filepath.Join(source, "next"), payload); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := practicalCommand(t, dir, example).CombinedOutput(); err != nil {
+		t.Fatalf("snapshot two: %v %s", err, out)
+	}
+	for _, tc := range []struct{ level, want string }{{"daily.0", "version two, changed size\n"}, {"daily.1", "version one\n"}} {
+		got := string(readTestFile(t, filepath.Join(root, tc.level, "local", "payload")))
+		if got != tc.want {
+			t.Fatalf("%s restored=%q want=%q", tc.level, got, tc.want)
+		}
+	}
+	first, err := os.Stat(filepath.Join(root, "daily.0", "local", "unchanged"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.Stat(filepath.Join(root, "daily.1", "local", "unchanged"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(first, second) {
+		t.Fatal("unchanged snapshot data was not reused through a hard link")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "rsnapshot.pid")); !os.IsNotExist(err) {
+		t.Fatalf("snapshot lock remains: %v", err)
+	}
+}
+
+func TestPOSIXPracticalRsnapshotPreflightOrder(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "rsnapshot.trace")
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\n"), 0700)
+	config := filepath.Join(dir, "rsnapshot.conf")
+	writeTestFile(t, config, []byte("config_version 1.2\n"), 0600)
+	cmd := practicalCommand(t, dir, practicalExample(t, "rsnapshot-preflight.yesh"))
+	cmd.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSNAPSHOT_CONFIG="+config,
+		"YESH_RSNAPSHOT_LEVEL=daily",
+		"YESH_RSNAPSHOT_SYNC_FIRST=0",
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("rsnapshot preflight: %v\n%s", err, out)
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	want := []string{"rsnapshot", "-c", config, "configtest", "rsnapshot", "-c", config, "-t", "daily"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("rsnapshot preflight argv: %q want %q", got, want)
+	}
+}
+
+func TestPOSIXPracticalRsnapshotGuardedApply(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "rsnapshot.conf")
+	confirm := filepath.Join(dir, "approved")
+	report := filepath.Join(dir, "rsnapshot-test.log")
+	trace := filepath.Join(dir, "trace")
+	writeTestFile(t, config, []byte("config_version 1.2\n"), 0600)
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\nprintf '%s\\n' 'rsnapshot test plan'\nlast=\"\"\nfor last do :; done\nif [ \"$last\" = daily ]; then mkdir -p \"$YESH_RSNAPSHOT_PUBLISHED\"; fi\n"), 0700)
+	run := func() (int, string) {
+		cmd := practicalCommand(t, dir, practicalExample(t, "rsnapshot-apply.yesh"))
+		cmd.Env = append(os.Environ(),
+			"YESH_TEST_CLI=1",
+			"YESH_RSNAPSHOT_CONFIG="+config,
+			"YESH_RSNAPSHOT_LEVEL=daily",
+			"YESH_RSNAPSHOT_SYNC_FIRST=0",
+			"YESH_RSNAPSHOT_ROOT="+root,
+			"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
+			"YESH_RSNAPSHOT_LOCK="+filepath.Join(dir, "rsnapshot.pid"),
+			"YESH_RSNAPSHOT_REPORT="+report,
+			"YESH_RSNAPSHOT_PUBLISHED="+filepath.Join(root, "daily.0"),
+			"YESH_RSNAPSHOT_CONFIRM="+confirm,
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"TRACE_FILE="+trace,
+		)
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		return code, string(out)
+	}
+	if code, out := run(); code != 4 || !strings.Contains(out, "confirmation") {
+		t.Fatalf("without confirmation: code=%d output=%q", code, out)
+	}
+	got := strings.TrimSuffix(string(readTestFile(t, trace)), "\x00")
+	args := strings.Split(got, "\x00")
+	calls := 0
+	for _, arg := range args {
+		if arg == "rsnapshot" {
+			calls++
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("interval ran without confirmation: calls=%d trace=%q", calls, args)
+	}
+	writeTestFile(t, confirm, nil, 0600)
+	if code, out := run(); code != 0 {
+		t.Fatalf("with confirmation: code=%d output=%q", code, out)
+	}
+	got = strings.TrimSuffix(string(readTestFile(t, trace)), "\x00")
+	args = strings.Split(got, "\x00")
+	calls = 0
+	for _, arg := range args {
+		if arg == "rsnapshot" {
+			calls++
+		}
+	}
+	want := []string{"rsnapshot", "-c", config, "daily"}
+	if calls != 5 || len(args) < len(want) || strings.Join(args[len(args)-len(want):], "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("confirmed interval missing from trace: %q", args)
+	}
+}
+
+func TestPOSIXPracticalRsnapshotGuardedApplyFreeSpaceFailureStopsRotation(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(dir, "snapshots")
+	if err := os.Mkdir(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "rsnapshot.conf")
+	confirm := filepath.Join(dir, "approved")
+	report := filepath.Join(dir, "rsnapshot-test.log")
+	trace := filepath.Join(dir, "trace")
+	writeTestFile(t, config, []byte("config_version 1.2\n"), 0600)
+	writeTestFile(t, filepath.Join(bin, "findmnt"), []byte("#!/bin/sh\nexit 0\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "df"), []byte("#!/bin/sh\nexit 1\n"), 0700)
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\n"), 0700)
+	writeTestFile(t, confirm, nil, 0600)
+	cmd := practicalCommand(t, dir, practicalExample(t, "rsnapshot-apply.yesh"))
+	cmd.Env = append(os.Environ(),
+		"YESH_TEST_CLI=1",
+		"YESH_RSNAPSHOT_CONFIG="+config,
+		"YESH_RSNAPSHOT_LEVEL=daily",
+		"YESH_RSNAPSHOT_SYNC_FIRST=0",
+		"YESH_RSNAPSHOT_ROOT="+root,
+		"YESH_RSNAPSHOT_SOURCE=UUID=test-fixture",
+		"YESH_RSNAPSHOT_CONFIRM="+confirm,
+		"YESH_RSNAPSHOT_REPORT="+report,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("free-space preflight unexpectedly passed: err=%v output=%q", err, out)
+	}
+	if data, readErr := os.ReadFile(trace); readErr == nil && len(data) != 0 {
+		t.Fatalf("rsnapshot ran after free-space command failed: %q", data)
+	}
+}
+
+func TestPOSIXPracticalRsnapshotConfigtestFailureStopsRotation(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "rsnapshot.trace")
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\nlast=\"\"\nfor last do :; done\nif [ \"$last\" = configtest ]; then exit 2; fi\nexit 0\n"), 0700)
+	script := filepath.Join(dir, "backup.yesh")
+	source := string(readTestFile(t, practicalExample(t, "rsnapshot-local.yesh"))) + "\ntouch published\n"
+	writeTestFile(t, script, []byte(source), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "TRACE_FILE="+trace)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("configtest failure unexpectedly succeeded")
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		code := -1
+		if ok {
+			code = exit.ExitCode()
+		}
+		t.Fatalf("configtest failure exit code=%d output=%q", code, out)
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	want := []string{"rsnapshot", "-c", "rsnapshot.conf", "configtest"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("rsnapshot continued after failed configtest: got %q want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("rotation marker exists after failed configtest: %v", err)
+	}
+}
+
+func TestPOSIXPracticalRsnapshotLockConflictStopsPublication(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(dir, "rsnapshot.trace")
+	lock := filepath.Join(dir, "rsnapshot.pid")
+	writeTestFile(t, lock, []byte("held by another backup\n"), 0600)
+	writeTestFile(t, filepath.Join(dir, "rsnapshot.conf"), []byte("lockfile\t"+lock+"\n"), 0600)
+	writeTestFile(t, filepath.Join(bin, "rsnapshot"), []byte("#!/bin/sh\nprintf '%s\\000' rsnapshot \"$@\" >> \"$TRACE_FILE\"\nlast=\"\"\nfor last do :; done\nif [ \"$last\" = daily ] && [ -e \"$LOCK_FILE\" ]; then exit 75; fi\nexit 0\n"), 0700)
+	script := filepath.Join(dir, "backup.yesh")
+	source := string(readTestFile(t, practicalExample(t, "rsnapshot-local.yesh"))) + "\ntouch published\n"
+	writeTestFile(t, script, []byte(source), 0600)
+	cmd := practicalCommand(t, dir, script)
+	cmd.Env = append(cmd.Env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TRACE_FILE="+trace,
+		"LOCK_FILE="+lock,
+	)
+	out, err := cmd.CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		code := -1
+		if ok {
+			code = exit.ExitCode()
+		}
+		t.Fatalf("lock conflict exit code=%d output=%q", code, out)
+	}
+	got := strings.Split(strings.TrimSuffix(string(readTestFile(t, trace)), "\x00"), "\x00")
+	want := []string{"rsnapshot", "-c", "rsnapshot.conf", "configtest", "rsnapshot", "-c", "rsnapshot.conf", "daily"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("lock conflict argv: got %q want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "published")); !os.IsNotExist(err) {
+		t.Fatalf("rotation marker exists after lock conflict: %v", err)
+	}
+}
+
+func TestPOSIXPracticalCancelledJobDoesNotCommit(t *testing.T) {
+	dir := t.TempDir()
+	pidfile := filepath.Join(dir, "pid")
+	script := filepath.Join(dir, "job.yesh")
+	fixture := posixFixture(t, `printf 'unfinished\n'; echo $$ > "$1"; exec sleep 30`)
+	source := fixture + " " + pidfile + " > work.partial\nmv -- work.partial ready\nprintf '%s' '{\"status\":\"complete\"}' > state.json\n"
+	writeTestFile(t, script, []byte(source), 0600)
+	writeTestFile(t, filepath.Join(dir, "state.json"), []byte("previous state"), 0600)
+	cmd := practicalCommand(t, dir, script)
+	var output bytes.Buffer
+	cmd.Stderr = &output
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cmd.Process.Kill() }()
+	var pid int
+	until := time.Now().Add(3 * time.Second)
+	for time.Now().Before(until) {
+		data, _ := os.ReadFile(pidfile)
+		if _, err := fmt.Sscanf(string(data), "%d", &pid); err == nil && pid > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if pid == 0 {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatal("job did not become ready")
+	}
+	defer syscall.Kill(-pid, syscall.SIGKILL)
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Wait(); err == nil {
+		t.Fatal("cancelled job succeeded")
+	}
+	if err := syscall.Kill(-pid, 0); err != syscall.ESRCH {
+		t.Fatalf("cancelled job group survived: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ready")); !os.IsNotExist(err) {
+		t.Fatalf("partial result was published: %v", err)
+	}
+	if got := string(readTestFile(t, filepath.Join(dir, "state.json"))); got != "previous state" {
+		t.Fatalf("cancellation published success: %q", got)
+	}
+	if got := string(readTestFile(t, filepath.Join(dir, "work.partial"))); got != "unfinished\n" {
+		t.Fatalf("partial result lost: %q", got)
+	}
+}

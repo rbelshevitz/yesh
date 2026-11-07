@@ -1,0 +1,388 @@
+//go:build linux
+
+package yeshcore
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+)
+
+type serviceResourceSnapshot struct {
+	properties map[string]string
+	platform   osReleaseInfo
+	supervisor string
+	epoch      serviceResourceEpoch
+	cgroup     string
+	observedAt time.Time
+	metrics    map[string]string
+	processes  []processInfo
+	rssBytes   uint64
+}
+
+func (r *runtime) queryServiceResources(manager, unit string) (serviceResourceSnapshot, error) {
+	if manager == "openrc" {
+		return r.queryOpenRCServiceResources(unit)
+	}
+	parent := r.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	defer cancel()
+	argv := systemctlArgv(manager, "show", "--no-pager", "--property="+serviceResourceProperties, unit)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	var out, diagnostic storageOutput
+	cmd.Stdout = &out
+	cmd.Stderr = &diagnostic
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return serviceResourceSnapshot{}, ctx.Err()
+		}
+		message := strings.TrimSpace(diagnostic.String())
+		if message == "" {
+			message = err.Error()
+		}
+		return serviceResourceSnapshot{}, fmt.Errorf("systemctl failed: %s", message)
+	}
+	if out.exceeded || diagnostic.exceeded {
+		return serviceResourceSnapshot{}, fmt.Errorf("systemctl output exceeds %d bytes", maxStorageOutput)
+	}
+	properties, err := parseServiceResourceProperties(out.Bytes())
+	if err != nil {
+		return serviceResourceSnapshot{}, err
+	}
+	if properties["Id"] != unit {
+		return serviceResourceSnapshot{}, fmt.Errorf("systemctl returned canonical unit %q; aliases are not supported", properties["Id"])
+	}
+	platform, err := readOSRelease(os.ReadFile)
+	if err != nil {
+		// Platform identity is useful context, but it must not make a valid
+		// service observation fail when os-release is unavailable.
+		platform = osReleaseInfo{}
+	}
+	snapshot := serviceResourceSnapshot{properties: properties, platform: platform, supervisor: "systemd", cgroup: properties["ControlGroup"], observedAt: time.Now().UTC(), metrics: unavailableServiceResourceMetrics()}
+	if snapshot.cgroup == "" {
+		return snapshot, nil
+	}
+	root := r.cgroupRoot
+	if root == "" {
+		root = "/sys/fs/cgroup"
+	}
+	processes, metrics, rss, err := collectCgroupResources(root, snapshot.cgroup)
+	if err != nil {
+		return serviceResourceSnapshot{}, err
+	}
+	snapshot.processes, snapshot.metrics, snapshot.rssBytes = processes, metrics, rss
+	return snapshot, nil
+}
+
+func (r *runtime) queryAutoServiceResources(unit string) (string, serviceResourceSnapshot, error) {
+	system, systemErr := r.queryServiceResources("system", unit)
+	openrc, openRCErr := r.queryServiceResources("openrc", unit)
+	if systemErr == nil && openRCErr == nil {
+		return "", serviceResourceSnapshot{}, fmt.Errorf("service %q is reported by both systemd and OpenRC", unit)
+	}
+	if systemErr == nil {
+		return "systemd", system, nil
+	}
+	if openRCErr == nil {
+		return "openrc", openrc, nil
+	}
+	return "", serviceResourceSnapshot{}, fmt.Errorf("neither systemd nor OpenRC confirmed service %q (systemd: %v; OpenRC: %v)", unit, systemErr, openRCErr)
+}
+
+func (r *runtime) resolveAutoServiceManager(unit string) (string, error) {
+	manager, _, err := r.queryAutoServiceResources(unit)
+	return manager, err
+}
+
+func parseServiceResourceProperties(data []byte) (map[string]string, error) {
+	want := map[string]bool{}
+	for _, key := range strings.Split(serviceResourceProperties, ",") {
+		want[key] = true
+	}
+	result := make(map[string]string, len(want))
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || !want[key] {
+			return nil, fmt.Errorf("unexpected systemctl show field %q", line)
+		}
+		if _, exists := result[key]; exists {
+			return nil, fmt.Errorf("duplicate systemctl show field %q", key)
+		}
+		result[key] = value
+	}
+	for _, key := range []string{"Id", "LoadState", "ActiveState", "SubState", "ControlGroup"} {
+		if _, ok := result[key]; !ok {
+			return nil, fmt.Errorf("systemctl show omitted required field %q", key)
+		}
+	}
+	return result, nil
+}
+
+// collectCgroupResources reads Linux cgroup and process state without assuming
+// which service manager supplied the cgroup path.
+func collectCgroupResources(root, controlGroup string) ([]processInfo, map[string]string, uint64, error) {
+	if root == "" || !filepath.IsAbs(root) || controlGroup == "" || !strings.HasPrefix(controlGroup, "/") || strings.ContainsRune(controlGroup, '\x00') {
+		return nil, nil, 0, errors.New("invalid cgroup path")
+	}
+	path := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(controlGroup, "/")))
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, nil, 0, errors.New("cgroup path escapes cgroup root")
+	}
+	if info, err := os.Stat(path); err != nil || !info.IsDir() {
+		if err == nil {
+			err = errors.New("cgroup path is not a directory")
+		}
+		return nil, nil, 0, fmt.Errorf("read cgroup %q: %w", controlGroup, err)
+	}
+
+	pids := make(map[int]bool)
+	processesIncomplete := false
+	err = filepath.WalkDir(path, func(current string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if current != path && errors.Is(walkErr, os.ErrNotExist) {
+				processesIncomplete = true
+				return nil
+			}
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if entry.Name() != "cgroup.procs" {
+			return nil
+		}
+		data, err := os.ReadFile(current)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				processesIncomplete = true
+				return nil
+			}
+			return cgroupProcessListError(current, err)
+		}
+		for _, field := range strings.Fields(string(data)) {
+			pid, err := strconv.Atoi(field)
+			if err != nil || pid <= 0 {
+				return fmt.Errorf("invalid PID %q in %s", field, current)
+			}
+			pids[pid] = true
+			if len(pids) > maxProcessSnapshot {
+				return fmt.Errorf("service cgroup exceeds %d processes", maxProcessSnapshot)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	processes := make([]processInfo, 0, len(pids))
+	var rss uint64
+	for pid := range pids {
+		process, err := readProcessInfo(pid)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				processesIncomplete = true
+				continue
+			}
+			return nil, nil, 0, fmt.Errorf("read process %d: %w", pid, err)
+		}
+		if !cgroupPathContains(controlGroup, process.cgroup) {
+			// The process moved after cgroup.procs was read. Do not include
+			// its RSS in this service snapshot; the membership is no longer
+			// proven, and a later process may reuse the PID.
+			processesIncomplete = true
+			continue
+		}
+		processes = append(processes, process)
+		if ^uint64(0)-rss < process.rssBytes {
+			return nil, nil, 0, errors.New("process RSS total overflow")
+		}
+		rss += process.rssBytes
+	}
+	sort.Slice(processes, func(i, j int) bool { return processes[i].pid < processes[j].pid })
+	metrics := unavailableServiceResourceMetrics()
+	metrics["cgroup.type"] = readCgroupMetric(path, "cgroup.type")
+	metrics["cgroup.controllers"] = readCgroupMetric(path, "cgroup.controllers")
+	if processesIncomplete {
+		metrics["processes.incomplete"] = "yes"
+	} else {
+		metrics["processes.incomplete"] = "no"
+	}
+	for _, name := range []string{"memory.current", "memory.max", "memory.swap.current", "memory.swap.max", "pids.current", "pids.max"} {
+		metrics[name] = readCgroupMetric(path, name)
+	}
+	for _, name := range []string{"populated", "frozen"} {
+		metrics["cgroup.events."+name] = readCgroupMetric(path, "cgroup.events", name)
+	}
+	for _, name := range []string{"usage_usec", "user_usec", "system_usec", "nr_periods", "nr_throttled", "throttled_usec"} {
+		metrics["cpu.stat."+name] = readCgroupMetric(path, "cpu.stat", name)
+	}
+	metrics["cpu.stat.local.throttled_usec"] = readCgroupMetric(path, "cpu.stat.local", "throttled_usec")
+	for _, name := range []string{"low", "high", "max", "oom", "oom_kill", "oom_group_kill", "sock_throttled"} {
+		metrics["memory.events."+name] = readCgroupMetric(path, "memory.events", name)
+		metrics["memory.events.local."+name] = readCgroupMetric(path, "memory.events.local", name)
+	}
+	metrics["memory.swap.events.high"] = readCgroupMetric(path, "memory.swap.events", "high")
+	metrics["memory.swap.events.max"] = readCgroupMetric(path, "memory.swap.events", "max")
+	metrics["memory.swap.events.fail"] = readCgroupMetric(path, "memory.swap.events", "fail")
+	metrics["pids.events.max"] = readCgroupMetric(path, "pids.events", "max")
+	for _, name := range []string{"anon", "file", "kernel"} {
+		metrics["memory.stat."+name] = readCgroupMetric(path, "memory.stat", name)
+	}
+	ioMetrics, err := readCgroupIOStat(path)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if ioMetrics == nil {
+		metrics["io.stat.available"] = "unavailable"
+	} else {
+		metrics["io.stat.available"] = "yes"
+	}
+	for key, value := range ioMetrics {
+		metrics[key] = value
+	}
+	for _, resource := range []string{"memory", "cpu", "io"} {
+		for _, state := range []string{"some", "full"} {
+			for _, window := range []string{"avg10", "avg60", "avg300"} {
+				key := resource + ".pressure." + state + "." + window
+				metrics[key] = readCgroupPressureMetric(path, resource+".pressure", state, window)
+			}
+		}
+	}
+	for _, resource := range []string{"memory", "cpu", "io"} {
+		for _, window := range []string{"avg10", "avg60", "avg300"} {
+			key := "host." + resource + ".pressure.some." + window
+			metrics[key] = readCgroupPressureMetric("/proc/pressure", resource, "some", window)
+		}
+	}
+	return processes, metrics, rss, nil
+}
+
+func cgroupProcessListError(path string, err error) error {
+	if errors.Is(err, syscall.EOPNOTSUPP) {
+		return fmt.Errorf("read cgroup.procs %q: threaded cgroups are not supported", path)
+	}
+	return err
+}
+
+func cgroupPathContains(root, candidate string) bool {
+	if root == "" || candidate == "" || root[0] != '/' || candidate[0] != '/' {
+		return false
+	}
+	root = strings.TrimRight(root, "/")
+	if root == "" {
+		root = "/"
+	}
+	if root == "/" {
+		return true
+	}
+	return candidate == root || strings.HasPrefix(candidate, root+"/")
+}
+
+const maxCgroupIOStatDevices = 128
+
+// readCgroupIOStat preserves the device identity because io.stat is keyed by
+// major:minor and the kernel does not promise line order. Values are counters;
+// callers must compare the same device across snapshots before calculating a
+// delta.
+func readCgroupIOStat(path string) (map[string]string, error) {
+	data, err := os.ReadFile(filepath.Join(path, "io.stat"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	metrics := make(map[string]string)
+	devices := 0
+	for lineNumber, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 || !validCgroupDevice(fields[0]) {
+			return nil, fmt.Errorf("invalid io.stat line %d", lineNumber+1)
+		}
+		devices++
+		if devices > maxCgroupIOStatDevices {
+			return nil, fmt.Errorf("cgroup io.stat exceeds %d devices", maxCgroupIOStatDevices)
+		}
+		for _, field := range fields[1:] {
+			key, value, ok := strings.Cut(field, "=")
+			if !ok || key == "" || value == "" {
+				return nil, fmt.Errorf("invalid io.stat field on line %d", lineNumber+1)
+			}
+			if _, err := strconv.ParseUint(value, 10, 64); err != nil {
+				return nil, fmt.Errorf("invalid io.stat value %q on line %d", value, lineNumber+1)
+			}
+			metrics["io.stat."+fields[0]+"."+key] = value
+		}
+	}
+	return metrics, nil
+}
+
+func validCgroupDevice(value string) bool {
+	major, minor, ok := strings.Cut(value, ":")
+	if !ok || major == "" || minor == "" {
+		return false
+	}
+	if _, err := strconv.ParseUint(major, 10, 32); err != nil {
+		return false
+	}
+	if _, err := strconv.ParseUint(minor, 10, 32); err != nil {
+		return false
+	}
+	return true
+}
+
+func readCgroupMetric(path string, names ...string) string {
+	data, err := os.ReadFile(filepath.Join(append([]string{path}, names[0])...))
+	if err != nil {
+		return "unavailable"
+	}
+	if len(names) == 1 {
+		return strings.TrimSpace(string(data))
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == names[1] {
+			return fields[1]
+		}
+	}
+	return "unavailable"
+}
+
+func readCgroupPressureMetric(path, filename, state, window string) string {
+	data, err := os.ReadFile(filepath.Join(path, filename))
+	if err != nil {
+		return "unavailable"
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || fields[0] != state {
+			continue
+		}
+		for _, field := range fields[1:] {
+			key, value, ok := strings.Cut(field, "=")
+			if ok && key == window {
+				return value
+			}
+		}
+	}
+	return "unavailable"
+}

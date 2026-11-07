@@ -1,0 +1,278 @@
+package yeshcore
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+)
+
+type conditionKind int
+
+const (
+	commandCondition conditionKind = iota
+	existsCondition
+	matchesCondition
+	freeSpaceCondition
+	processMemoryCondition
+	containsCondition
+	overlapsCondition
+	addressClassCondition
+)
+
+type conditionExpr struct {
+	kind  conditionKind
+	text  string
+	terms []commandToken
+}
+
+func parseCondition(text string) (conditionExpr, error) {
+	text = strings.TrimSpace(text)
+	expr := conditionExpr{text: text}
+	if strings.HasPrefix(text, "exists(") {
+		return expr, fmt.Errorf("use exists path, not exists(path)")
+	}
+	terms, err := words(text)
+	if err != nil {
+		return expr, err
+	}
+	if len(terms) == 0 {
+		return expr, fmt.Errorf("if requires a condition")
+	}
+	expr.terms = terms
+	keyword := func(i int, word string) bool {
+		return i < len(terms) && !terms[i].literal && !terms[i].operator && terms[i].text == word
+	}
+	if keyword(0, "exists") {
+		if len(terms) != 2 || terms[1].operator {
+			return expr, fmt.Errorf("expected: exists path (one string value)")
+		}
+		expr.kind = existsCondition
+	} else if keyword(1, "matches") {
+		if len(terms) != 3 && !(len(terms) == 4 && keyword(2, "regex")) {
+			return expr, fmt.Errorf("expected: text matches regex")
+		}
+		for _, term := range terms {
+			if term.operator {
+				return expr, fmt.Errorf("operators are not allowed inside matches")
+			}
+		}
+		expr.kind = matchesCondition
+	} else if keyword(0, "free_space") {
+		if len(terms) != 4 || terms[1].operator || !keyword(2, "at_least") || terms[3].operator {
+			return expr, fmt.Errorf("expected: free_space path at_least amount")
+		}
+		if _, err := parseByteSize(terms[3].text); err != nil {
+			return expr, err
+		}
+		expr.kind = freeSpaceCondition
+	} else if keyword(0, "memory") {
+		if len(terms) != 5 || terms[1].operator || terms[2].operator || terms[3].operator ||
+			terms[4].operator || !keyword(3, "at_most") || terms[2].text != "rss" {
+			return expr, fmt.Errorf("expected: memory $process_set rss at_most amount")
+		}
+		if _, err := parseByteSize(terms[4].text); err != nil {
+			return expr, err
+		}
+		expr.kind = processMemoryCondition
+	} else if keyword(0, "contains") {
+		if len(terms) != 3 || terms[1].operator || terms[2].operator {
+			return expr, fmt.Errorf("expected: contains $cidr $ip")
+		}
+		expr.kind = containsCondition
+	} else if keyword(0, "overlaps") {
+		if len(terms) != 3 || terms[1].operator || terms[2].operator {
+			return expr, fmt.Errorf("expected: overlaps $cidr $cidr")
+		}
+		expr.kind = overlapsCondition
+	} else if keyword(0, "is") {
+		if len(terms) != 3 || terms[1].operator || terms[2].operator {
+			return expr, fmt.Errorf("expected: is link-local|multicast|global-unicast $ip")
+		}
+		switch terms[1].text {
+		case "link-local", "multicast", "global-unicast", "loopback":
+		default:
+			return expr, fmt.Errorf("unknown address class %q", terms[1].text)
+		}
+		expr.kind = addressClassCondition
+	}
+	return expr, nil
+}
+
+func (r *runtime) conditionValue(term commandToken, line int) (value, error) {
+	if term.literal {
+		return value{scalar: term.text}, nil
+	}
+	return r.eval(term.text, line)
+}
+
+func (r *runtime) condition(text string, line int) (bool, error) {
+	expr, err := parseCondition(text)
+	if err != nil {
+		return false, fmt.Errorf("%s:%d: %w", r.filename, line, err)
+	}
+	return r.evaluateCondition(expr, line)
+}
+
+func isNonEmptyPathValue(v value) bool {
+	return v.fstab == nil && v.device == nil && v.ip == nil && v.cidr == nil &&
+		!v.isList && v.regex == nil && v.scalar != "" && !strings.ContainsRune(v.scalar, 0)
+}
+
+func (r *runtime) evaluateCondition(expr conditionExpr, line int) (bool, error) {
+	switch expr.kind {
+	case existsCondition:
+		v, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		if !isNonEmptyPathValue(v) {
+			return false, fmt.Errorf("%s:%d: exists expects one non-empty path string", r.filename, line)
+		}
+		ok, err := fileExists(v.scalar)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: exists: %w", r.filename, line, err)
+		}
+		return ok, nil
+	case matchesCondition:
+		left, err := r.conditionValue(expr.terms[0], line)
+		if err != nil {
+			return false, err
+		}
+		var right value
+		if len(expr.terms) == 4 {
+			raw := expr.terms[3].text
+			if expr.terms[3].literal {
+				raw = strconv.Quote(raw)
+			}
+			right, err = r.eval("regex "+raw, line)
+		} else {
+			right, err = r.conditionValue(expr.terms[2], line)
+		}
+		if err != nil {
+			return false, err
+		}
+		if left.fstab != nil || left.device != nil || left.ip != nil || left.cidr != nil || left.isList || left.regex != nil || right.regex == nil {
+			return false, fmt.Errorf("%s:%d: matches expects text matches regex", r.filename, line)
+		}
+		return right.regex.MatchString(left.scalar), nil
+	case freeSpaceCondition:
+		path, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		if !isNonEmptyPathValue(path) {
+			return false, fmt.Errorf("%s:%d: free_space expects one non-empty path string", r.filename, line)
+		}
+		need, err := parseByteSize(expr.terms[3].text)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: %w", r.filename, line, err)
+		}
+		free, err := freeBytes(path.scalar)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: free_space: %w", r.filename, line, err)
+		}
+		return free >= need, nil
+	case processMemoryCondition:
+		name, isReference := variableReference(expr.terms[1].text)
+		if !isReference {
+			return false, fmt.Errorf("%s:%d: memory expects a $process_set", r.filename, line)
+		}
+		set, ok := r.values[name]
+		if !ok || !set.isProcesses {
+			return false, fmt.Errorf("%s:%d: memory expects a process set", r.filename, line)
+		}
+		need, err := parseByteSize(expr.terms[4].text)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: %w", r.filename, line, err)
+		}
+		total, err := processRSSTotal(set.processes)
+		if err != nil {
+			return false, fmt.Errorf("%s:%d: memory: %w", r.filename, line, err)
+		}
+		return total <= need, nil
+	case containsCondition:
+		network, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		address, err := r.conditionValue(expr.terms[2], line)
+		if err != nil {
+			return false, err
+		}
+		if network.cidr == nil || address.ip == nil {
+			return false, fmt.Errorf("%s:%d: contains expects a CIDR prefix and an IP address", r.filename, line)
+		}
+		if network.cidr.Addr().BitLen() != address.ip.BitLen() {
+			return false, fmt.Errorf("%s:%d: contains cannot mix IPv4 and IPv6", r.filename, line)
+		}
+		return network.cidr.Contains(*address.ip), nil
+	case overlapsCondition:
+		left, err := r.conditionValue(expr.terms[1], line)
+		if err != nil {
+			return false, err
+		}
+		right, err := r.conditionValue(expr.terms[2], line)
+		if err != nil {
+			return false, err
+		}
+		if left.cidr == nil || right.cidr == nil {
+			return false, fmt.Errorf("%s:%d: overlaps expects two CIDR prefixes", r.filename, line)
+		}
+		if left.cidr.Addr().BitLen() != right.cidr.Addr().BitLen() {
+			return false, fmt.Errorf("%s:%d: overlaps cannot mix IPv4 and IPv6", r.filename, line)
+		}
+		return left.cidr.Overlaps(*right.cidr), nil
+	case addressClassCondition:
+		address, err := r.conditionValue(expr.terms[2], line)
+		if err != nil {
+			return false, err
+		}
+		if address.ip == nil {
+			return false, fmt.Errorf("%s:%d: address class expects an IP address", r.filename, line)
+		}
+		switch expr.terms[1].text {
+		case "link-local":
+			return address.ip.IsLinkLocalUnicast(), nil
+		case "multicast":
+			return address.ip.IsMulticast(), nil
+		case "global-unicast":
+			return address.ip.IsGlobalUnicast(), nil
+		case "loopback":
+			return address.ip.IsLoopback(), nil
+		default:
+			return false, fmt.Errorf("%s:%d: unknown address class %q", r.filename, line, expr.terms[1].text)
+		}
+	}
+	return r.evaluateCommandCondition(expr, line)
+}
+
+func (r *runtime) evaluateCommandCondition(expr conditionExpr, line int) (bool, error) {
+	if r.plan {
+		return false, fmt.Errorf("%s:%d: --plan cannot evaluate command condition: %s", r.filename, line, expr.text)
+	}
+	err := r.run(expr.text, line, false)
+	if err == nil {
+		return true, nil
+	}
+	var exitErr *exec.ExitError
+	var status statusError
+	if (errors.As(err, &exitErr) && exitErr.ProcessState.Exited()) || errors.As(err, &status) {
+		return false, nil
+	}
+	return false, err
+}
+
+func fileExists(name string) (bool, error) {
+	_, err := os.Stat(name)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
