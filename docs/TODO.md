@@ -526,7 +526,17 @@ service scenarios use this path. A local nginx configuration backup was also
 exercised: the changed file was transferred, the repeat run was empty, and
 extra target files were not deleted.
 
-### Plan for the next few days
+The navigator is now paused. It remains a separate teaching companion for a
+first introduction to yesh, not a second language, configuration editor, or
+execution tool. Existing wizards explain the checks, parser result, plan, save
+path, and boundary of what was not proved. Do not add new branches, including
+`rsnapshot`, during the pause.
+
+The project version is stored in `internal/version/VERSION` and embedded in
+both binaries. The navigator and parser are built from the same source version;
+no adjacent `yesh` binary is required.
+
+### Deferred until navigator work resumes
 
 1. Finish manual TUI verification: keyboard navigation, scrolling, completion,
    save errors, short terminals, and terminal resize.

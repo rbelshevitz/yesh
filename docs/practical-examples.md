@@ -321,7 +321,7 @@ then checks DNS, the route, and the remote source directory before a dry run;
 staging directory and publishes it only after `rsync` succeeds. These checks do
 not establish that the remote files are correct or that the host is trusted:
 the operator must verify the host fingerprint and prepare `known_hosts` first.
-See [the SSH key section](syntax-guide.ru.md#ssh-ключи-для-источника-на-другом-узле)
+See [the SSH key section](syntax-guide.md#ssh-keys-for-a-remote-source)
 for that setup.
 
 [`network-service-preflight.yesh`](../examples/network-service-preflight.yesh)
