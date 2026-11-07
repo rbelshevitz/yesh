@@ -4,12 +4,13 @@ This is the short working map. It contains only the current milestone,
 verifiable tasks, and boundaries. Historical decisions and closed discussions
 are kept in the [archive](TODO-history.md).
 
-## Current focus: preparing `v0.3.0`
+## Current focus: after `v0.3.0`
 
 Releases `v0.2.1` and `v0.2.2` are published. The working tree now prepares
-`v0.3.0` as a stabilization milestone for the implemented Linux scenarios,
-documentation, and checks. No `v0.3.0` tag has been created. New language
-constructs remain out of scope. The working boundary is Linux/amd64.
+`v0.3.0` is prepared as a stabilization milestone for the implemented Linux
+scenarios, documentation, and checks; the tag has been pushed, and publication
+of the release still needs to be completed in GitHub. New language constructs
+remain out of scope. The working boundary is Linux/amd64.
 
 ### `v0.2.2` acceptance
 
@@ -378,7 +379,7 @@ of the new state model it introduces.
 
 ---
 
-## Separate future milestone: `yesh navigator`
+## Separate milestone: `yesh navigator`
 
 The navigator remains an experimental companion milestone. Before adding new
 screens, finish extracting it into a separate `yesh-navigator` executable. The
@@ -531,6 +532,11 @@ first introduction to yesh, not a second language, configuration editor, or
 execution tool. Existing wizards explain the checks, parser result, plan, save
 path, and boundary of what was not proved. Do not add new branches, including
 `rsnapshot`, during the pause.
+
+In `v0.3.0`, the navigator is a separate `yesh-navigator` binary, built only
+with the `navigator` tag. It uses the shared parser and plan output and is
+published beside the regular `yesh` binary. Further navigator development is
+paused until there is a separate decision about new scenarios.
 
 The project version is stored in `internal/version/VERSION` and embedded in
 both binaries. The navigator and parser are built from the same source version;
