@@ -9,7 +9,7 @@ yesh is readable Linux automation you can explain.
 > Make the checks, exact `argv`, order of operations, and failure boundary
 > visible before a small administrative script changes a real node.
 
-## The niche
+## What yesh is for
 
 yesh is for the awkward middle ground between a shell one-liner and a full
 automation system: one Linux node, one bounded operation, several things that
@@ -61,6 +61,8 @@ starting external commands or opening redirections. For a real scenario, start
 with the [static-release examples](docs/practical-examples.md#static-release-publication-with-openrc-and-systemd)
 or the [incremental rsync example](examples/rsync-incremental.yesh).
 
+## TUI assistant for first-time users
+
 If yesh is new to you, the separate TUI assistant offers a gentle first path
 through it. It leads from a task choice to a small form, explains the checks,
 shows the real script plan, and makes the saved file explicit. The assistant
@@ -75,22 +77,7 @@ Run it from a working tree:
 The assistant is built as a separate companion binary; the regular `yesh` binary
 does not depend on it.
 
-yesh is a language for bounded Linux operations where it is clear what will run,
-what will change, and how the result will be checked. Commands remain ordinary
-Linux commands, while the script makes its preconditions, order of operations,
-and failure boundary clear. yesh does not replace Bash or Ansible. It serves a
-different purpose: describing and running small Linux operations where mistakes
-can be costly. The plan is visible before execution and the result can be checked
-afterwards. For these scenarios, yesh is easier to read and review than an
-equivalent Bash script.
-
-yesh removes more than shell syntax noise. It makes recurring
-protective code visible and reusable: preflight checks, failure boundaries,
-argument inspection, locks, cleanup, planning, and result verification.
-The result is a small executable operation card: less repeated scaffolding,
-while the underlying Linux operations remain explicit.
-
-## What it is for
+## How yesh helps
 
 yesh targets small administrative scripts: backups, configuration publication,
 service checks, diagnostics, and individual CI/CD steps. It is not an interactive
