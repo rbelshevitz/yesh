@@ -5,8 +5,8 @@ configuration does not replace the working file, and an interrupted operation
 is not reported as successful. An exit code alone is not sufficient.
 
 All files in `examples/` are checked for parsing. The practical scenarios are
-exercised by `cmd/yesh/practical_posix_test.go` and
-`cmd/yesh/initrd_linux_test.go`. Tests use temporary directories, do not touch
+exercised by `internal/yeshcore/practical_posix_test.go` and
+`internal/yeshcore/initrd_linux_test.go`. Tests use temporary directories, do not touch
 production services, and do not require a real remote SSH host.
 
 ## How to read an example
@@ -269,8 +269,8 @@ truth for `retain`, `sync_first`, `no_create_root`, `lockfile`, backup points,
 
 `configtest` checks the configuration syntax and the referenced helper paths;
 it does not copy data, prove that the source is readable, prove that the
-destination is the intended mounted filesystem, or guarantee that a later
-transfer will succeed. yesh performs the mount and free-space checks around it,
+destination is the intended mounted filesystem, or prove that a later transfer
+will succeed. yesh performs the mount and free-space checks around it,
 while rsnapshot remains responsible for parsing and applying its own options.
 
 The visible order is:
@@ -425,7 +425,7 @@ bounded `/proc`.
 commands and stops after an inactive service. The fixtures verify argv, order,
 and that later commands do not run. This does not test a real systemd bus.
 
-The typed examples make the stronger guarantees explicit:
+The typed examples make the individual checks explicit:
 [service-status.yesh](../examples/service-status.yesh) reads a fixed property
 allowlist, [service-restart.yesh](../examples/service-restart.yesh) verifies
 the exact returned unit and `ActiveState` after restart,
