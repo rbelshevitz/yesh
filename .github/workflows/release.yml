@@ -45,7 +45,9 @@ jobs:
       - name: Run release checks
         run: |
           go test -trimpath ./...
+          go test -trimpath -tags navigator ./...
           go vet ./...
+          go vet -tags navigator ./...
 
       - name: Build and package
         shell: bash
@@ -61,10 +63,17 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" \
             go build -trimpath -ldflags "-X main.version=$GITHUB_REF_NAME" \
             -o "$stage/yesh" ./cmd/yesh
+          CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" \
+            go build -trimpath -tags navigator -ldflags "-X main.version=$GITHUB_REF_NAME" \
+            -o "$stage/yesh-navigator" ./cmd/yesh-navigator
           cp LICENSE README.md README.ru.md README.he.md "$stage/"
 
           if [[ "$GOARCH" == amd64 ]]; then
             [[ "$("$stage/yesh" --version)" == "yesh $GITHUB_REF_NAME" ]]
+            expected_navigator=$'yesh navigator  '"$GITHUB_REF_NAME"$'\nparser core     '"$GITHUB_REF_NAME"
+            [[ "$("$stage/yesh-navigator" --version)" == "$expected_navigator" ]]
+            [[ "$("$stage/yesh" -v)" == "yesh $GITHUB_REF_NAME" ]]
+            [[ "$("$stage/yesh-navigator" -v)" == "$expected_navigator" ]]
           fi
 
           tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$package.tar.gz" "$package"
@@ -116,7 +125,8 @@ jobs:
           - finite, read-only service and cgroup resource observation;
           - an explicit Bash comparison baseline for the incremental rsync case;
           - explicit `--plan`, locking, rerun, failure, and recovery scenarios;
-          - a Linux/amd64 binary, README files, and the MIT license.
+          - Linux/amd64 binaries `yesh` and `yesh-navigator`, README files, and
+            the MIT license.
 
           ## Scope
 

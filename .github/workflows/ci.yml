@@ -48,6 +48,9 @@ jobs:
       - name: Portable tests (Windows)
         if: runner.os == 'Windows'
         run: go test -trimpath ./...
+      - name: Navigator tests (Windows)
+        if: runner.os == 'Windows'
+        run: go test -trimpath -tags navigator ./...
       - name: Linux tests
         if: runner.os == 'Linux'
         run: go test -trimpath ./...
@@ -62,3 +65,5 @@ jobs:
         run: go test ./cmd/yesh -run '^$' -fuzz FuzzPipelinePreflight -fuzztime=10s -parallel=2
       - run: go vet ./...
       - run: go build -trimpath ./cmd/yesh
+      - name: Build navigator
+        run: go build -trimpath -tags navigator ./cmd/yesh-navigator

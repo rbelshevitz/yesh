@@ -58,7 +58,7 @@ func TestPOSIXCLIHelpAndVersion(t *testing.T) {
 			t.Fatalf("%v: %v\n%s", args, err, out)
 		}
 		text := string(out)
-		for _, want := range []string{fmt.Sprintf("yesh %s — Linux automation you can explain", Version()), "usage: yesh [flags] SCRIPT.yesh", "-version", "-plan"} {
+		for _, want := range []string{fmt.Sprintf("yesh %s — Linux automation you can explain", Version()), "usage: yesh [flags] SCRIPT.yesh", "-version", "-v", "-plan"} {
 			if !strings.Contains(text, want) {
 				t.Fatalf("%v: help does not contain %q: %s", args, want, text)
 			}
@@ -69,6 +69,13 @@ func TestPOSIXCLIHelpAndVersion(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != fmt.Sprintf("yesh %s\n", Version()) {
 		t.Fatalf("version: err=%v output=%q", err, out)
+	}
+	for _, flagName := range []string{"-v", "-version"} {
+		cmd := posixCLI(t, ctx, flagName)
+		out, err := cmd.CombinedOutput()
+		if err != nil || string(out) != fmt.Sprintf("yesh %s\n", Version()) {
+			t.Fatalf("version %s: err=%v output=%q", flagName, err, out)
+		}
 	}
 }
 

@@ -34,13 +34,14 @@ func RunCLI() int {
 	plan := flags.Bool("plan", false, "show commands without executing them")
 	diagnostic := flags.String("diagnostic", "text", "error diagnostic format: text or json")
 	showVersion := flags.Bool("version", false, "print version and exit")
+	showVersionShort := flags.Bool("v", false, "print version and exit")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
 		}
 		return 2
 	}
-	if *showVersion {
+	if *showVersion || *showVersionShort {
 		fmt.Fprintf(os.Stdout, "yesh %s\n", yeshversion.Version)
 		return 0
 	}

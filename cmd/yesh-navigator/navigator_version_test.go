@@ -24,8 +24,10 @@ func TestNavigatorVersionReportFormatting(t *testing.T) {
 func TestNavigatorVersionRequested(t *testing.T) {
 	old := os.Args
 	t.Cleanup(func() { os.Args = old })
-	os.Args = []string{"yesh-navigator", "--version"}
-	if !navigatorVersionRequested() {
-		t.Fatal("--version was not recognized")
+	for _, argument := range []string{"--version", "-v", "-version"} {
+		os.Args = []string{"yesh-navigator", argument}
+		if !navigatorVersionRequested() {
+			t.Fatalf("%s was not recognized", argument)
+		}
 	}
 }

@@ -25,7 +25,7 @@ func navigatorVersionReport() (string, error) {
 
 func navigatorVersionRequested() bool {
 	for _, argument := range os.Args[1:] {
-		if argument == "--version" {
+		if argument == "--version" || argument == "-v" || argument == "-version" {
 			return true
 		}
 	}
