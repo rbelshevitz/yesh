@@ -1,0 +1,49 @@
+# Read-only pre-publication check for one HTTPS service.
+# The chain is deliberately explicit: name -> route -> TLS/SNI -> HTTP.
+# yesh does not resolve names, open sockets, or interpret certificates itself;
+# the external Linux tools remain authoritative.
+#
+# Required environment:
+#   YESH_NET_HOST       DNS name and TLS SNI name
+#   YESH_NET_ADDRESS    one resolved address for `ip route get`
+#   YESH_NET_TLS_TARGET host:port value for `openssl -connect`
+#   YESH_NET_URL        HTTPS health URL
+#
+# Run with `--plan` first. It shows every external argv without making a
+# connection. A successful local check proves only this path at this moment.
+#
+# Role of yesh: keep the diagnostic chain, order, failure causes, and exit
+# codes visible. yesh does not become a DNS resolver, route inspector, TLS
+# library, or HTTP client; those external tools remain responsible for their
+# own results. No file, route, certificate, or service state is changed here.
+
+host = environment YESH_NET_HOST
+address = environment YESH_NET_ADDRESS
+tls_target = environment YESH_NET_TLS_TARGET
+url = environment YESH_NET_URL
+
+if getent ahosts $host:
+    echo "DNS check passed"
+else:
+    echo "DNS check failed"
+    exit 3
+
+if ip route get $address:
+    echo "route check passed"
+else:
+    echo "route check failed"
+    exit 4
+
+if openssl s_client -brief -verify_return_error -connect $tls_target -servername $host </dev/null:
+    echo "TLS check passed"
+else:
+    echo "TLS check failed"
+    exit 5
+
+if curl --fail --silent --show-error --head --connect-timeout 5 --max-time 10 $url:
+    echo "HTTP check passed"
+else:
+    echo "HTTP check failed"
+    exit 6
+
+echo "network preflight passed"

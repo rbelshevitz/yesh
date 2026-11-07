@@ -1,4 +1,4 @@
-.TH YESH 1 "2026-10-27" "yesh experimental" "User Commands"
+.TH YESH 1 "2026-11-07" "yesh experimental" "User Commands"
 .SH NAME
 yesh \- readable Linux automation with bounded process pipelines
 .SH SYNOPSIS
@@ -17,9 +17,9 @@ runtime values and filesystem state are checked only when the selected action ru
 .PP
 This implementation is experimental. Read the script and its external
 commands before granting access to privileged resources.
-The project is under active development; the safety measures documented in
-SAFETY.md are mandatory requirements and must be implemented before a stable
-release. yesh is not an operating-system isolation boundary for untrusted code.
+The project is under active development; the confirmed behavior and limits are
+documented in SAFETY.md. yesh is not an operating-system isolation boundary for
+untrusted code.
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -246,6 +246,11 @@ count, total RSS, available memory/task/CPU counters, OOM events, and a process
 table. It does not signal the service or change resource limits. Missing fields
 are reported as unavailable; the result is a point-in-time observation and
 requires Linux, systemd, and readable cgroup v2 state.
+.PP
+OpenRC support is experimental and Linux-only. `service status openrc UNIT`
+reads the finite `rc-status` report; resource observations and measurements may
+be incomplete when cgroup or process data is unavailable. Restart and bounded
+wait are not implemented for OpenRC.
 .SS Finite service measurement (Linux)
 .nf
 state_dir = "/tmp/yesh-api-state"

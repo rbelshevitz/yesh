@@ -33,6 +33,30 @@ filesystem.
 
 ## Completed practical evidence
 
+### Static release publication
+
+After `v0.2.2`, the project verified static release publication without adding
+new yesh syntax. Three examples cover nginx under OpenRC, lighttpd under OpenRC
+on Alpine, and nginx under systemd. The checked order is:
+
+```text
+prepared tree → required file → server configuration → lock
+→ publication → current switch → HTTP check
+```
+
+The Linux fixtures cover successful publication, an HTTP failure, rollback, a
+held lock, invalid server configuration, an existing temporary symlink, reruns,
+and interruption after `current` has switched. The latter establishes the
+boundary that ordinary rollback is compensating work, not a transaction.
+
+The later polish flattened deeply nested validation in the three local scripts
+without changing exit codes or lock release. After a failed HTTP check, each
+script restores the previous symlink first and then checks the restored release
+through the same URL. That second check observes the result; it does not decide
+whether restoration is attempted. `deploy-release-rwe.yesh` remains a separate
+teaching exercise with an unconditional rollback, rather than a health-check
+failure path.
+
 - archive and restore workflows with `tar`, `gzip`, and `pv`;
 - configuration validation, staging, same-filesystem publication, service
   restart with an active postcondition, bounded journal, and failure paths;
@@ -93,3 +117,21 @@ support is not claimed until a real ARM64 smoke test is completed.
 Older speculative designs, duplicated milestone lists, and completed
 intermediate checklists were removed from this archive when the short roadmap
 was compacted. The repository history remains the source for exact revisions.
+
+## Moved from the working roadmap after `v0.2.2`
+
+The detailed `v0.2.1` acceptance and stand matrix are closed and no longer
+occupy the current roadmap. Their results remain in the confirmed-evidence
+section and in Git.
+
+The architecture review did not add built-in network, container, or monitoring
+capabilities. The next practical candidates are configuration publication,
+pre-publication network checks, replacement of one container service, and
+finite Alpine/OpenRC diagnosis. They must first use existing external commands,
+explicit argv, locks, timeouts, `--plan`, and result checks. A new capability is
+allowed only if the same problem recurs in at least two independent scenarios.
+
+Second-tier candidates are a one-shot SQLite migration, rootless container
+volume preparation, initramfs structure checks, and log maintenance. A permanent
+daemon, node discovery, a distributed desired-state model, built-in DNS/TLS/HTTP/
+firewall, and Docker/Podman management remain outside the project boundary.

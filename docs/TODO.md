@@ -116,43 +116,6 @@ long-running-job resume, cgroup management, ARM64, or replacements for
 These results prove specific Linux/amd64 stands, not every OS, filesystem,
 network, service, or power-loss scenario.
 
-## `v0.2.1` acceptance
-
-Status: the current corpus is accepted against the confirmed Linux/amd64
-scenarios. Stand results do not claim universal support for every kernel,
-distribution, filesystem, or security policy.
-
-- [x] incremental `rsync` from a source on another node;
-- [x] a guarded `rsnapshot` interval;
-- [x] a finite service-resource snapshot;
-- [x] snapshot comparison with a break at service restart;
-- [x] configuration publication and service-state verification;
-- [x] separate file-log and journald maintenance.
-
-Before publishing the tag, repeat only the release checks:
-
-1. `go test ./...`;
-2. `go vet ./...` and a `-trimpath` build;
-3. green Linux and Windows CI;
-4. review the change list, README files, manuals, and release text.
-
-The acceptance was based on positive and negative cases, reruns, `--plan`,
-machine-readable reports, and checks that failures leave data unchanged.
-External commands remain visible: yesh does not hide their argv, exit codes, or
-responsibility for the network, permissions, and filesystem.
-
-### Stand matrix
-
-- local temporary stand without privilege: two `rsync` snapshots,
-  `--link-dest`, rerun, failure, lock, publication, and restore;
-- a real SSH node: transfer in both directions, read failure, and rerun;
-- a separate Linux loopback/ext4 stand with root: `rsnapshot`,
-  `no_create_root`, two rotations, hard links, restore, and an unmounted
-  destination.
-
-The root check is run manually on a separate node. yesh does not escalate
-privileges and does not present a local skip as proof of real SSH or mounting.
-
 ## Immediate tasks
 
 ### 1. Polish the backup boundary
@@ -322,9 +285,9 @@ or alerting system itself.
 🚫 Do not add a daemon, alerting system, `pkill`, `cgroup.kill`, limit writes, or
   automatic container ownership claims here.
 
-### 4. One container service on a small node
+### 4. A single container service on a small node
 
-This is not a new “container” niche. yesh's general niche is a finite,
+This is not a new container-management niche. yesh's general niche is a finite,
 verifiable operation on one Linux node where external tools already do the work
 but shell glue hides ordering, failure boundaries, and result checks. The
 container case is the next concrete example after static release publication.
@@ -345,8 +308,8 @@ transaction.
 
 - [ ] Debian or Alpine with two local containers from one small image;
 - [ ] nginx or lighttpd in front of two local ports;
-- [ ] rootless Podman and a separate Docker run, with the privilege boundary
-  documented;
+- [ ] a rootless Podman run and a separate Docker-daemon run, with the privilege
+  boundary documented;
 - [ ] success, failure before switching, failure after switching, held lock,
   rerun, stale temporary object, and `--plan`;
 - [ ] image admission by digest and a separate DNS/TLS/HTTP preflight;
@@ -372,10 +335,10 @@ before changing state:
    stopped containers when checking references, show deletion candidates in
    `--plan`, and make reruns safe. Do not begin with broad `prune`.
 
-Do not add a container runtime, OCI model, built-in DNS/TLS or firewall module,
-signature policy, Compose model, or Kubernetes API. If two independent stands
-do not expose the same ordering or proof problem, keep the solution in external
-commands.
+Do not add a container runtime, an OCI model, a built-in DNS/TLS or firewall
+module, a signature policy, a Compose model, or a Kubernetes API. If two
+independent stands do not reveal the same ordering or proof problem, keep the
+solution in external commands.
 
 ### 5. Polish tutorial and manuals
 
@@ -1059,9 +1022,63 @@ distinct from a missing driver, filesystem, image, or `/boot` space problem.
 ## Next working step
 
 Keep the backup boundary stable and use the completed `rsync`/`rsnapshot`
-examples as the acceptance reference. Do not add network capabilities or
-metrics yet; the next changes should be small documentation or test repairs
-against a real failure.
+examples as the acceptance reference. After the navigator pause, investigate
+practical core scenarios without extending the language, in this order:
+
+1. configuration publication with external validation, atomic publication,
+   service restart, and state/journal checks;
+2. a pre-publication network check: name → address → route → SSH/TLS → HTTP,
+   using explicit external commands;
+3. replacement of one container service through external Docker/Podman, with
+   image, HTTP, and compensating-return checks;
+4. finite service diagnosis on Alpine/OpenRC with partial `/proc`, cgroup, or
+   journal visibility.
+
+Second-tier candidates are a one-shot SQLite migration, rootless container-volume
+preparation, initramfs structure checks, and log maintenance around external
+`logrotate`/journald. For each scenario, first test whether current lists,
+conditions, locks, timeouts, explicit argv, `--plan`, and result checks suffice.
+Consider a new capability only after the same problem appears in at least two
+independent scenarios. Do not add built-in Docker/Podman, DNS, TLS, HTTP,
+firewall, namespace, node discovery, a distributed desired-state model, or a
+continuous agent.
+
+Every practical example needs positive and negative cases, a partial failure,
+a rerun, a no-change plan, and a clear boundary of what was proved. Do not turn
+“incomplete” or “unavailable” into zero or a guess.
+
+### Loop boundary
+
+`for name in $list:` already covers iteration over known services, hosts, and
+paths. Do not add a general `while`, ranges, `break`, `continue`, command-output
+capture, or built-in directory traversal yet: service waiting already has the
+finite `service wait` operation, while output and filesystem traversal belong
+to external `find`, `stat`, `rsync`, `getent`, and similar tools.
+
+The only candidate to reconsider is a bounded repeat such as
+`repeat 3 times every 2s`. It is allowed only after two independent scenarios
+show that a finite list plus an external command creates substantial
+unreadability. Its design must require a finite attempt count, visible delay,
+preservation of the last failure, and a `--plan` showing every potential
+attempt; hidden unbounded waiting is not acceptable.
+
+Use the same template for every example:
+
+- goal and why yesh makes the order of actions easier to explain;
+- visible external commands and expanded `argv`;
+- positive case;
+- failure before data changes;
+- partial failure after a change;
+- rerun and stale temporary objects;
+- `--plan` with no connections, writes, or external actions;
+- boundary of the proved behavior.
+
+Prepare configuration publication first: external validation, `publish`, service
+restart, and bounded state/journal checks. Then prepare the network chain with
+separate failure causes. Keep the container example to one replacement on one
+node, and Alpine/OpenRC to a finite report with explicit incomplete data. None
+of these examples should become a daemon, a built-in network client, or a
+container manager.
 
 ## Boundaries and documents
 

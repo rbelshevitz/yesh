@@ -67,6 +67,7 @@
 - `storage-preflight.yesh` — устройство, точка монтирования и тип файловой системы;
 - `storage-device-check.yesh` — устройство и его свойства;
 - `rsync-network-preflight.yesh` — DNS, маршрут, SSH и удалённый путь;
+- `network-service-preflight.yesh` — DNS, маршрут, TLS/SNI и HTTPS-проверка;
 - `rsync-safe-copy.yesh` — копирование с проверкой идентичности хранилища;
 - `backup.yesh` — создание и публикация архива после успешной команды;
 - `backup-with-progress.yesh` — архивирование через `tar`, `pv` и `gzip` с

@@ -40,6 +40,7 @@ partial files, and lock cleanup.
 | Release switching and unconditional rollback | [`deploy-release-rwe.yesh`](../examples/deploy-release-rwe.yesh) | missing source or incomplete staging |
 | Read-only incident report | [`incident-report-rwe.yesh`](../examples/incident-report-rwe.yesh) | unavailable service, journal, or diagnostic source |
 | Networked rsync snapshot | [`rsync-networked-incremental-rwe.yesh`](../examples/rsync-networked-incremental-rwe.yesh) | DNS, route, SSH, or remote-path failure |
+| HTTPS service preflight | [`network-service-preflight.yesh`](../examples/network-service-preflight.yesh) | DNS, route, TLS, or HTTP failure |
 | Selected-snapshot restore | [`rsync-selected-restore.yesh`](../examples/rsync-selected-restore.yesh) | symlink source or non-empty target |
 | rsnapshot with confirmation | [`rsnapshot-apply.yesh`](../examples/rsnapshot-apply.yesh) | missing confirmation or failed config test |
 | Scheduled backup | [`cron-backup-rwe.yesh`](../examples/cron-backup-rwe.yesh) | cancellation, timeout, or held lock |
@@ -322,6 +323,14 @@ not establish that the remote files are correct or that the host is trusted:
 the operator must verify the host fingerprint and prepare `known_hosts` first.
 See [the SSH key section](syntax-guide.ru.md#ssh-ключи-для-источника-на-другом-узле)
 for that setup.
+
+[`network-service-preflight.yesh`](../examples/network-service-preflight.yesh)
+is the broader read-only chain for a service that will be published or switched:
+it checks DNS, the route, TLS/SNI, and an HTTPS health response in separate
+steps. `getent`, `ip`, `openssl`, and `curl` remain visible external commands;
+yesh does not provide a DNS, TLS, or HTTP client. A failed later step does not
+turn earlier successes into an overall success, and an unavailable tool is a
+failed or unavailable check rather than proof that the network is healthy.
 
 ## Static release publication with OpenRC and systemd
 
