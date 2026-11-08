@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="yesh — readable Linux automation and preflight checks.">
+  <title>yesh — Linux automation you can explain</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#f4f0e7; --ink:#20211f; --quiet:#68645c; --line:#c8c0b3; --red:#a14337; --blue:#214d68; --code:#e9e3d8; --serif:Georgia,"Times New Roman",serif; --sans:Arial,Helvetica,sans-serif; --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--serif); }
+    a { color:var(--blue); text-decoration-thickness:1px; text-underline-offset:3px; }
+    a:hover { color:var(--red); }
+    .page { width:min(980px,calc(100% - 48px)); margin:0 auto; }
+    header { padding:17px 0 13px; border-bottom:1px solid var(--line); font-family:var(--sans); }
+    .masthead { display:flex; align-items:baseline; justify-content:space-between; gap:30px; }
+    .name { color:var(--ink); font:700 21px var(--mono); letter-spacing:-.08em; text-decoration:none; }
+    nav { display:flex; gap:20px; font-size:13px; }
+    nav a { color:var(--quiet); }
+    main { padding-bottom:80px; }
+    .intro { padding:34px 0 28px; border-bottom:1px solid var(--line); }
+    .kicker,.section-title { margin:0 0 17px; color:var(--red); font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+    h1 { max-width:800px; margin:0; font:500 clamp(48px,8vw,82px)/.98 var(--sans); letter-spacing:-.065em; }
+    .intro p { max-width:760px; margin:20px 0 0; color:#46453f; font-size:20px; line-height:1.4; }
+    .links { display:flex; flex-wrap:wrap; gap:18px; margin-top:20px; font:14px var(--sans); }
+    .code-wrap { margin:20px 0 0; border-top:3px solid var(--ink); }
+    .code-label { padding:10px 0; color:var(--quiet); font:12px var(--mono); }
+    pre { margin:0; overflow:auto; background:var(--code); padding:24px; color:#30332e; font:13px/1.75 var(--mono); }
+    .kw { color:var(--red); } .cmd { color:var(--blue); } .str { color:#6c6139; }
+    .plan { padding:15px 24px; border-top:1px solid var(--line); background:#ded7c9; color:#4c4a43; font:12px/1.6 var(--mono); }
+    .plan b { color:var(--red); font-weight:500; }
+    section { padding:28px 0; border-bottom:1px solid var(--line); }
+    .prose { max-width:860px; font-size:18px; line-height:1.48; }
+    .prose, .note, .intro p { text-wrap: pretty; }
+    .prose p { margin:0 0 12px; }
+    .prose p:last-child { margin-bottom:0; }
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:44px; }
+    h2 { margin:0 0 18px; font:500 35px/1.08 var(--sans); letter-spacing:-.045em; }
+    h3 { margin:0 0 8px; font:700 15px var(--sans); }
+    .note { color:var(--quiet); font-size:16px; line-height:1.5; }
+    .plain-list { margin:0; padding:0; list-style:none; border-top:1px solid var(--line); }
+    .plain-list li { padding:11px 0; border-bottom:1px solid var(--line); }
+    .plain-list strong { display:block; font:700 14px var(--sans); }
+    .plain-list span { display:block; margin-top:4px; color:var(--quiet); font-size:15px; line-height:1.45; }
+    blockquote { max-width:780px; margin:0; font-size:clamp(25px,4vw,40px); line-height:1.1; letter-spacing:-.045em; }
+    blockquote em { color:var(--red); font-style:normal; }
+    .compare { display:grid; grid-template-columns:1fr 1fr; gap:36px; }
+    .compare h3 { padding-bottom:11px; border-bottom:2px solid var(--line); }
+    .compare .yesh h3 { color:var(--blue); border-color:var(--blue); }
+    .compare pre { padding:18px 0 0; background:transparent; font-size:12px; }
+    footer { padding:18px 0 26px; border-top:1px solid var(--line); color:var(--quiet); font:13px var(--sans); }
+    footer .footer-row { display:flex; justify-content:space-between; gap:20px; }
+    /* Editorial documentation treatment */
+    :root { --bg:#fbfbfa; --ink:#101419; --quiet:#4e5962; --line:#dfe4e7; --red:#1769aa; --blue:#1769aa; --code:#11171c; --code-ink:#eaf0f3; --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif; --ui:"Rajdhani",ui-sans-serif,system-ui,sans-serif; --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace; }
+    body { background:var(--bg); color:var(--ink); font-family:var(--sans); }
+    a { color:var(--blue); text-underline-offset:4px; }
+    a:hover { color:#0c4c7e; }
+    .page { width:min(1160px,calc(100% - 48px)); }
+    header { padding:12px 0; border-bottom:1px solid var(--line); }
+    .masthead { align-items:center; }
+    .name { display:inline; color:var(--ink); font-family:var(--display); font-size:19px; font-weight:700; letter-spacing:-.06em; }
+    nav { gap:22px; font-family:var(--ui); font-size:15px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+    nav a { color:var(--quiet); text-decoration:none; }
+    nav a:hover { color:var(--ink); }
+    main { padding-bottom:44px; }
+    .intro { display:grid; grid-template-columns:minmax(0,1fr); gap:0; padding:46px 0 34px; border-bottom:1px solid var(--line); }
+    .kicker,.section-title { color:var(--blue); font-family:var(--ui); font-weight:700; letter-spacing:.12em; }
+    h1 { font-family:var(--sans); font-size:clamp(42px,6vw,76px); line-height:1; font-weight:600; letter-spacing:-.035em; }
+    .intro p { max-width:760px; margin-top:18px; color:#273139; font-size:18px; line-height:1.42; }
+    .intro .kicker { grid-column:1; }
+    .intro h1 { grid-column:1; }
+    .intro > p:not(.kicker) { grid-column:1; }
+    .intro .links { grid-column:1; }
+    .feature-link { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 16px; margin-top:18px; padding:12px 14px; border-left:3px solid var(--blue); background:#e8f2fa; color:#273a48; text-decoration:none; font-size:15px; }
+    .feature-link:hover { color:#0c4c7e; background:#dcecf7; }
+    .feature-link span { font-family:var(--ui); font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+    .feature-link strong { font-weight:600; }
+    .code-wrap { grid-column:1 / -1; margin-top:22px; overflow:hidden; border:1px solid #cbd4d9; border-top:1px solid #cbd4d9; border-radius:12px; background:var(--code); box-shadow:0 14px 30px rgba(22,36,44,.1); }
+    .code-label { padding:9px 15px; border-bottom:1px solid #2d3941; color:#9faeb7; }
+    pre { background:var(--code); color:var(--code-ink); padding:18px 20px; line-height:1.65; }
+    .kw { color:#8ec9f4; } .cmd { color:#f4c675; } .str { color:#a9d7b1; }
+    .plan { padding:10px 15px; border-top:1px solid #2d3941; background:#192229; color:#b7c3ca; }
+    .plan b { color:#f4c675; }
+    section { padding:30px 0; border-bottom:1px solid var(--line); }
+    .prose { max-width:820px; color:#20282e; font:17px/1.52 var(--sans); }
+    .split { grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr); gap:44px; }
+    h2 { font-family:var(--sans); font-size:clamp(28px,3.4vw,40px); line-height:1.08; font-weight:500; letter-spacing:-.02em; }
+    .note { color:#4e5962; font:16px/1.52 var(--sans); }
+    .plain-list { display:grid; gap:10px; border:0; }
+    .plain-list li { padding:13px 15px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+    .plain-list li span { margin-top:7px; color:#4e5962; font:15px/1.5 var(--sans); }
+    blockquote { max-width:920px; padding:22px 26px; border-left:4px solid var(--blue); background:#e8f2fa; color:#273a48; font-size:clamp(28px,4vw,47px); }
+    blockquote em { color:var(--blue); }
+    .compare { gap:18px; }
+    .compare > div { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    .compare h3 { margin:0; padding:12px 15px; border-bottom:1px solid var(--line); color:var(--quiet); font:11px var(--mono); letter-spacing:.06em; text-transform:uppercase; }
+    .compare pre { padding:16px; background:#f4f0e8; color:#29343a; font-size:12px; }
+    .compare .yesh { border-color:#9fc7e1; }
+    .compare .yesh h3 { color:var(--blue); background:#e8f2fa; }
+    .compare .yesh pre { background:#f1f7fb; }
+    footer { padding:22px 0 30px; }
+    @media (max-width:680px) { .page{width:min(100% - 32px,1160px)} .masthead{align-items:flex-start;flex-direction:column;gap:10px} nav{gap:14px} .intro{display:block;padding:36px 0 28px} .intro p{font-size:17px} .code-wrap{margin-top:22px} .split,.compare{grid-template-columns:1fr;gap:24px} section{padding:24px 0} blockquote{padding:18px 16px} footer .footer-row{flex-direction:column} }
+    /* DEV-inspired reading surface: article-first, light, and direct. */
+    body { background:#f5f5f5; color:#171717; }
+    .page { width:min(1080px,calc(100% - 40px)); }
+    header { margin-top:12px; padding:14px 18px; border:1px solid #e8e8e8; border-radius:10px; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,.04); }
+    .name { color:#171717; font-family:var(--display); font-size:22px; letter-spacing:-.04em; }
+    nav { font-family:var(--sans); font-size:13px; letter-spacing:0; text-transform:none; }
+    nav a { color:#575757; }
+    main { padding-bottom:36px; }
+    .intro { margin-top:18px; padding:42px 44px 38px; border:1px solid #e8e8e8; border-radius:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.035); }
+    .kicker,.section-title { color:#3b49df; font-family:var(--sans); font-size:12px; letter-spacing:.06em; }
+    h1 { max-width:850px; font-size:clamp(40px,6vw,68px); line-height:1.02; letter-spacing:-.045em; color:#171717; }
+    .intro p { max-width:790px; color:#3d3d3d; font-size:19px; line-height:1.5; }
+    .links { gap:10px; font-size:14px; }
+    .links a { padding:8px 12px; border:1px solid #d7d7d7; border-radius:7px; background:#fff; text-decoration:none; }
+    .links a:hover { border-color:#3b49df; background:#f4f5ff; }
+    .feature-link { border-left:0; border:1px solid #d6d9ff; border-radius:9px; background:#f4f5ff; color:#252525; }
+    .feature-link span { color:#3b49df; }
+    .code-wrap { margin-top:28px; border:1px solid #2b2b2b; border-radius:10px; box-shadow:none; }
+    section { margin-top:18px; padding:32px 36px; border:1px solid #e8e8e8; border-radius:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.025); }
+    .prose { color:#292929; font-size:18px; line-height:1.62; }
+    h2 { color:#171717; font-size:34px; }
+    .plain-list { gap:10px; }
+    .plain-list li { border:1px solid #e8e8e8; border-radius:9px; background:#fff; }
+    .plain-list li span { color:#575757; }
+    blockquote { border-left-color:#3b49df; border-radius:0 10px 10px 0; background:#f4f5ff; color:#252525; }
+    .compare > div { border-color:#e3e3e3; }
+    footer { margin-top:18px; padding:22px 4px 30px; border-top:0; }
+    .questions { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin:22px 0 0; padding:0; list-style:none; }
+    .questions li { min-height:92px; padding:14px; border:1px solid #e8e8e8; border-radius:9px; background:#fff; color:#303030; font-size:15px; line-height:1.35; }
+    .questions li::before { display:block; margin-bottom:8px; color:#3b49df; font:600 12px var(--mono); content:counter(question); counter-increment:question; }
+    .questions { counter-reset:question; }
+    @media (max-width:860px) { .questions{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:680px) { .page{width:min(100% - 24px,1080px)} header{margin-top:8px} .intro{padding:30px 22px 26px} section{padding:25px 22px} .questions{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header><div class="masthead"><a class="name" href="#top">yesh</a><nav aria-label="Site navigation"><a href="#questions">why</a><a href="#work">where it fits</a><a href="#notes">notes</a><a href="https://github.com/rbelshevitz/yesh">source</a></nav></div></header>
+    <main id="top">
+      <section class="intro">
+        <p class="kicker">A small language for Linux operations</p>
+        <h1>Linux automation you can explain.</h1>
+        <p>Small Linux automation scripts grow in a predictable way: validation, quoting, branching, file publication, service changes, and failure handling accumulate around a few familiar commands. yesh keeps that surrounding procedure visible, so you can review what it checks, changes, and leaves untouched before it runs.</p>
+        <div class="links"><a href="https://github.com/rbelshevitz/yesh#quick-start">quick start</a><a href="https://github.com/rbelshevitz/yesh/blob/main/docs/syntax-guide.md">syntax guide</a><a href="https://github.com/rbelshevitz/yesh/releases">releases</a></div>
+        <a class="feature-link" href="https://dev.to/rbelshevitz/why-i-built-yesh-linux-automation-you-can-explain-32cj"><span>Read the story</span><strong>Why I built yesh — Linux automation you can explain</strong><span>dev.to ↗</span></a>
+        <div class="code-wrap"><div class="code-label">config.yesh</div><pre><span class="kw">if</span> <span class="cmd">grep</span> -q <span class="str">'^mode=production$'</span> config.next:
+    <span class="cmd">install</span> -m 0640 -- config.next /etc/myapp.conf.next
+    <span class="kw">publish</span> /etc/myapp.conf.next to /etc/myapp.conf
+    <span class="kw">service</span> restart myapp.service until active within 10s</pre><div class="plan"><b>PLAN</b> validate → prepare → publish → restart → verify</div></div>
+      </section>
+      <section id="questions"><p class="section-title">The review standard</p><div class="prose"><p>Before running a small operational script, an operator should be able to answer five simple questions:</p></div><ol class="questions"><li>What does it check first?</li><li>What exact arguments reach each process?</li><li>Which files or services can change?</li><li>What happens if a command fails halfway through?</li><li>What remains unchanged?</li></ol></section>
+      <section id="about"><p class="section-title">About</p><div class="prose"><p>Bash is excellent for interactive work, short glue, and composing Unix programs. yesh is for the awkward middle: a script too important to hide behind shell tricks, but too close to the Linux command line to justify a larger framework.</p><p>Python and Ansible still solve different problems. yesh keeps the real Linux command visible and makes the procedure around it easier to inspect.</p></div></section>
+      <section id="plan"><p class="section-title">Before it runs</p><div class="prose"><p>Commands are executed directly, not rebuilt into a string for <code>sh -c</code>. The same parsed script can show the concrete work before anything starts:</p></div><div class="code-wrap"><div class="code-label">yesh --plan examples/service-restart.yesh</div><pre>PLAN [<span class="str">"grep"</span> <span class="str">"-q"</span> <span class="str">"^mode=production$"</span> <span class="str">"config.next"</span>]
+PLAN [<span class="str">"install"</span> <span class="str">"-m"</span> <span class="str">"0640"</span> <span class="str">"--"</span> <span class="str">"config.next"</span> <span class="str">"/etc/myapp.conf.next"</span>]
+PLAN publish <span class="str">"/etc/myapp.conf.next"</span> to <span class="str">"/etc/myapp.conf"</span></pre></div></section>
+      <section id="work"><p class="section-title">Current work</p><div class="split"><div><h2>Where yesh fits</h2><ul class="plain-list"><li><strong><a href="https://github.com/rbelshevitz/yesh/blob/main/docs/practical-examples.md">Backup and publication</a></strong><span>Coordinate rsync, storage checks, locking, publication, reruns, and recovery.</span></li><li><strong><a href="https://github.com/rbelshevitz/yesh/blob/main/docs/systemd.md">Service diagnosis</a></strong><span>Ask systemd or OpenRC for a bounded state, journal, process, or resource snapshot.</span></li><li><strong><a href="https://github.com/rbelshevitz/yesh/blob/main/docs/syntax-guide.md#ssh-keys-for-a-remote-source">Networked operations</a></strong><span>Keep SSH, SCP, rsync, DNS, routes, and remote paths visible as external tools.</span></li></ul></div><div><h2>What it is not</h2><p class="note">It is not a shell replacement, a fleet manager, an orchestrator, or a resident monitoring agent. It does not replace Ansible’s inventory, roles, desired state, or multi-host coordination. yesh is a clear operation for one node, or one understandable step inside a larger automation system.</p></div></div></section>
+      <section><blockquote>“What does it check? What command does it run? <em>What remains if it fails?</em>”</blockquote></section>
+      <section><p class="section-title">Bash comparison</p><div class="prose"><p>This is the same incremental backup procedure in both languages: check the snapshot root, refuse an existing destination, copy into a private directory with <code>rsync</code>, then publish the completed tree. The Bash version is a careful baseline, not a caricature.</p></div><div class="compare"><div><h3>examples/bash-rsync-incremental-baseline.sh</h3><pre>set -Eeuo pipefail
+IFS=$'\n\t'
+
+die() { printf 'error: %s\n' "$*" >&amp;2; exit 1; }
+trap cleanup EXIT
+
+[[ -d $root ]] || die "snapshot root is missing"
+[[ ! -e $current ]] || die "snapshot already exists"
+[[ ! -e $temporary ]] || die "temporary path already exists"
+
+exec 9&gt;"$lock" || die "cannot open lock"
+flock -n 9 || die "another backup holds the lock"
+mkdir -- "$temporary"
+
+rsync_args=(-a --fsync --delay-updates)
+[[ -e $previous ]] &amp;&amp; rsync_args+=(--link-dest="$previous")
+rsync "${rsync_args[@]}" -- "$source" "$temporary/"
+mv -- "$temporary" "$current"</pre></div><div class="yesh"><h3>examples/rsync-incremental.yesh</h3><pre>if exists "/backup":
+    if exists "/backup/snapshot.1":
+        echo "current snapshot already exists"
+        exit 3
+    else:
+        if exists "/backup/.snapshot.1.tmp":
+            echo "temporary snapshot already exists"
+            exit 4
+        else:
+            with lock "/run/lock/app-backup.lock":
+                if exists "/backup/snapshot.0":
+                    rsync -a --fsync --delay-updates --link-dest "/backup/snapshot.0" -- "/srv/app/" "/backup/.snapshot.1.tmp"
+                else:
+                    rsync -a --fsync --delay-updates -- "/srv/app/" "/backup/.snapshot.1.tmp"
+                publish "/backup/.snapshot.1.tmp" to "/backup/snapshot.1"</pre></div></div><p class="note" style="margin-top:16px">The difference is not that yesh replaces <code>rsync</code>. It makes the preconditions, lock, failure boundary, and publication step part of the readable procedure. <a href="https://github.com/rbelshevitz/yesh/blob/main/examples/bash-rsync-incremental-baseline.sh">Read the Bash baseline</a> · <a href="https://github.com/rbelshevitz/yesh/blob/main/examples/rsync-incremental.yesh">Read the yesh scenario</a> · <a href="https://github.com/rbelshevitz/yesh/blob/main/docs/quickstart.md#practical-scenario-logs">See the documentation</a></p></section>
+      <section id="notes"><p class="section-title">Small systems and notes</p><div class="prose"><p>Alpine is a useful reference case: a small image may have musl, BusyBox, and OpenRC rather than systemd, and a full Bash installation is not a safe assumption. A network operation may have only the SSH features it actually needs.</p><p>yesh is distributed as a small statically linked Go binary. That is a good fit for this kind of work: the operational image does not need a language runtime, a shell framework, or a package of hidden helpers. Put the binary beside the specific external tools the procedure requires, and its execution boundary stays easy to inspect.</p><p>For this environment yesh can be a separate static operational image. It does not restore a shell or become another init system. It coordinates one bounded operation with the external tools that are explicitly present.</p><p>Resource observation is deliberately finite. A scenario can identify the service and its supervisor, collect process and cgroup data, read a bounded part of the journal, and save a JSONL record for later comparison. A summary can show whether memory or process behaviour changed across those records.</p><p>This is useful for a diagnosis or a deployment check because the script leaves a small, inspectable account of what was observed. It is not a background collector: it does not poll forever, keep a central state store, or replace a monitoring system.</p><p><a href="https://github.com/rbelshevitz/yesh/blob/main/docs/underthehood/resource-constrained-os.md">resource-constrained systems</a> · <a href="https://github.com/rbelshevitz/yesh/blob/main/docs/underthehood/container-operations-findings.md">container operations</a> · <a href="https://github.com/rbelshevitz/yesh/blob/main/docs/underthehood/bash-corpus.md">an essay on bash’s problems</a></p></div></section>
+    </main>
+    <footer><div class="footer-row"><span>yesh — Linux automation you can explain.</span><span><a href="https://github.com/rbelshevitz/yesh">source on GitHub</a> · MIT License</span></div></footer>
+  </div>
+</body>
+</html>
